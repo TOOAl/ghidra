@@ -1,0 +1,61 @@
+# config/models.yaml — LLM 교체 슬롯
+# 여기 model 이름만 바꾸면 두뇌가 진화함. 코드는 그대로.
+
+# 기본값: 무료 로컬 모델 (완전 오프라인)
+default:
+  provider: ollama
+  model: qwen3:14b
+  base_url: http://localhost:11434/v1
+  api_key: ollama  # Ollama는 키 불필요, 더미값
+  temperature: 0.2
+  max_tokens: 8192
+
+# 프리셋 — 주석 해제해서 바로 사용
+presets:
+  # 로컬 무료 (Ollama 설치 필요: https://ollama.com)
+  local_qwen3:
+    provider: ollama
+    model: qwen3:14b
+  local_deepseek:
+    provider: ollama
+    model: deepseek-r1:14b
+  local_llama:
+    provider: ollama
+    model: llama3.1:8b
+
+  # 클라우드 무료 (OpenRouter 가입 후 무료 키 발급: https://openrouter.ai)
+  openrouter_qwen3_free:
+    provider: openrouter
+    model: qwen/qwen3-32b:free
+    base_url: https://openrouter.ai/api/v1
+    api_key_env: OPENROUTER_API_KEY
+
+  openrouter_deepseek_free:
+    provider: openrouter
+    model: deepseek/deepseek-r1:free
+    base_url: https://openrouter.ai/api/v1
+    api_key_env: OPENROUTER_API_KEY
+
+  # 초고속 무료 (Groq 가입: https://console.groq.com)
+  groq_llama:
+    provider: groq
+    model: llama-3.3-70b-versatile
+    base_url: https://api.groq.com/openai/v1
+    api_key_env: GROQ_API_KEY
+
+  # 유료 최상위 (원할 때만)
+  claude_sonnet:
+    provider: anthropic
+    model: claude-sonnet-4-20250514
+    api_key_env: ANTHROPIC_API_KEY
+
+  gpt_4o_mini:
+    provider: openai
+    model: gpt-4o-mini
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+
+# 사용법:
+# python run.py --preset local_qwen3 --binary ./sample --task "..."
+# python run.py --preset openrouter_qwen3_free --binary ./sample --task "..."
+# python run.py --provider ollama --model qwen3:32b --binary ./sample --task "..."

@@ -1,0 +1,84 @@
+[
+  {
+    "name": "list_functions",
+    "description": "프로그램 내 모든 함수 목록 반환. 이름, 주소, 크기 포함. 먼저 전체 구조 파악할 때 사용.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "filter": { "type": "string", "description": "이름 필터 (예: 'FUN_', 'main', 정규식)" },
+        "limit": { "type": "integer", "default": 50 }
+      }
+    }
+  },
+  {
+    "name": "decompile",
+    "description": "특정 함수를 C 의사코드로 디컴파일. 리버싱 핵심 도구.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "함수 이름 또는 주소" },
+        "include_xrefs": { "type": "boolean", "default": false }
+      },
+      "required": ["name"]
+    }
+  },
+  {
+    "name": "list_strings",
+    "description": "바이너리 내 문자열 검색. C2 주소, 키, URL 탐지.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "filter": { "type": "string" },
+        "limit": { "type": "integer", "default": 100 }
+      }
+    }
+  },
+  {
+    "name": "get_xrefs",
+    "description": "특정 함수/주소에 대한 교차 참조 (누가 호출하는지 / 무엇을 호출하는지)",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "direction": { "type": "string", "enum": ["to", "from", "both"], "default": "both" }
+      },
+      "required": ["name"]
+    }
+  },
+  {
+    "name": "rename_function",
+    "description": "함수 이름 변경. 분석 결과를 Ghidra DB에 반영. 의미있는 이름으로 복구할 때 사용.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "old_name": { "type": "string" },
+        "new_name": { "type": "string" }
+      },
+      "required": ["old_name", "new_name"]
+    }
+  },
+  {
+    "name": "set_comment",
+    "description": "함수/주소에 주석 추가. 취약점 근거, 분석 메모 기록.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "comment": { "type": "string" }
+      },
+      "required": ["name", "comment"]
+    }
+  },
+  {
+    "name": "search_memory",
+    "description": "과거 분석 기억에서 유사한 함수/버그 패턴 검색. RAG. 반드시 근거 찾을 때 사용.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "query": { "type": "string", "description": "검색할 내용 (예: 'C2 통신 함수')" },
+        "k": { "type": "integer", "default": 3 }
+      },
+      "required": ["query"]
+    }
+  }
+]

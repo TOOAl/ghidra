@@ -1,0 +1,32 @@
+# config/settings.yaml — 두뇌 설정
+ghidra:
+  install_dir_env: GHIDRA_INSTALL_DIR  # 환경변수에서 읽음
+  # install_dir: /opt/ghidra_12.1.4_PUBLIC  # 직접 지정 시 주석 해제
+  startup_timeout_ms: 120000
+
+rea:
+  enabled: true
+  mcp_transport: stdio  # stdio | http
+  # http_url: http://127.0.0.1:8080/mcp  # http 모드일 때
+
+memory:
+  vector_db: chroma
+  persist_dir: ./memory/chroma_db
+  embedding_provider: local  # local (sentence-transformers) | openai
+  embedding_model: all-MiniLM-L6-v2
+  max_results: 5
+
+agent:
+  max_turns: 20
+  planning: true          # 작업 전 계획을 세울지
+  memory_search: true     # 매 턴마다 기억 검색할지
+  auto_save: true         # 분석 후 자동 기억 저장
+  evidence_required: true # 모든 결론에 증거 요구
+
+evaluator:
+  enabled: true
+  rubric: # 100점 채점 기준
+    accuracy: 40          # 사실 정확도
+    evidence: 30          # 증거 충분성
+    completeness: 20      # 빠진 것 없는지
+    readability: 10       # 보고서 가독성

@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "ghidra": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/LaurieWired/GhidraMCP", "ghidra-mcp", "--ghidra-server", "http://127.0.0.1:8080/"],
+      "env": {}
+    },
+    "ghidra-headless": {
+      "command": "python3",
+      "args": ["ghidra_headless_mcp.py", "--ghidra-install-dir", "/path/to/ghidra"],
+      "cwd": "/path/to/ghidra-headless-mcp"
+    }
+  }
+}

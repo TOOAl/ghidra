@@ -1,0 +1,23 @@
+# GhidraClaudeCode-Brain — 무료 진화형 두뇌 의존성
+# 모두 무료/오픈소스. 유료는 선택.
+
+# LLM 어댑터 (모델 교체 슬롯)
+openai>=1.50.0          # Ollama, OpenRouter, Groq 모두 이걸로 호출
+anthropic>=0.40.0       # Claude 쓸 때만
+
+# 설정
+pyyaml>=6.0
+
+# 기억 (Memory) — 로컬 무료 Vector DB
+chromadb>=0.5.0
+sentence-transformers>=3.0.0
+
+# Ghidra / REA (Ghidra 설치 시 필요)
+# pyghidra>=3.3.0       # 주석 해제 시 활성화 (GHIDRA_INSTALL_DIR 필요)
+# mcp>=1.0.0            # REA MCP 클라이언트
+
+# 유틸
+requests>=2.31.0
+
+# Ghidra 플러그인 통신
+# (플러그인 jar는 Ghidra/Extensions/ 에 설치)

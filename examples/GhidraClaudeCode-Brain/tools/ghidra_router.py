@@ -1,0 +1,71 @@
+"""
+tools/ghidra_router.py — REA + Ghidra 플러그인 읽기/쓰기 라우터
+
+- 읽기 (REA Provider): list_functions, decompile, get_xrefs, list_strings
+  → REA가 이미 Ghidra로 분석한 결과를 MCP로 가져옴 (무료, 읽기전용)
+- 쓰기 (Ghidra Plugin): rename_function, set_comment
+  → 네가 만든 플러그인이 Ghidra DB에 직접 씀
+- 기억 (Memory): search_memory
+  → 로컬 Vector DB에서 유사 사례 검색
+
+이 라우터가 "읽기+쓰기+여러 포맷"을 하나로 합치는 접착제.
+"""
+import json
+from pathlib import Path
+
+class GhidraRouter:
+    def __init__(self, rea_client=None, ghidra_plugin_url=None, memory=None):
+        """
+        rea_client: REA MCP 클라이언트 (예: mcp.Client)
+        ghidra_plugin_url: 네 플러그인의 HTTP 엔드포인트 (예: http://127.0.0.1:8080)
+        memory: Memory 객체
+        """
+        self.rea = rea_client
+        self.plugin_url = ghidra_plugin_url
+        self.memory = memory
+
+    def dispatch(self, name: str, inp: dict) -> dict:
+        # 1. 기억 검색 — 로컬에서 처리
+        if name == "search_memory" and self.memory:
+            return self.memory.search(inp.get("query", ""), k=inp.get("k", 3))
+
+        # 2. 쓰기 — Ghidra 플러그인으로
+        if name in ("rename_function", "set_comment") and self.plugin_url:
+            return self._call_plugin(name, inp)
+
+        # 3. 읽기 — REA로
+        if self.rea:
+            try:
+                return self.rea.call_tool(name, inp)
+            except Exception as e:
+                return {"error": f"REA 호출 실패: {e}", "fallback": "mock"}
+
+        # 4. Mock (REA/Ghidra 없이도 데모 가능)
+        return self._mock(name, inp)
+
+    def _call_plugin(self, name: str, inp: dict) -> dict:
+        import requests
+        try:
+            resp = requests.post(f"{self.plugin_url}/{name}", json=inp, timeout=5)
+            return resp.json()
+        except Exception as e:
+            return {"error": f"Plugin 호출 실패: {e}", "input": inp}
+
+    def _mock(self, name: str, inp: dict) -> dict:
+        mocks = {
+            "list_functions": {"functions": [
+                {"name": "main", "addr": "0x401000", "size": 320},
+                {"name": "FUN_00401200", "addr": "0x401200", "size": 89},
+                {"name": "check_license", "addr": "0x401350", "size": 210},
+            ]},
+            "decompile": {"name": inp.get("name"), "c_code": f"// {inp.get('name')} 의사코드\nint {inp.get('name')}() {{ if (auth==0) return -1; }}"},
+            "list_strings": {"strings": ["http://c2.evil.com", "license check failed", "AES_KEY_1234"]},
+            "get_xrefs": {"to": ["main"], "from": ["strcmp", "send"]},
+            "rename_function": {"ok": True, "old": inp.get("old_name"), "new": inp.get("new_name")},
+            "set_comment": {"ok": True},
+            "search_memory": {"results": [
+                {"case": "2024-10 악성코드 A", "similarity": 0.91, "note": "동일한 C2 패턴"},
+                {"case": "2025-01 CVE-2024-1234", "similarity": 0.87, "note": "버퍼오버플로우 유사"},
+            ]},
+        }
+        return mocks.get(name, {"mock": True, "input": inp})

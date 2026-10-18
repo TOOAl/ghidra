@@ -78,5 +78,14 @@ class GhidraRouter:
                 {"case": "2024-10 악성코드 A", "similarity": 0.91, "note": "동일한 C2 패턴"},
                 {"case": "2025-01 CVE-2024-1234", "similarity": 0.87, "note": "버퍼오버플로우 유사"},
             ]},
+            "list_js_modules": {"asar": inp.get("asar_path", "app.asar"), "modules": ["editor/block.ts", "editor/toggle.ts", "sync/offline.ts", "sync/queue.ts", "database/query.ts", "database/rollup.ts", "notion/ipc.ts"]},
+            "get_js_source": {"module": inp.get("module"), "source": f"// {inp.get('module')} — Notion 패턴 (mock)\n// Block CRDT, sync queue, DB query 로직\n// 이 패턴을 notion/ 폴더 3기능으로 재구현\n"},
+            "list_ipc_channels": {"channels": ["notion:sync", "notion:db-query", "notion:block-update", "notion:offline-queue"]},
+            "list_dotnet_info": {"path": inp.get("path"), "assemblies": ["Notion.Desktop.dll"]},
+            "list_firmware_info": {"path": inp.get("path"), "regions": ["squashfs", "u-boot"]},
+            "get_website_structure": {"url": inp.get("url"), "title": "Notion — block-based workspace", "scripts": ["app.js"]},
+            "create_block": {"ok": True, "type": inp.get("type", "text"), "id": "blk_" + inp.get("content", "")[:8].replace(" ", "_")},
+            "query_database": {"filter": inp.get("filter"), "results": [{"task": "C2 분석", "model": "qwen/qwen3-32b:free", "date": "2026-10-18"}]},
+            "queue_sync": {"ok": True, "queued": inp.get("task"), "queue_len": 1},
         }
         return mocks.get(name, {"mock": True, "input": inp})

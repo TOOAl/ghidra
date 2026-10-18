@@ -126,5 +126,106 @@
       },
       "required": ["query"]
     }
+  },
+  {
+    "name": "list_js_modules",
+    "description": "Electron app.asar 내 JS 모듈 목록. Notion 분석용. REA JS 프로바이더.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "asar_path": { "type": "string", "description": "app.asar 경로 (예: /Applications/Notion.app/Contents/Resources/app.asar)" },
+        "filter": { "type": "string", "description": "필터 (예: 'editor', 'sync')" }
+      }
+    }
+  },
+  {
+    "name": "get_js_source",
+    "description": "JS 모듈 소스 읽기. 블록/동기화/DB 패턴 흡수용.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "module": { "type": "string", "description": "모듈 경로 (예: 'editor/block.ts')" },
+        "limit": { "type": "integer", "default": 2000 }
+      },
+      "required": ["module"]
+    }
+  },
+  {
+    "name": "list_ipc_channels",
+    "description": "Electron IPC 채널 목록. 메인↔렌더러 통신 파악.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "filter": { "type": "string" }
+      }
+    }
+  },
+  {
+    "name": "list_dotnet_info",
+    "description": ".NET 어셈블리 메타데이터. REA .NET 프로바이더.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string" }
+      }
+    }
+  },
+  {
+    "name": "list_firmware_info",
+    "description": "펌웨어 region/artifact 목록. Binwalk/Unblob 기반.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string" }
+      }
+    }
+  },
+  {
+    "name": "get_website_structure",
+    "description": "웹사이트 구조/스크립트/네트워크 관찰. REA browser 프로바이더.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "url": { "type": "string", "description": "URL (예: https://notion.so)" }
+      },
+      "required": ["url"]
+    }
+  },
+  {
+    "name": "create_block",
+    "description": "Notion 블록 생성 — 분석 보고서를 블록 단위로 저장. 흡수 기능.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["text", "code", "toggle", "callout"], "default": "text" },
+        "content": { "type": "string", "description": "블록 내용" },
+        "parent": { "type": "string", "description": "부모 블록 ID (옵션)" }
+      },
+      "required": ["content"]
+    }
+  },
+  {
+    "name": "query_database",
+    "description": "Notion DB처럼 session/memory 조회. 필터/정렬/롤업.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "filter": { "type": "string", "description": "예: 'model:qwen' 또는 'tool:decompile'" },
+        "sort": { "type": "string", "enum": ["recent", "oldest"], "default": "recent" },
+        "limit": { "type": "integer", "default": 10 }
+      }
+    }
+  },
+  {
+    "name": "queue_sync",
+    "description": "오프라인 큐에 작업 추가. 외부 LLM 오프라인 시 사용, 온라인 시 재시도.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "task": { "type": "string" },
+        "binary": { "type": "string" }
+      },
+      "required": ["task"]
+    }
   }
 ]

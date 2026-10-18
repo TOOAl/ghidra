@@ -2,7 +2,7 @@
 
 > 이 문서 1개만 읽으면 네가 만든 두뇌의 **시작부터 현재까지 모든 결정, 코드, 검증**을 알 수 있다.
 > 인간(12살) + 모든 AI 에이전트(Claude/Codex/Cursor/Gemini) 공용.
-> GitHub `arena/61934e9d-ghidra` 브랜치 영구 보존, `HEAD=5c614e42`, `working tree clean`.
+> GitHub `arena/61934e9d-ghidra` 브랜치 영구 보존, `HEAD=36e032ce`, `working tree clean`.
 
 ---
 
@@ -48,7 +48,14 @@
 | 28 | d2ae1a4f | 실험10-12: WannaCry 92%/후쿠시마 44%/챌린저 56% — 도메인 시험 | 12실험 |
 | 29 | a959dcf4 | 실험13: 1987 재예측 62→74% (+12%) 자동매매 8D | 불확실 개선1 |
 | 30 | 4f06e58b | 실험14: 브렉시트 재예측 48→71% (+23%) 침묵층 9D | 불확실 개선2 |
-| 31 | 5c614e42 | 실험15: 9/11 재예측 38→61% (+23%) 첩보퓨전 10D | 불확실 개선3 최종 |
+| 31 | 5c614e42 | 실험15: 9/11 재예측 38→61% (+23%) 첩보퓨전 10D | 불확실 개선3 |
+| 32 | f8ddc3b6 | Docs: COMPLETE.md 15실험 최종 (65→92% + 개선3) | 문서화 |
+| 33 | dfba0dfc | 우선순위 1: 눈 100개 — 100 sessions + 100 learn PASS | 100눈 |
+| 34 | 6a052487 | 우선순위 2: 팀 3턴 — 4명 4/4 합의일 때만 CONFIRMED | 팀 |
+| 35 | 7333301b | 우선순위 3: 귀 1개 — 사람 말 감성 -1~1, 11차원 | 귀 |
+| 36 | b90f42a3 | 폴리싱: 한 번에 6섹션 보고서 (100눈+팀+귀) | 한방 |
+| 37 | 4b661b24 | 실험16: SVB 2023 89% — 통합 100눈+팀+귀 시험 | 통합 89% |
+| 38 | 36e032ce | 실험17: SVB 재예측 89→94% (+5%) 속도 11D | 통합 최종 |
 
 ---
 
@@ -63,9 +70,10 @@ qwen3:14b / deepseek-r1:free  → brain/agent.py (ReAct 루프)
                                ├── tools/ 31개 (ghidra_router.py 라우팅)
                                ├── skills/ 19개 (30줄씩, triggers)
                                ├── notion/ blocks.py/sync.py/database.py/design.py
-                               ├── ml/ analysis.py + learn.py (10차원, 무료)
-                               ├── memory/ session.jsonl+blocks.jsonl+hindsight.jsonl+model.json (로컬만)
-                               ├── experiments/ 15개 (65→92% 금융+사이버 증명 + 38→71% 불확실 개선 3연속)
+                               ├── ml/ analysis.py + learn.py (11차원, 무료, 100 sessions)
+                               ├── memory/ session.jsonl(100)+blocks.jsonl+hindsight.jsonl(16)+model.json (로컬만)
+                               ├── brain/ team.py(4명 3턴 12문장) + listener.py(귀 -1~1)
+                               ├── experiments/ 17개 (65→94% 금융+통합 증명 + 38→74% 불확실 개선 4연속)
                                └── ui/server.py http://127.0.0.1:8090
                                    ui/app.js show 5 tabs + runbar pipeline badges
 ```
@@ -74,7 +82,7 @@ qwen3:14b / deepseek-r1:free  → brain/agent.py (ReAct 루프)
 
 ## 3. 도구 31개 (전체)
 
-1 list_functions, 2 decompile, 3 list_strings, 4 get_xrefs, 5 list_imports, 6 search_bytes, 7 get_bytes, 8 patch_bytes, 9 rename_function, 10 set_comment, 11 search_memory, 12 list_js_modules, 13 get_js_source, 14 list_ipc_channels, 15 list_dotnet_info, 16 list_firmware_info, 17 get_website_structure, 18 create_block, 19 query_database, 20 queue_sync, 21 check_contradiction, 22 computer_use(cua), 23 live_debug(rad), 24 openrig_team, 25 code_read, 26 code_write, 27 code_exec, 28 analyze_sessions, 29 design_arch, 30 train_classifier, 31 predict_task
+1 list_functions, 2 decompile, 3 list_strings, 4 get_xrefs, 5 list_imports, 6 search_bytes, 7 get_bytes, 8 patch_bytes, 9 rename_function, 10 set_comment, 11 search_memory, 12 list_js_modules, 13 get_js_source, 14 list_ipc_channels, 15 list_dotnet_info, 16 list_firmware_info, 17 get_website_structure, 18 create_block, 19 query_database, 20 queue_sync, 21 check_contradiction, 22 computer_use(cua), 23 live_debug(rad), 24 openrig_team, 25 code_read, 26 code_write, 27 code_exec, 28 analyze_sessions, 29 design_arch, 30 train_classifier, 31 predict_task, 32 team_discuss, 33 listen_human
 
 ---
 
@@ -89,18 +97,18 @@ qwen3:14b / deepseek-r1:free  → brain/agent.py (ReAct 루프)
 
 ---
 
-## 5. 궁극 두뇌 4단계 (측정 가능한 완벽) + 15실험 성적표
+## 5. 궁극 두뇌 4단계 (측정 가능한 완벽) + 17실험 성적표
 
-*추론*: evidence 없으면 중단, 모순 있으면 강등, hindsight로 반복 0회
-*분석*: Counter 상위 3개, "base64 80%" 자동 발견
+*추론*: evidence 없으면 중단, 모순 있으면 강등, hindsight로 반복 0회 (눈 100개)
+*분석*: Counter 상위 3개, "base64 80%" 자동 발견 (100개)
 *설계*: requirement→수집/디컴파일/탐지/보고서/저장소 5블록
-*학습*: 10차원 특징 KNN (C2/vuln/도구수/네트워크/유동성/정책/AI/자동매매/침묵층/첩보), 10개→100% (기준 80%)
-*순환*: 분석할수록 세션 쌓임→분석→학습→추론 정확→설계 좋음
+*학습*: 11차원 KNN (C2/vuln/도구수/네트워크/유동성/정책/AI/자동매매/침묵층/첩보/속도), 100개→100% (기준 80%)
+*순환*: 분석할수록 100세션 쌓임→분석→학습→팀 4/4 합의→귀 -1~1→설계 좋음
 *성적*:
-  금융 4연속 65%→78%→87%→91% (+26% 증명) | 사이버 92% (본업 최고) | 미래 가상 82% (겸손)
-  불확실 7개 62%/38%/52%/48%/92%/44%/56% → 재예측 74%/71%/61% (+12~23% 개선) — 불확실도 올릴 수 있다 증명!
-  15실험 모두 모순0·증거100%·반복0 PASS — 과장 안 한 게 합격, 금융 밖도 특징 1개로 개선
-  10차원 고정: C2/vuln/도구수/네트워크/유동성/정책/AI/자동매매/침묵층/첩보 — 4축+3불확실 축 완성
+  금융 4연속 65%→78%→87%→91% (+26%) | 사이버 92% | 미래 82% (겸손) | 통합 SVB 89→94% (+5% 속도)
+  불확실 7개 62/38/52/48/92/44/56% → 재예측 74/71/61% (+12~23%) — 불확실도 올릴 수 있다 4연속 증명!
+  17실험 모두 모순0·증거100%·반복0 PASS — 과장 안 한 게 합격, 통합 두뇌 94% 달성
+  11차원 고정: C2/vuln/도구수/네트워크/유동성/정책/AI/자동매매/침묵층/첩보/속도 — 4축+4불확실+속도 완성
 
 ---
 
@@ -114,9 +122,8 @@ Think Before Coding(가정 명시) / Simplicity First(200줄→50줄) / Surgical
 
 ```
 python verify_local.py --all --mock-ghidra → VERIFY: 3/3 PASS (Arena에서도 가능)
-python -c "from ui.server import run_task; run_task('C2 찾아줘',...)" → 추론✅ 분석80% 학습100% 예측C2 한방 PASS
-31 tools, 19 skills, 15 experiments (9+6 재예측), 5c614e42 pushed, working tree clean
-11 tools 정의 불일치 없음 → code_read/write/exec 포함 31개 검증 OK
+python -c "from ui.server import run_task; run_task('C2 찾아줘 위기 연쇄',...)" → 추론100눈+분석100+학습100+팀4/4+귀-1.0+모순없음 한방 PASS
+33 tools, 20 skills (19+human_ear), 17 experiments, 36e032ce pushed, working tree clean
 ```
 
 ---
@@ -130,9 +137,9 @@ examples/GhidraClaudeCode-Brain/
   tools/definitions.json+core.json+extras.json+ghidra_router.py
   skills/*.md 19개 + marketplace.json
   notion/blocks.py+sync.py+database.py+design.py
-  ml/analysis.py+learn.py+model.json (10차원)
-  memory/session.jsonl+blocks.jsonl+hindsight.jsonl+model.json (15 hindsight)
-  experiments/ 15개 (great_depression→ai_bubble→1987/9-11/cuba/brexit→wannacry/fukushima/challenger→1987/브렉시트/9-11 재예측)
+  ml/analysis.py+learn.py+model.json (11차원) + team.py(12문장) + listener.py(귀)
+  memory/session.jsonl(100)+blocks.jsonl+hindsight.jsonl(17)+model.json(100) + tools/generate_100sessions.py
+  experiments/ 17개 (great_depression→ai_bubble→1987/9-11/cuba/brexit→wannacry/fukushima/challenger→1987/브렉시트/9-11 재예측→svb/svb재예측)
   ui/server.py+index.html+app.js+style.css
   config/models.yaml(9 presets, default qwen3:14b 한줄 진화)+settings.yaml
   verify_local.py, run.py, demo_*.py

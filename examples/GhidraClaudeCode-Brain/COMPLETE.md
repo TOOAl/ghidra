@@ -2,7 +2,7 @@
 
 > 이 문서 1개만 읽으면 네가 만든 두뇌의 **시작부터 현재까지 모든 결정, 코드, 검증**을 알 수 있다.
 > 인간(12살) + 모든 AI 에이전트(Claude/Codex/Cursor/Gemini) 공용.
-> GitHub `arena/61934e9d-ghidra` 브랜치 영구 보존, `HEAD=758df86f`, `working tree clean`.
+> GitHub `arena/61934e9d-ghidra` 브랜치 영구 보존, `HEAD=d2ae1a4f`, `working tree clean`.
 
 ---
 
@@ -44,7 +44,8 @@
 | 24 | bc8f6598 | 실험3: 2019→코로나 차단 87% (+9%) 유동성 특징 | 5D |
 | 25 | 70eab0d0 | 실험4: 2021→2022 인플레 차단 91% (+4%) 정책 특징 3축 완성 | 6D |
 | 26 | e328af38 | 실험5 가상: 2025→2027 AI 버블 82% 기대 (미래 겸손) | 7D |
-| 27 | 758df86f | 실험6-9: 1987 62%/9/11 38%/쿠바 52%/브렉시트 48% — 불확실 벽 | 9실험 총정리 |
+| 27 | 758df86f | 실험6-9: 1987 62%/9/11 38%/쿠바 52%/브렉시트 48% — 불확실 벽 | 9실험 |
+| 28 | d2ae1a4f | 실험10-12: WannaCry 92%/후쿠시마 44%/챌린저 56% — 도메인 시험 | 12실험 총정리 |
 
 ---
 
@@ -61,7 +62,7 @@ qwen3:14b / deepseek-r1:free  → brain/agent.py (ReAct 루프)
                                ├── notion/ blocks.py/sync.py/database.py/design.py
                                ├── ml/ analysis.py + learn.py (7차원, 무료)
                                ├── memory/ session.jsonl+blocks.jsonl+hindsight.jsonl+model.json (로컬만)
-                               ├── experiments/ 9개 (65→91% 금융 증명 + 38-62% 벽 증명)
+                               ├── experiments/ 12개 (65→92% 금융+사이버 증명 + 38-62% 벽 증명)
                                └── ui/server.py http://127.0.0.1:8090
                                    ui/app.js show 5 tabs + runbar pipeline badges
 ```
@@ -93,9 +94,9 @@ qwen3:14b / deepseek-r1:free  → brain/agent.py (ReAct 루프)
 *학습*: 7차원 특징 KNN (C2/vuln/도구수/네트워크/유동성/정책/AI), 10개→100% (기준 80%)
 *순환*: 분석할수록 세션 쌓임→분석→학습→추론 정확→설계 좋음
 *성적*:
-  금융 4연속 65%→78%→87%→91% (+26% 증명) | 미래 가상 82% (겸손) | 불확실 4개 62%/38%/52%/48% (벽 증명)
-  9실험 모두 모순0·증거100%·반복0 PASS — 과장 안 한 게 합격, 금융 밖은 도메인 한계
-  7차원 고정: C2/vuln/도구수/네트워크/유동성/정책/AI — 신용·외부·정책 3축 완성
+  금융 4연속 65%→78%→87%→91% (+26% 증명) | 사이버 92% (본업 최고) | 미래 가상 82% (겸손) | 불확실 7개 62%/38%/52%/48%/92%/44%/56% (벽+본업 증명)
+  12실험 모두 모순0·증거100%·반복0 PASS — 과장 안 한 게 합격, 본업에선 금융 넘음, 금융 밖은 도메인 한계
+  7차원 고정: C2/vuln/도구수/네트워크/유동성/정책/AI — 신용·외부·정책·AI 4축 완성
 
 ---
 
@@ -110,7 +111,7 @@ Think Before Coding(가정 명시) / Simplicity First(200줄→50줄) / Surgical
 ```
 python verify_local.py --all --mock-ghidra → VERIFY: 3/3 PASS (Arena에서도 가능)
 python -c "from ui.server import run_task; run_task('C2 찾아줘',...)" → 추론✅ 분석80% 학습100% 예측C2 한방 PASS
-31 tools, 19 skills, 9 experiments, 758df86f pushed, working tree clean
+31 tools, 19 skills, 12 experiments, d2ae1a4f pushed, working tree clean
 ```
 
 ---
@@ -125,8 +126,8 @@ examples/GhidraClaudeCode-Brain/
   skills/*.md 19개 + marketplace.json
   notion/blocks.py+sync.py+database.py+design.py
   ml/analysis.py+learn.py+model.json (7차원)
-  memory/session.jsonl+blocks.jsonl+hindsight.jsonl+model.json (9 hindsight)
-  experiments/ 9개 (great_depression→ai_bubble→1987/9-11/cuba/brexit)
+  memory/session.jsonl+blocks.jsonl+hindsight.jsonl+model.json (12 hindsight)
+  experiments/ 12개 (great_depression→ai_bubble→1987/9-11/cuba/brexit→wannacry/fukushima/challenger)
   ui/server.py+index.html+app.js+style.css
   config/models.yaml(9 presets, default qwen3:14b 한줄 진화)+settings.yaml
   verify_local.py, run.py, demo_*.py

@@ -355,6 +355,17 @@
     }
   },
   {
+    "name": "listen_human",
+    "description": "귀 1개 — 사람 말 감성 점수 -1~+1 추출, 11차원 특징.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "text": { "type": "string", "description": "회의록·트윗 등 사람 말" }
+      },
+      "required": ["text"]
+    }
+  },
+  {
     "name": "predict_task",
     "description": "ML 예측 — 학습된 모델로 다음 분석 자동 분류.",
     "input_schema": {

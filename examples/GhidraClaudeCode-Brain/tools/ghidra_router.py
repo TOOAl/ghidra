@@ -123,6 +123,12 @@ class GhidraRouter:
             "code_exec": {"cmd": inp.get("cmd"), "ok": True, "output": "mock exec ok"},
         }
         # 실제 로컬 동작 — mock 전에 진짜 시도 (Arena 샌드박스=실제 파일)
+        if name == "listen_human":
+            try:
+                from brain.listener import listen
+                return listen(inp.get("text",""))
+            except Exception as e:
+                return {"error": str(e)}
         if name == "team_discuss":
             try:
                 from brain.team import discuss

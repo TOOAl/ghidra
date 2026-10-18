@@ -320,5 +320,16 @@
         "limit": { "type": "integer", "default": 20 }
       }
     }
+  },
+  {
+    "name": "design_arch",
+    "description": "ML 설계 — 요구사항 한 줄을 5블록 아키텍처로 그리기.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "requirement": { "type": "string", "description": "예: 악성코드 분석기 만들어줘" }
+      },
+      "required": ["requirement"]
+    }
   }
 ]

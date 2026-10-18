@@ -11,13 +11,14 @@ from typing import Optional
 
 @dataclass
 class ModelConfig:
-    provider: str       # ollama | openrouter | groq | openai | anthropic
+    provider: str       # ollama | openrouter | groq | openai | anthropic | openai_compatible
     model: str
     base_url: Optional[str] = None
     api_key: Optional[str] = None
     api_key_env: Optional[str] = None
     temperature: float = 0.2
     max_tokens: int = 8192
+    note: Optional[str] = None  # 설명용, 무시됨
 
     def resolved_api_key(self) -> str:
         if self.api_key:
@@ -27,6 +28,9 @@ class ModelConfig:
         # Ollama는 키 불필요
         if self.provider == "ollama":
             return "ollama"
+        # openai_compatible 범용 — 환경변수 없으면 빈 문자열 (일부 무료 엔드포인트는 키 불필요)
+        if self.provider == "openai_compatible":
+            return os.getenv(self.api_key_env or "", "") if self.api_key_env else ""
         return ""
 
 class ModelAdapter:
@@ -73,7 +77,10 @@ class ModelAdapter:
         """
         if self.config.provider == "anthropic":
             return self._chat_anthropic(system, messages, tools)
+        elif self.config.provider in ("openai", "ollama", "openrouter", "groq", "openai_compatible"):
+            return self._chat_openai_compatible(system, messages, tools)
         else:
+            # 알 수 없는 provider도 OpenAI 호환으로 시도 (미래 LLM 대비)
             return self._chat_openai_compatible(system, messages, tools)
 
     def _chat_openai_compatible(self, system: str, messages: list, tools: list = None) -> dict:

@@ -72,6 +72,33 @@
                     └──────────────────────┘
 ```
 
+## 하이브리드 변형 — 외부 LLM(무료) + 로컬 두뇌 (NEW)
+
+네가 원하는 방식이 바로 이거야:
+
+*   **외부 (무료)**: Arena / OpenRouter Free / Groq Free — 생각만 빌림
+*   **로컬 (내 PC)**: 도구(Ghidra+REA) + 기억(ChromaDB) + 스킬 — 영구 저장
+
+```
+외부 LLM (Arena 등, 무료)  ──API──▶  로컬 Brain (agent.py가 루프 운전)
+                              ◀──      → Ghidra 실행 (로컬)
+                                       → memory/chroma_db 저장 (로컬)
+                                       → skills/*.md 학습 (로컬)
+```
+
+바이너리 원본은 절대 외부로 안 나가고, 의사코드 조각만 질문으로 나감. 
+자세한 건 `ARCHITECTURE_HYBRID.md` 참고.
+
+```bash
+# Arena처럼 외부 무료 LLM 쓰는 예
+export ARENA_API_KEY=...
+python run.py --binary ./sample --task "C2 찾아줘" --preset arena_free
+
+# OpenRouter 무료 모델로 쓰는 예
+export OPENROUTER_API_KEY=sk-or-...
+python run.py --binary ./sample --task "취약점 찾아줘" --preset openrouter_free_generic
+```
+
 ## 폴더 구조
 
 ```

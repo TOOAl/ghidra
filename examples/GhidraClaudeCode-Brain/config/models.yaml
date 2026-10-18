@@ -43,6 +43,33 @@ presets:
     base_url: https://api.groq.com/openai/v1
     api_key_env: GROQ_API_KEY
 
+  # 하이브리드: 외부 무료 LLM + 로컬 두뇌 (네가 원하는 변형)
+  # 패턴: 로컬에서 루프를 돌고, 생각만 외부에 물어봄. 도구/기억/스킬은 로컬에 저장.
+  arena_free:
+    provider: openai_compatible
+    model: arena-model  # Arena에서 제공하는 모델명으로 교체 (예: qwen3-32b, claude-sonnet 등)
+    base_url: https://api.arena.ai/v1  # Arena OpenAI 호환 엔드포인트로 교체
+    api_key_env: ARENA_API_KEY
+    note: "외부 LLM은 무료 추론, 로컬에 도구+기억+스킬 저장 — 바이너리 원본은 외부로 안 나감"
+
+  openrouter_free_generic:
+    provider: openai_compatible
+    model: qwen/qwen3-32b:free
+    base_url: https://openrouter.ai/api/v1
+    api_key_env: OPENROUTER_API_KEY
+
+  groq_free_generic:
+    provider: openai_compatible
+    model: llama-3.3-70b-versatile
+    base_url: https://api.groq.com/openai/v1
+    api_key_env: GROQ_API_KEY
+
+  huggingface_free:
+    provider: openai_compatible
+    model: Qwen/Qwen2.5-Coder-32B-Instruct
+    base_url: https://api-inference.huggingface.co/v1
+    api_key_env: HF_TOKEN
+
   # 유료 최상위 (원할 때만)
   claude_sonnet:
     provider: anthropic

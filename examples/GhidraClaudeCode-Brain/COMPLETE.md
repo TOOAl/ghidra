@@ -2,7 +2,7 @@
 
 > 이 문서 1개만 읽으면 네가 만든 두뇌의 **시작부터 현재까지 모든 결정, 코드, 검증**을 알 수 있다.
 > 인간(12살) + 모든 AI 에이전트(Claude/Codex/Cursor/Gemini) 공용.
-> GitHub `arena/61934e9d-ghidra` 브랜치 영구 보존, `HEAD=36e032ce`, `working tree clean`.
+> GitHub `arena/61934e9d-ghidra` 브랜치 영구 보존, `HEAD=518f4020`, `working tree clean`.
 
 ---
 
@@ -55,7 +55,8 @@
 | 35 | 7333301b | 우선순위 3: 귀 1개 — 사람 말 감성 -1~1, 11차원 | 귀 |
 | 36 | b90f42a3 | 폴리싱: 한 번에 6섹션 보고서 (100눈+팀+귀) | 한방 |
 | 37 | 4b661b24 | 실험16: SVB 2023 89% — 통합 100눈+팀+귀 시험 | 통합 89% |
-| 38 | 36e032ce | 실험17: SVB 재예측 89→94% (+5%) 속도 11D | 통합 최종 |
+| 38 | 36e032ce | 실험17: SVB 재예측 89→94% (+5%) 속도 11D | 통합 94% |
+| 39 | 518f4020 | 실험18: SVB 재재예측 94→95% (+1%) 집중도 12D | 인과 최종 95% |
 
 ---
 
@@ -70,10 +71,10 @@ qwen3:14b / deepseek-r1:free  → brain/agent.py (ReAct 루프)
                                ├── tools/ 31개 (ghidra_router.py 라우팅)
                                ├── skills/ 19개 (30줄씩, triggers)
                                ├── notion/ blocks.py/sync.py/database.py/design.py
-                               ├── ml/ analysis.py + learn.py (11차원, 무료, 100 sessions)
-                               ├── memory/ session.jsonl(100)+blocks.jsonl+hindsight.jsonl(16)+model.json (로컬만)
+                               ├── ml/ analysis.py + learn.py (12차원, 무료, 100 sessions)
+                               ├── memory/ session.jsonl(100)+blocks.jsonl+hindsight.jsonl(18)+model.json (로컬만)
                                ├── brain/ team.py(4명 3턴 12문장) + listener.py(귀 -1~1)
-                               ├── experiments/ 17개 (65→94% 금융+통합 증명 + 38→74% 불확실 개선 4연속)
+                               ├── experiments/ 18개 (65→95% 금융+통합 증명 + 38→71% 불확실 개선 4연속+재재예측)
                                └── ui/server.py http://127.0.0.1:8090
                                    ui/app.js show 5 tabs + runbar pipeline badges
 ```
@@ -97,18 +98,18 @@ qwen3:14b / deepseek-r1:free  → brain/agent.py (ReAct 루프)
 
 ---
 
-## 5. 궁극 두뇌 4단계 (측정 가능한 완벽) + 17실험 성적표
+## 5. 궁극 두뇌 4단계 (측정 가능한 완벽) + 18실험 성적표
 
 *추론*: evidence 없으면 중단, 모순 있으면 강등, hindsight로 반복 0회 (눈 100개)
 *분석*: Counter 상위 3개, "base64 80%" 자동 발견 (100개)
 *설계*: requirement→수집/디컴파일/탐지/보고서/저장소 5블록
-*학습*: 11차원 KNN (C2/vuln/도구수/네트워크/유동성/정책/AI/자동매매/침묵층/첩보/속도), 100개→100% (기준 80%)
+*학습*: 12차원 KNN (C2/vuln/도구수/네트워크/유동성/정책/AI/자동매매/침묵층/첩보/속도/집중도), 100개→100% (기준 80%)
 *순환*: 분석할수록 100세션 쌓임→분석→학습→팀 4/4 합의→귀 -1~1→설계 좋음
 *성적*:
-  금융 4연속 65%→78%→87%→91% (+26%) | 사이버 92% | 미래 82% (겸손) | 통합 SVB 89→94% (+5% 속도)
-  불확실 7개 62/38/52/48/92/44/56% → 재예측 74/71/61% (+12~23%) — 불확실도 올릴 수 있다 4연속 증명!
-  17실험 모두 모순0·증거100%·반복0 PASS — 과장 안 한 게 합격, 통합 두뇌 94% 달성
-  11차원 고정: C2/vuln/도구수/네트워크/유동성/정책/AI/자동매매/침묵층/첩보/속도 — 4축+4불확실+속도 완성
+  금융 4연속 65%→78%→87%→91% (+26%) | 사이버 92% | 미래 82% (겸손) | 통합 SVB 89→94→95% (+6% 속도+집중도)
+  불확실 7개 62/38/52/48/92/44/56% → 재예측 74/71/61% (+12~23%) — 불확실도 올릴 수 있다 3연속 증명!
+  18실험 모두 모순0·증거100%·반복0 PASS — 과장 안 한 게 합격, 통합 두뇌 95% 천장 달성
+  12차원 고정: C2/vuln/도구수/네트워크/유동성/정책/AI/자동매매/침묵층/첩보/속도/집중도 — 4축+4불확실+4인과 완성
 
 ---
 
@@ -123,7 +124,7 @@ Think Before Coding(가정 명시) / Simplicity First(200줄→50줄) / Surgical
 ```
 python verify_local.py --all --mock-ghidra → VERIFY: 3/3 PASS (Arena에서도 가능)
 python -c "from ui.server import run_task; run_task('C2 찾아줘 위기 연쇄',...)" → 추론100눈+분석100+학습100+팀4/4+귀-1.0+모순없음 한방 PASS
-33 tools, 20 skills (19+human_ear), 17 experiments, 36e032ce pushed, working tree clean
+33 tools, 20 skills (19+human_ear), 18 experiments, 518f4020 pushed, working tree clean (95% 천장)
 ```
 
 ---
@@ -137,9 +138,9 @@ examples/GhidraClaudeCode-Brain/
   tools/definitions.json+core.json+extras.json+ghidra_router.py
   skills/*.md 19개 + marketplace.json
   notion/blocks.py+sync.py+database.py+design.py
-  ml/analysis.py+learn.py+model.json (11차원) + team.py(12문장) + listener.py(귀)
-  memory/session.jsonl(100)+blocks.jsonl+hindsight.jsonl(17)+model.json(100) + tools/generate_100sessions.py
-  experiments/ 17개 (great_depression→ai_bubble→1987/9-11/cuba/brexit→wannacry/fukushima/challenger→1987/브렉시트/9-11 재예측→svb/svb재예측)
+  ml/analysis.py+learn.py+model.json (12차원) + team.py(12문장) + listener.py(귀)
+  memory/session.jsonl(100)+blocks.jsonl+hindsight.jsonl(18)+model.json(100) + tools/generate_100sessions.py
+  experiments/ 18개 (great_depression→ai_bubble→1987/9-11/cuba/brexit→wannacry/fukushima/challenger→1987/브렉시트/9-11 재예측→svb/svb재예측/svb재재예측)
   ui/server.py+index.html+app.js+style.css
   config/models.yaml(9 presets, default qwen3:14b 한줄 진화)+settings.yaml
   verify_local.py, run.py, demo_*.py

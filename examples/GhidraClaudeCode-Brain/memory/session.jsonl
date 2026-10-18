@@ -3,3 +3,8 @@
 {"type": "memory_add", "func": "main", "doc": "함수 main: Task: C2 주소 찾아줘\n// main 의사코드\nint main() { if (auth==0) return -1; }"}
 {"task": "C2 주소 찾아줘", "model": "qwen/qwen3-32b:free", "report": "# 분석 보고서 — C2 주소 탐색 (OpenRouter qwen/qwen3-32b:free, 무료)\n\n## 요약\n- **작업**: C2 주소 찾아줘\n- **모델**: qwen/qwen3-32b:free (OpenRouter 무료, 외부 LLM)\n- **도구/기억**: 로컬 Ghidra + REA + Vector DB (내 PC에만 저장)\n\n## 발견\n1. **CONFIRMED**: `list_strings`에서 `http://c2.evil.com/api` 발견 — 0x00401234 주소에 저장됨\n2. **LIKELY**: `main` 함수(0x401000)가 `check_license`를 호출하며, 이 함수가 위 C2 문자열을 `WSAConnect`로 전송\n3. **기억 대조**: 과거 사례 \"2024-10 악성코드 A\"와 91% 유사 (memory/chroma_db)\n\n## 조치\n- `FUN_00401200` → `decrypt_config` 로 이름 복구 제안 (rename_function)\n- `check_license`에 주석 추가: \"C2 통신 — 외부 LLM 분석, 증거: decompile 12번째 줄\"\n\n## 비용\n- 외부 LLM: 0원 (OpenRouter Free Tier)\n- 로컬 도구/기억: 0원\n- 바이너리 원본: 외부로 전송 안 됨 (의사코드 조각만 전송)\n\n## 다음 단계\n- 실제 환경에서는 `Ghidra 플러그인(쓰기)`가 위 rename/comment를 DB에 반영\n- `memory/chroma_db`에 이번 분석 자동 저장 → 다음 분석 때 재사용\n"}
 {"task": "4명 조합 테스트", "binary": "/bin/ls", "preset": "openrouter_free_generic", "report": "# 4명 조합 테스트\n\n## 증거\n- 함수 3개\n- 문자열 ['http://c2.evil.com', 'license check failed']\n\n결론: CONFIRMED — 외부 LLM(openrouter_free_generic) + 로컬 도구로 분석"}
+{"task":"C2 분석 1","tool_log":[{"tool":"list_strings"},{"tool":"decompile"}]}
+{"task":"C2 분석 2","tool_log":[{"tool":"list_strings"},{"tool":"decompile"}]}
+{"task":"C2 분석 3","tool_log":[{"tool":"list_strings"},{"tool":"decompile"}]}
+{"task":"C2 분석 4","tool_log":[{"tool":"list_strings"},{"tool":"decompile"}]}
+{"task":"C2 분석 5","tool_log":[{"tool":"list_strings"},{"tool":"decompile"}]}

@@ -123,6 +123,12 @@ class GhidraRouter:
             "code_exec": {"cmd": inp.get("cmd"), "ok": True, "output": "mock exec ok"},
         }
         # 실제 로컬 동작 — mock 전에 진짜 시도 (Arena 샌드박스=실제 파일)
+        if name == "analyze_sessions":
+            try:
+                from ml.analysis import analyze
+                return analyze(inp.get("limit", 20))
+            except Exception as e:
+                return {"error": str(e)}
         if name in ("code_read", "code_write", "code_exec"):
             try:
                 if name == "code_read":

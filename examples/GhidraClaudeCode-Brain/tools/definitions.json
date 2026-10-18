@@ -310,5 +310,15 @@
       },
       "required": ["cmd"]
     }
+  },
+  {
+    "name": "analyze_sessions",
+    "description": "ML 분석 — session 20개에서 패턴(상위 도구, base64 등) 자동 발견.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "limit": { "type": "integer", "default": 20 }
+      }
+    }
   }
 ]

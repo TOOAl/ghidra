@@ -4,6 +4,11 @@ ghidra:
   # install_dir: /opt/ghidra_12.1.4_PUBLIC  # 직접 지정 시 주석 해제
   startup_timeout_ms: 120000
 
+write_plugin:
+  enabled: true
+  url: http://127.0.0.1:8089  # GhidraWritePlugin HTTP 서버 (로컬 전용)
+  health_check: true
+
 rea:
   enabled: true
   mcp_transport: stdio  # stdio | http

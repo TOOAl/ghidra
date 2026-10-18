@@ -45,11 +45,18 @@ class GhidraRouter:
 
     def _call_plugin(self, name: str, inp: dict) -> dict:
         import requests
+        # plugin URL이 / 로 끝나면 그대로, 아니면 name 붙이기
+        url = self.plugin_url.rstrip("/")
+        if not url.endswith(name):
+            url = f"{url}/{name}"
         try:
-            resp = requests.post(f"{self.plugin_url}/{name}", json=inp, timeout=5)
-            return resp.json()
+            resp = requests.post(url, json=inp, timeout=5)
+            try:
+                return resp.json()
+            except Exception:
+                return {"ok": resp.status_code == 200, "message": resp.text[:800], "status": resp.status_code}
         except Exception as e:
-            return {"error": f"Plugin 호출 실패: {e}", "input": inp}
+            return {"error": f"Plugin 호출 실패: {e}", "input": inp, "url": url}
 
     def _mock(self, name: str, inp: dict) -> dict:
         mocks = {

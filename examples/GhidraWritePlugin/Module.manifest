@@ -1,0 +1,6 @@
+MANIFEST-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: GhidraWritePlugin
+Bundle-SymbolicName: GhidraWritePlugin;singleton:=true
+Bundle-Version: 1.0.0
+

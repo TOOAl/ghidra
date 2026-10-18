@@ -25,7 +25,35 @@ class GhidraRouter:
         self.memory = memory
 
     def dispatch(self, name: str, inp: dict) -> dict:
-        # 1. 기억 검색 — 로컬에서 처리
+        # 1. 모순 검사 — brain/contradiction.py 룰 3개
+        if name == "check_contradiction":
+            try:
+                from brain.contradiction import check_contradiction
+                return check_contradiction(inp.get("report", ""), inp.get("evidence", {}))
+            except Exception as e:
+                return {"error": f"contradiction check 실패: {e}"}
+
+        # 2. Notion 블록/DB/큐 — 로컬 notion/ 모듈
+        if name == "create_block":
+            try:
+                from notion.blocks import create_block
+                return create_block(inp.get("content", ""), inp.get("type", "text"), inp.get("parent"))
+            except Exception as e:
+                return {"error": str(e)}
+        if name == "query_database":
+            try:
+                from notion.database import query_database
+                return query_database(inp.get("filter"), inp.get("sort", "recent"), inp.get("limit", 10))
+            except Exception as e:
+                return {"error": str(e)}
+        if name == "queue_sync":
+            try:
+                from notion.sync import queue_sync
+                return queue_sync(inp.get("task", ""), inp.get("binary"))
+            except Exception as e:
+                return {"error": str(e)}
+
+        # 3. 기억 검색 — 로컬에서 처리
         if name == "search_memory" and self.memory:
             return self.memory.search(inp.get("query", ""), k=inp.get("k", 3))
 

@@ -1,1 +1,3 @@
 {"id": "blk_e8e038ab", "type": "callout", "content": "C2 분석 보고서 — http://c2.evil.com 발견", "parent": null, "created": "2026-10-18T13:32:20.170487"}
+{"id": "blk_02c46a81", "type": "code", "content": "다빈치 스케치", "parent": null, "created": "2026-10-18T13:37:40.596952"}
+{"id": "blk_780dbefe", "type": "code", "content": "if(key==0) return -1; // 스케치", "parent": null, "created": "2026-10-18T13:37:50.452964"}

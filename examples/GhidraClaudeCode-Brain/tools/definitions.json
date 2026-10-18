@@ -227,5 +227,17 @@
       },
       "required": ["task"]
     }
+  },
+  {
+    "name": "check_contradiction",
+    "description": "모순 발견 — 보고서의 CONFIRMED가 증거 없이 주장됐는지 3가지 룰로 검증. 모순 있으면 등급 강등 제안.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "report": { "type": "string", "description": "검증할 보고서 텍스트" },
+        "evidence": { "type": "object", "description": "Tool 결과 모음 (예: {\"list_strings\": [...]})" }
+      },
+      "required": ["report"]
+    }
   }
 ]

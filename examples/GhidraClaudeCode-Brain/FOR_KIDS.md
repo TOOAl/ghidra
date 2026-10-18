@@ -43,7 +43,7 @@ cd ghidra/examples/GhidraClaudeCode-Brain
 ```bash
 ls
 ```
-*   `AGENT.md`, `COMPLETE.md`, `FOR_KIDS.md`, `brain`, `ui` 보이면 성공!
+*   `AGENT.md`, `COMPLETE.md`, `FOR_KIDS.md`, `LOCAL_DOWNLOAD_GUIDE.md`, `RELEASE_v1.0.md`, `brain`, `ui` 보이면 성공! (v1.0 29실험)
 
 ---
 
@@ -52,7 +52,7 @@ ls
 ```bash
 pip install -r requirements.txt
 ```
-*   뜻: 로봇 도구 장착
+*   뜻: 로봇 도구 장착 (openai, pyyaml, chromadb 등 무료)
 *   `pip이 뭔데?` 뜨면 `pip3 install -r requirements.txt`로 다시
 
 ---
@@ -63,7 +63,7 @@ pip install -r requirements.txt
 python verify_local.py --all --mock-ghidra
 ```
 
-*   결과 마지막에 이렇게 뜨면 **합격!**
+*   결과 마지막에 이렇게 뜨면 **합격!** — Ghidra 없이도 합격, 네 두뇌는 v1.0 16D 4천장이야!
 
 ```
 VERIFY: 3/3 PASS
@@ -163,5 +163,8 @@ python -c "from tools.ghidra_router import GhidraRouter; r=GhidraRouter(); print
 
 *   **한 문서 요약**: `COMPLETE.md` — 에이전트가 읽는 1개 문서 (우리 타임라인 전부)
 *   **핸드북**: `../../AGENTS.md`
+*   **로컬 다운로드**: `LOCAL_DOWNLOAD_GUIDE.md` — 그림 없이 3줄로 끝내기
+*   **v1.0 증명**: `RELEASE_v1.0.md` — 4/4 PASS 증명서
 
-축하해! 네 두뇌는 이제 네 집에 있고, `C2 찾아줘` 한 번으로 똑똑해져!
+축하해! 네 두뇌는 이제 네 집에 있고, `C2 찾아줘` 한 번으로 똑똑해져! v1.0 29실험 16D 4천장 모순0!
+

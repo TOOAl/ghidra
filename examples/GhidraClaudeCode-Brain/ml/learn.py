@@ -31,7 +31,8 @@ def train(samples=None) -> dict:
     if samples is None:
         if SESSION.exists() and SESSION.stat().st_size > 50:
             data = []
-            for l in SESSION.read_text().splitlines()[-10:]:
+            limit = 100 if SESSION.stat().st_size > 5000 else 10
+            for l in SESSION.read_text().splitlines()[-limit:]:
                 try:
                     j = json.loads(l)
                     tools = [t.get("tool","") for t in j.get("tool_log",[])]

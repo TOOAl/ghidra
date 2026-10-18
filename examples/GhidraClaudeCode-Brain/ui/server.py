@@ -102,13 +102,23 @@ def run_task(task: str, binary: str, preset: str):
         re = reason(task, ev)
         try:
             from ml.analysis import analyze
-            an = analyze(20)
+            an = analyze(100)
         except: an = {"insight": "분석 대기", "pattern": ""}
         try:
             from ml.learn import train, predict
             tr = train()
             pr = predict(task, list(ev.keys()))
         except: tr, pr = {"accuracy": 0, "insight": ""}, {"prediction": "?"}
+        # 우선순위 2: 팀 토론 3턴 12문장
+        try:
+            from brain.team import discuss
+            tm = discuss(task, ev, turns=3)
+        except: tm = {"consensus": "?", "insight": ""}
+        # 우선순위 3: 귀 감성
+        try:
+            from brain.listener import listen
+            ear = listen(task)
+        except: ear = {"score": 0, "label": "?"}
         de = None
         if any(k in task for k in ["설계", "만들어", "구조"]):
             try:
@@ -116,19 +126,19 @@ def run_task(task: str, binary: str, preset: str):
                 de = design(task)
             except: pass
         from brain.contradiction import check_contradiction
-        report = f"# {task}\n\n## 1. 추론\n- {'✅ ' + ' | '.join(re.get('steps',[])) if re['ok'] else '❌ ' + re.get('reason','')}\n\n## 2. 분석\n- {an.get('insight','')} ({an.get('pattern','')})\n\n## 3. 학습\n- {tr.get('insight','')} | 예측: {pr.get('prediction','')}\n"
+        report = f"# {task}\n\n## 1. 추론 (눈 100개)\n- {'✅ ' + ' | '.join(re.get('steps',[])) if re['ok'] else '❌ ' + re.get('reason','')}\n\n## 2. 분석 (100개)\n- {an.get('insight','')} ({an.get('pattern','')})\n\n## 3. 학습 (100개)\n- {tr.get('insight','')} | 예측: {pr.get('prediction','')}\n\n## 4. 팀 토론 (3턴)\n- {tm.get('insight','')} | 합의 {tm.get('consensus','')}\n\n## 5. 귀 감성\n- {ear.get('insight','')} (score {ear.get('score','')})\n"
         if de:
-            report += f"\n## 4. 설계\n- {de.get('insight','')} → {de.get('blocks',[])}\n"
-        report += f"\n## 증거\n- 함수 {len(ev['list_functions'].get('functions',[]))}개, 문자열 {ev['list_strings'].get('strings',[])[:2]}\n- 외부 LLM({preset or 'mock'}) + 로컬\n"
+            report += f"\n## 6. 설계\n- {de.get('insight','')} → {de.get('blocks',[])}\n"
+        report += f"\n## 증거\n- 함수 {len(ev['list_functions'].get('functions',[]))}개, 문자열 {ev['list_strings'].get('strings',[])[:2]}\n- 외부 LLM({preset or 'mock'}) + 로컬 + 팀+귀\n"
         contra = check_contradiction(report, ev)
         report += f"\n## 모순 검사\n- {contra['summary']}\n"
         if not contra["ok"]:
             report += f"- 강등: {contra['suggested_downgrades']}\n"
-        create_block(report[:600], type="text")
+        create_block(report[:800], type="text")
         (MEM / "session.jsonl").parent.mkdir(parents=True, exist_ok=True)
         with open(MEM / "session.jsonl", "a", encoding="utf-8") as f:
-            f.write(json.dumps({"task": task, "binary": binary, "preset": preset, "report": report[:1000], "reasoning": re, "analysis": an, "train": tr}, ensure_ascii=False)+"\n")
-        return {"ok": True, "report": report, "contradiction": contra, "reasoning": re, "analysis": an, "train": tr, "preset": preset or "mock"}
+            f.write(json.dumps({"task": task, "binary": binary, "preset": preset, "report": report[:1200], "reasoning": re, "analysis": an, "train": tr, "team": tm, "ear": ear}, ensure_ascii=False)+"\n")
+        return {"ok": True, "report": report, "contradiction": contra, "reasoning": re, "analysis": an, "train": tr, "team": tm, "ear": ear, "preset": preset or "mock"}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 

@@ -29,9 +29,11 @@ async function run(){
     const r=await fetch('/api/run', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({task,binary,preset})});
     const j=await r.json();
     let extra = '';
-    if(j.reasoning) extra += `<p><small>🧠 추론: ${esc(j.reasoning.steps? j.reasoning.steps.join(' → '): j.reasoning.reason||'')}</small></p>`;
-    if(j.analysis) extra += `<p><small>📊 분석: ${esc(j.analysis.insight||'')} (${esc(j.analysis.pattern||'')})</small></p>`;
-    if(j.train) extra += `<p><small>📚 학습: ${esc(j.train.insight||'')} | 예측: ${esc(j.train.prediction||'')}</small></p>`;
+    if(j.reasoning) extra += `<p><small>🧠 추론(100눈): ${esc(j.reasoning.steps? j.reasoning.steps.join(' → '): j.reasoning.reason||'')}</small></p>`;
+    if(j.analysis) extra += `<p><small>📊 분석(100개): ${esc(j.analysis.insight||'')} (${esc(j.analysis.pattern||'')})</small></p>`;
+    if(j.train) extra += `<p><small>📚 학습(100개): ${esc(j.train.insight||'')} | 예측: ${esc(j.train.prediction||'')}</small></p>`;
+    if(j.team) extra += `<p><small>👥 팀(3턴): ${esc(j.team.insight||'')} | 합의 ${esc(j.team.consensus||'')}</small></p>`;
+    if(j.ear) extra += `<p><small>👂 귀: ${esc(j.ear.insight||'')} (score ${j.ear.score})</small></p>`;
     rep.innerHTML = `<pre>${esc(j.report||j.error||'')}</pre>` + extra + (j.contradiction? `<p><small>모순: ${esc(j.contradiction.summary)}</small></p>`:'');
     show('report');
   }catch(e){ rep.innerHTML='<p>실패: '+esc(e.message)+'</p>'; }

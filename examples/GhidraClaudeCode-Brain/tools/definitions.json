@@ -343,6 +343,18 @@
     }
   },
   {
+    "name": "team_discuss",
+    "description": "팀 토론 3턴 — 다빈치/퀴리/튜링/오일러 4명이 3턴 토론, 4/4 합의일 때만 CONFIRMED.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "task": { "type": "string" },
+        "evidence": { "type": "object" }
+      },
+      "required": ["task"]
+    }
+  },
+  {
     "name": "predict_task",
     "description": "ML 예측 — 학습된 모델로 다음 분석 자동 분류.",
     "input_schema": {

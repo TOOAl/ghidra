@@ -29,8 +29,8 @@ class GhidraRouter:
         if name == "search_memory" and self.memory:
             return self.memory.search(inp.get("query", ""), k=inp.get("k", 3))
 
-        # 2. 쓰기 — Ghidra 플러그인으로
-        if name in ("rename_function", "set_comment") and self.plugin_url:
+        # 2. 쓰기 — Ghidra 플러그인으로 (patch 포함)
+        if name in ("rename_function", "set_comment", "set_plate_comment", "patch_bytes", "create_label") and self.plugin_url:
             return self._call_plugin(name, inp)
 
         # 3. 읽기 — REA로
@@ -66,8 +66,12 @@ class GhidraRouter:
                 {"name": "check_license", "addr": "0x401350", "size": 210},
             ]},
             "decompile": {"name": inp.get("name"), "c_code": f"// {inp.get('name')} 의사코드\nint {inp.get('name')}() {{ if (auth==0) return -1; }}"},
-            "list_strings": {"strings": ["http://c2.evil.com", "license check failed", "AES_KEY_1234"]},
+            "list_strings": {"strings": ["http://c2.evil.com", "license check failed", "AES_KEY_1234", "UPX!", "UPX0"]},
             "get_xrefs": {"to": ["main"], "from": ["strcmp", "send"]},
+            "list_imports": {"imports": ["kernel32.dll!CreateFileA", "advapi32.dll!CryptEncrypt", "ws2_32.dll!send", "ntdll.dll!NtProtectVirtualMemory"]},
+            "search_bytes": {"pattern": inp.get("pattern"), "hits": [{"address": "0x00401500", "bytes": "63 7C 77 7B", "note": "AES S-box 시그니처"}]},
+            "get_bytes": {"address": inp.get("address"), "bytes": "42 43 44 45 " * 8, "ascii": "BCDEFG...", "entropy": 7.2},
+            "patch_bytes": {"ok": True, "address": inp.get("address"), "patched": inp.get("bytes"), "comment": inp.get("comment"), "backup": "원본 바이트는 Ghidra undo로 복구 가능"},
             "rename_function": {"ok": True, "old": inp.get("old_name"), "new": inp.get("new_name")},
             "set_comment": {"ok": True},
             "search_memory": {"results": [

@@ -24,7 +24,7 @@
   },
   {
     "name": "list_strings",
-    "description": "바이너리 내 문자열 검색. C2 주소, 키, URL 탐지.",
+    "description": "바이너리 내 문자열 검색. C2 주소, 키, URL, UPX 시그니처 탐지.",
     "input_schema": {
       "type": "object",
       "properties": {
@@ -43,6 +43,52 @@
         "direction": { "type": "string", "enum": ["to", "from", "both"], "default": "both" }
       },
       "required": ["name"]
+    }
+  },
+  {
+    "name": "list_imports",
+    "description": "Import 테이블 목록. 패킹 탐지(개수 적음), 암호 API 탐지에 핵심.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "filter": { "type": "string", "description": "필터 (예: 'Crypt', 'AES')" }
+      }
+    }
+  },
+  {
+    "name": "search_bytes",
+    "description": "바이트 패턴 검색. 암호 상수(AES S-box), UPX stub 등 시그니처 스캔. 와일드카드 ?? 지원.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "pattern": { "type": "string", "description": "hex 패턴 (예: '60 BE ?? ?? ?? ??', '63 7C 77 7B')" }
+      },
+      "required": ["pattern"]
+    }
+  },
+  {
+    "name": "get_bytes",
+    "description": "주소에서 바이트 읽기. 키 덤프, 패치 전 원본 확인, 엔트로피 계산에 사용.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "string", "description": "주소 (예: '0x00403000')" },
+        "length": { "type": "integer", "description": "읽을 바이트 수", "default": 32 }
+      },
+      "required": ["address"]
+    }
+  },
+  {
+    "name": "patch_bytes",
+    "description": "주소에 바이트 패치. 취약점 패치, 무력화, 라이선스 체크 우회에 사용. 주의: 원본 백업 필수.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "string", "description": "패치할 주소" },
+        "bytes": { "type": "string", "description": "hex 바이트 (예: '90 90', '31 C0 C3')" },
+        "comment": { "type": "string", "description": "패치 이유 주석" }
+      },
+      "required": ["address", "bytes"]
     }
   },
   {

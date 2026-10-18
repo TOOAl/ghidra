@@ -40,6 +40,10 @@ public class WriteHttpServer {
         server.createContext("/set_plate_comment", this::handlePlate);
         server.createContext("/create_label", this::handleLabel);
         server.createContext("/list_functions", this::handleListFunctions);
+        server.createContext("/patch_bytes", this::handlePatch);
+        server.createContext("/get_bytes", this::handleGetBytes);
+        server.createContext("/search_bytes", this::handleSearchBytes);
+        server.createContext("/list_imports", this::handleListImports);
         server.setExecutor(java.util.concurrent.Executors.newCachedThreadPool());
         server.start();
     }
@@ -118,7 +122,6 @@ public class WriteHttpServer {
     private void handleListFunctions(HttpExchange ex) throws IOException {
         if (!checkMethod(ex, "GET")) return;
         String query = ex.getRequestURI().getQuery();
-        // Simple impl: if program open, list functions (read-only check)
         String result = invokeOnSwing(() -> {
             if (plugin.getCurrentProgramSafe() == null) return "No program open";
             StringBuilder sb = new StringBuilder("[");
@@ -144,6 +147,71 @@ public class WriteHttpServer {
         } else {
             sendJson(ex, 200, "{\"functions\":" + result + "}");
         }
+    }
+
+    private void handlePatch(HttpExchange ex) throws IOException {
+        if (!checkMethod(ex, "POST")) return;
+        String req = readBody(ex);
+        String addr = extractJsonField(req, "address");
+        String bytes = extractJsonField(req, "bytes");
+        String comment = extractJsonField(req, "comment");
+        if (addr == null || bytes == null) {
+            sendJson(ex, 400, "{\"error\":\"need address and bytes\"}");
+            return;
+        }
+        if (comment == null) comment = "";
+        final String c = comment;
+        String result = invokeOnSwing(() -> plugin.patchBytes(addr, bytes, c));
+        boolean ok = result.startsWith("OK");
+        sendJson(ex, ok ? 200 : 500, jsonMsg(result, ok));
+    }
+
+    private void handleGetBytes(HttpExchange ex) throws IOException {
+        // POST or GET both allowed
+        String addr = null; int len = 32;
+        if ("GET".equals(ex.getRequestMethod())) {
+            String q = ex.getRequestURI().getQuery();
+            if (q != null) {
+                addr = extractQueryField(q, "address");
+                String l = extractQueryField(q, "length");
+                if (l != null) try { len = Integer.parseInt(l); } catch (Exception ignored) {}
+            }
+        } else {
+            String req = readBody(ex);
+            addr = extractJsonField(req, "address");
+            String l = extractJsonField(req, "length");
+            if (l != null) try { len = Integer.parseInt(l); } catch (Exception ignored) {}
+            if (addr == null) addr = extractQueryField(ex.getRequestURI().getQuery(), "address");
+        }
+        if (addr == null) { sendJson(ex, 400, "{\"error\":\"need address\"}"); return; }
+        final int flen = len;
+        String result = invokeOnSwing(() -> plugin.getBytes(addr, flen));
+        if (result.startsWith("Error")) sendJson(ex, 404, jsonMsg(result, false));
+        else sendJson(ex, 200, "{\"address\":\"" + addr + "\",\"hex\":\"" + result + "\"}");
+    }
+
+    private void handleSearchBytes(HttpExchange ex) throws IOException {
+        if (!checkMethod(ex, "POST")) return;
+        String req = readBody(ex);
+        String pat = extractJsonField(req, "pattern");
+        if (pat == null) { sendJson(ex, 400, "{\"error\":\"need pattern\"}"); return; }
+        String result = invokeOnSwing(() -> plugin.searchBytes(pat));
+        if (result.startsWith("Error")) sendJson(ex, 500, jsonMsg(result, false));
+        else sendJson(ex, 200, "{\"pattern\":\"" + pat + "\",\"hits\":" + result + "}");
+    }
+
+    private void handleListImports(HttpExchange ex) throws IOException {
+        String filter = null;
+        if (ex.getRequestURI().getQuery() != null) filter = extractQueryField(ex.getRequestURI().getQuery(), "filter");
+        if ("POST".equals(ex.getRequestMethod())) {
+            String req = readBody(ex);
+            String f = extractJsonField(req, "filter");
+            if (f != null) filter = f;
+        }
+        final String ff = filter;
+        String result = invokeOnSwing(() -> plugin.listImports(ff));
+        if (result.startsWith("Error") || result.startsWith("No program")) sendJson(ex, result.startsWith("No program") ? 404 : 500, jsonMsg(result, false));
+        else sendJson(ex, 200, "{\"imports\":" + result + "}");
     }
 
     // --- helpers ---
@@ -196,7 +264,6 @@ public class WriteHttpServer {
 
     private String extractJsonField(String json, String key) {
         if (json == null) return null;
-        // very simple parser: "key": "value"
         String pat = "\"" + key + "\"";
         int idx = json.indexOf(pat);
         if (idx < 0) return null;
@@ -206,7 +273,16 @@ public class WriteHttpServer {
         if (q1 < 0) return null;
         int q2 = json.indexOf("\"", q1 + 1);
         if (q2 < 0) return null;
-        // handle escaped quotes naively
         return json.substring(q1 + 1, q2);
+    }
+
+    private String extractQueryField(String query, String key) {
+        if (query == null) return null;
+        for (String kv : query.split("&")) {
+            String[] p = kv.split("=", 2);
+            if (p.length == 2 && p[0].equals(key)) return java.net.URLDecoder.decode(p[1], StandardCharsets.UTF_8);
+            if (p.length == 1 && p[0].equals(key)) return "";
+        }
+        return null;
     }
 }

@@ -77,6 +77,10 @@ Brain이 `rename_function`을 호출하면, Ghidra 화면에서 함수명이 실
 | `/set_plate_comment` | POST | `{"name": "FUN_00401000", "comment": "라이선스 검증"}` | 함수 상단 plate 주석 |
 | `/create_label` | POST | `{"address": "0x00401234", "label": "c2_url"}` | 라벨 생성 |
 | `/list_functions` | GET | `?filter=FUN&limit=50` | 읽기 확인용 |
+| `/patch_bytes` | POST | `{"address": "0x00401234", "bytes": "90 90", "comment": "nop patch"}` | 바이트 패치 (undo 가능) |
+| `/get_bytes` | POST/GET | `{"address": "0x00403000", "length": 32}` | 바이트 읽기 (키 덤프) |
+| `/search_bytes` | POST | `{"pattern": "63 7C 77 7B ?? ??"}` | 바이트 패턴 검색 (AES S-box 등) |
+| `/list_imports` | GET/POST | `?filter=Crypt` | Import 목록 (filter 지원) |
 
 모든 쓰기는 `program.startTransaction()` / `endTransaction(true)` 로 안전하게 처리되고, 실패 시 `endTransaction(false)`로 롤백.
 

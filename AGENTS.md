@@ -1,5 +1,8 @@
 # AGENTS.md — GhidraClaudeCode-Brain Agent Handbook
 
+> **2026-10-19 최신**: 모든 과정은 `examples/GhidraClaudeCode-Brain/COMPLETE.md` 1개 문서에 집약. 이 AGENTS.md는 진입점.
+> 12살 사용법은 `FOR_KIDS.md` — 무엇을 켜고 무엇을 치는지 복사→붙여넣기 수준.
+
 > 모든 에이전트(Claude Code, Codex, Cursor, Gemini CLI 등)가 읽는 파일.
 > 이 문서 하나만 읽으면 지금까지 만든 두뇌를 이해하고, 로컬에서 바로 실행할 수 있다.
 > 언어: 한국어(사용자) + 영어(도구/코드) 혼합 — 에이전트는 둘 다 읽는다.

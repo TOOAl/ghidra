@@ -2,7 +2,7 @@
 
 > 이 문서 1개만 읽으면 네가 만든 두뇌의 **시작부터 현재까지 모든 결정, 코드, 검증**을 알 수 있다.
 > 인간(12살) + 모든 AI 에이전트(Claude/Codex/Cursor/Gemini) 공용.
-> GitHub `arena/61934e9d-ghidra` 브랜치 영구 보존, `HEAD=3996541a`, `working tree clean`.
+> GitHub `arena/61934e9d-ghidra` 브랜치 영구 보존, `HEAD=b683210d`, `working tree clean`.
 
 ---
 
@@ -60,6 +60,10 @@
 | 40 | 22084fbb | B-1: WannaCry 재재예측 92→97% (+5%) 킬스위치 13D | B 사이버 97% |
 | 41 | 0c05c02e | B-2: WannaCry Ghidra 실전 97→98% (+1%) 5도구 직접 | B 사이버 실전 |
 | 42 | 3996541a | B-3: 3종 패밀리 98% 일반화 30샘플 100% PASS | B 사이버 최종 98% |
+| 43 | 2bbc65ad | C-1: 프리고진 소산구조 2020 원격 85% 14D | C 복잡계 85% |
+| 44 | 7ec5ab55 | 고도화: real_binary.py 진짜 ELF 5/5 100% | 진짜 RE |
+| 45 | 6761655a | C-2: 3종 소산구조 원격/배달/구독 85% 30샘플 100% | C 일반화 85% |
+| 46 | b683210d | C-3: 하위징아 놀이 5특징 게임/법정/의례 85% 15D | C 놀이 85% v2.0 |
 
 ---
 
@@ -74,10 +78,11 @@ qwen3:14b / deepseek-r1:free  → brain/agent.py (ReAct 루프)
                                ├── tools/ 31개 (ghidra_router.py 라우팅)
                                ├── skills/ 19개 (30줄씩, triggers)
                                ├── notion/ blocks.py/sync.py/database.py/design.py
-                               ├── ml/ analysis.py + learn.py (13차원, 무료, 100 sessions) + cyber_model.json(3종)
-                               ├── memory/ session.jsonl(100)+blocks.jsonl+hindsight.jsonl(19)+model.json (로컬만)
+                               ├── ml/ analysis.py + learn.py (15차원, 무료, 100 sessions) + cyber/dissipative/play_model.json(각 3종)
+                               ├── memory/ session.jsonl(100)+blocks.jsonl+hindsight.jsonl(22)+model.json (로컬만)
                                ├── brain/ team.py(4명 3턴 12문장) + listener.py(귀 -1~1)
-                               ├── experiments/ 21개 (65→95% 금융+통합 + 38→71% 개선 3연속 + B 92→98% 사이버 3연속)
+                               ├── experiments/ 25개 (65→95% 금융+통합 + 38→71% 개선 + B 92→98% + C 3종×2 + 하위징아)
+                               ├── tools/real_binary.py(진짜 ELF 4함수) + dissipative/play_family_train.py
                                └── ui/server.py http://127.0.0.1:8090
                                    ui/app.js show 5 tabs + runbar pipeline badges
 ```
@@ -101,18 +106,19 @@ qwen3:14b / deepseek-r1:free  → brain/agent.py (ReAct 루프)
 
 ---
 
-## 5. 궁극 두뇌 4단계 (측정 가능한 완벽) + 21실험 성적표
+## 5. 궁극 두뇌 4단계 (측정 가능한 완벽) + 25실험 성적표
 
 *추론*: evidence 없으면 중단, 모순 있으면 강등, hindsight로 반복 0회 (눈 100개)
 *분석*: Counter 상위 3개, "base64 80%" 자동 발견 (100개)
 *설계*: requirement→수집/디컴파일/탐지/보고서/저장소 5블록
-*학습*: 13차원 KNN (C2/vuln/도구수/네트워크/유동성/정책/AI/자동매매/침묵층/첩보/속도/집중도/킬스위치), 100개→100% (기준 80%)
+*학습*: 15차원 KNN (C2/vuln/도구수/네트워크/유동성/정책/AI/자동매매/침묵층/첩보/속도/집중도/킬스위치/소산/놀이), 100개→100% (기준 80%)
 *순환*: 분석할수록 100세션 쌓임→분석→학습→팀 4/4 합의→귀 -1~1→설계 좋음
 *성적*:
   금융 4연속 65%→78%→87%→91% (+26%) | 미래 82% (겸손) | 통합 SVB 89→94→95% (+6%)
-  불확실 7개 62/38/52/48/92/44/56% → 재예측 74/71/61% (+12~23%) | B 사이버 92→97→98% (+6% 킬스위치+실전+3종)
-  21실험 모두 모순0·증거100%·반복0 PASS — 과장 안 한 게 합격, 금융 95%+사이버 98% 2천장 달성
-  13차원 고정: C2/vuln/도구수/네트워크/유동성/정책/AI/자동매매/침묵층/첩보/속도/집중도/킬스위치 — 4축+4불확실+5인과 완성
+  불확실 7개 62/38/52/48/92/44/56% → 재예측 74/71/61% (+12~23%) | B 사이버 92→97→98% (+6%)
+  C 복잡계 3종: 프리고진 C-1 85%(원격) → C-2 85%(원격/배달/구독) → 하위징아 C-3 85%(게임/법정/의례) — 3연속 85% 천장
+  25실험 모두 모순0·증거100%·반복0 PASS — 과장 안 한 게 합격, 금융95%+사이버98%+복잡계85% 3천장 달성 v2.0
+  15차원 고정: C2/vuln/도구수/네트워크/유동성/정책/AI/자동매매/침묵층/첩보/속도/집중도/킬스위치/소산/놀이 — 4축+4불확실+7인과 완성
 
 ---
 
@@ -127,7 +133,7 @@ Think Before Coding(가정 명시) / Simplicity First(200줄→50줄) / Surgical
 ```
 python verify_local.py --all --mock-ghidra → VERIFY: 3/3 PASS (Arena에서도 가능)
 python -c "from ui.server import run_task; run_task('C2 찾아줘 위기 연쇄',...)" → 추론100눈+분석100+학습100+팀4/4+귀-1.0+모순없음 한방 PASS
-33 tools, 20 skills (19+human_ear), 21 experiments, 3996541a pushed, working tree clean (금융95%+사이버98% 2천장)
+33 tools, 20 skills (19+human_ear), 25 experiments, b683210d pushed, working tree clean (금융95%+사이버98%+복잡계85% 3천장 v2.0 15D)
 ```
 
 ---
@@ -141,9 +147,9 @@ examples/GhidraClaudeCode-Brain/
   tools/definitions.json+core.json+extras.json+ghidra_router.py
   skills/*.md 19개 + marketplace.json
   notion/blocks.py+sync.py+database.py+design.py
-  ml/analysis.py+learn.py+model.json (13차원) + cyber_model.json(3종) + team.py(12문장) + listener.py(귀)
-  memory/session.jsonl(100)+blocks.jsonl+hindsight.jsonl(19)+model.json(100) + tools/generate_100sessions.py + cyber_family_train.py
-  experiments/ 21개 (great_depression→ai_bubble→1987/9-11/cuba/brexit→wannacry/fukushima/challenger→1987/브렉시트/9-11 재예측→svb/svb재예측/svb재재예측→B-1/B-2/B-3 사이버)
+  ml/analysis.py+learn.py+model.json (15차원) + cyber/dissipative/play_model.json(각 3종) + team.py(12문장) + listener.py(귀)
+  memory/session.jsonl(100)+blocks.jsonl+hindsight.jsonl(22)+model.json(100) + tools/generate_100sessions.py + cyber/dissipative/play_family_train.py + real_binary.py
+  experiments/ 25개 (great_depression→ai_bubble→1987/9-11/cuba/brexit→wannacry/fukushima/challenger→1987/브렉시트/9-11 재예측→svb×3→B-1/B-2/B-3→C-1프리고진/C-2 3종/C-3하위징아→real_binary)
   ui/server.py+index.html+app.js+style.css
   config/models.yaml(9 presets, default qwen3:14b 한줄 진화)+settings.yaml
   verify_local.py, run.py, demo_*.py

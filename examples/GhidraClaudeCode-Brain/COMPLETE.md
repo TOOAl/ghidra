@@ -2,7 +2,7 @@
 
 > 이 문서 1개만 읽으면 네가 만든 두뇌의 **시작부터 현재까지 모든 결정, 코드, 검증**을 알 수 있다.
 > 인간(12살) + 모든 AI 에이전트(Claude/Codex/Cursor/Gemini) 공용.
-> GitHub `arena/61934e9d-ghidra` 브랜치 영구 보존, `HEAD=081d4066`, `working tree clean`.
+> GitHub `arena/61934e9d-ghidra` 브랜치 영구 보존, `HEAD=4de39103`, `working tree clean`.
 
 ---
 
@@ -66,6 +66,8 @@
 | 46 | b683210d | C-3: 하위징아 놀이 5특징 게임/법정/의례 85% 15D | C 놀이 85% v2.0 |
 | 47 | 9fc014b2 | D-1: 양자화 개념 + Willow 임계 80% 16D | D 양자 80% |
 | 48 | 081d4066 | D-2: 양자 3종 컴퓨팅/통신/센싱 80% 30샘플 모순0 | D 양자 80% 일반화 |
+| 49 | 45dfae27 | v1.0: RELEASE_v1.0.md 4/4 PASS tag v1.0 28실험 4천장 | v1.0 도달 |
+| 50 | 4de39103 | D-3: 양자×놀이 게임/예술/의례 80% + real_binary_v2 114imports | D 최종 + 진짜 RE |
 
 ---
 
@@ -80,11 +82,11 @@ qwen3:14b / deepseek-r1:free  → brain/agent.py (ReAct 루프)
                                ├── tools/ 31개 (ghidra_router.py 라우팅)
                                ├── skills/ 19개 (30줄씩, triggers)
                                ├── notion/ blocks.py/sync.py/database.py/design.py
-                               ├── ml/ analysis.py + learn.py (16차원, 무료, 100 sessions) + cyber/dissipative/play/quantum*_model.json(각 3종)
-                               ├── memory/ session.jsonl(100)+blocks.jsonl+hindsight.jsonl(31)+model.json (로컬만)
+                               ├── ml/ analysis.py + learn.py (16차원, 무료, 100 sessions) + cyber/dissipative/play/quantum*_model.json(각 3종) + quantum_play(양자×놀이)
+                               ├── memory/ session.jsonl(100)+blocks.jsonl+hindsight.jsonl(32)+model.json (로컬만)
                                ├── brain/ team.py(4명 3턴 12문장) + listener.py(귀 -1~1)
-                               ├── experiments/ 28개 (65→95% 금융+통합 + 38→71% 개선 + B 92→98% + C 85%×3 + D 양자화·Willow·3종 모순0)
-                               ├── tools/real_binary.py(진짜 ELF 4함수) + quantum/dissipative/play_family_train.py
+                               ├── experiments/ 29개 (65→95% 금융+통합 + 38→71% 개선 + B 92→98% + C 85%×3 + D 양자화·Willow·3종·양자×놀이 모순0 + v1.0)
+                               ├── tools/real_binary_v2.py(진짜 ELF capstone 114imports + disasm) + quantum/dissipative/play
                                └── ui/server.py http://127.0.0.1:8090
                                    ui/app.js show 5 tabs + runbar pipeline badges
 ```
@@ -108,7 +110,7 @@ qwen3:14b / deepseek-r1:free  → brain/agent.py (ReAct 루프)
 
 ---
 
-## 5. 궁극 두뇌 4단계 (측정 가능한 완벽) + 28실험 성적표
+## 5. 궁극 두뇌 4단계 (측정 가능한 완벽) + 29실험 성적표
 
 *추론*: evidence 없으면 중단, 모순 있으면 강등, hindsight로 반복 0회 (눈 100개)
 *분석*: Counter 상위 3개, "base64 80%" 자동 발견 (100개)
@@ -119,8 +121,8 @@ qwen3:14b / deepseek-r1:free  → brain/agent.py (ReAct 루프)
   금융 4연속 65%→78%→87%→91% (+26%) | 미래 82% (겸손) | 통합 SVB 89→94→95% (+6%)
   불확실 7개 62/38/52/48/92/44/56% → 재예측 74/71/61% (+12~23%) | B 사이버 92→97→98% (+6%)
   C 복잡계 3종: 프리고진 C-1 85%(원격) → C-2 85%(원격/배달/구독) → 하위징아 C-3 85%(게임/법정/의례) — 3연속 85% 천장
-  D 양자 2종: 양자화 개념 + D-1 Willow 80%(Λ=2.14) → D-2 80%(컴퓨팅/통신/센싱) — 모순0 2연속, 1종→3종 일반화
-  28실험 모두 모순0·증거100%·반복0 PASS — 과장 안 한 게 합격, 금융95%+사이버98%+복잡계85%+양자80% 4천장 달성 v2.1 16D
+  D 양자 3종: D-1 Willow 80%(Λ=2.14) → D-2 80%(컴퓨팅/통신/센싱) → D-3 80%(게임/예술/의례) — 모순0 3연속, 1종→3종→양자×놀이
+  29실험 모두 모순0·증거100%·반복0 PASS — 과장 안 한 게 합격, 금융95%+사이버98%+복잡계85%+양자80% 4천장 달성 v2.1 16D
   16차원 고정: C2/vuln/도구수/네트워크/유동성/정책/AI/자동매매/침묵층/첩보/속도/집중도/킬스위치/소산/놀이/양자 — 4축+4불확실+8인과 완성
 
 ---
@@ -136,7 +138,7 @@ Think Before Coding(가정 명시) / Simplicity First(200줄→50줄) / Surgical
 ```
 python verify_local.py --all --mock-ghidra → VERIFY: 3/3 PASS (Arena에서도 가능)
 python -c "from ui.server import run_task; run_task('C2 찾아줘 위기 연쇄',...)" → 추론100눈+분석100+학습100+팀4/4+귀-1.0+모순없음 한방 PASS
-33 tools, 20 skills (19+human_ear), 28 experiments, 081d4066 pushed, working tree clean (금융95%+사이버98%+복잡계85%+양자80% 4천장 v2.1 16D 모순0)
+33 tools, 20 skills (19+human_ear), 29 experiments, 4de39103 pushed, working tree clean (금융95%+사이버98%+복잡계85%+양자80% 4천장 v2.1 16D 모순0, v1.0 tag)
 ```
 
 ---
@@ -150,9 +152,9 @@ examples/GhidraClaudeCode-Brain/
   tools/definitions.json+core.json+extras.json+ghidra_router.py
   skills/*.md 19개 + marketplace.json
   notion/blocks.py+sync.py+database.py+design.py
-  ml/analysis.py+learn.py+model.json (16차원) + cyber/dissipative/play/quantum*_model.json(각 3종) + team.py(12문장) + listener.py(귀)
-  memory/session.jsonl(100)+blocks.jsonl+hindsight.jsonl(31)+model.json(100) + tools/generate_100sessions.py + cyber/dissipative/play/quantum_family_train.py + real_binary.py
-  experiments/ 28개 (great_depression→ai_bubble→1987/9-11/cuba/brexit→wannacry/fukushima/challenger→1987/브렉시트/9-11 재예측→svb×3→B-1/B-2/B-3→C-1프리고진/C-2 3종/C-3하위징아→real_binary→D-양자화/D-1 Willow/D-2 3종)
+  ml/analysis.py+learn.py+model.json (16차원) + cyber/dissipative/play/quantum*_model.json(각 3종) + quantum_play + team.py(12문장) + listener.py(귀)
+  memory/session.jsonl(100)+blocks.jsonl+hindsight.jsonl(32)+model.json(100) + tools/generate_100sessions.py + cyber/dissipative/play/quantum_family_train.py + real_binary_v2.py
+  experiments/ 29개 (great_depression→ai_bubble→1987/9-11/cuba/brexit→wannacry/fukushima/challenger→1987/브렉시트/9-11 재예측→svb×3→B-1/B-2/B-3→C-1프리고진/C-2 3종/C-3하위징아→real_binary→D-양자화/D-1 Willow/D-2 3종/D-3 양자×놀이→v1.0)
   ui/server.py+index.html+app.js+style.css
   config/models.yaml(9 presets, default qwen3:14b 한줄 진화)+settings.yaml
   verify_local.py, run.py, demo_*.py

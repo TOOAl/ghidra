@@ -6,3 +6,4 @@
 {"id": "blk_f851ca7d", "type": "text", "content": "상태: S1 --UPX--> S2 --AES--> S3 // 튜링 형식화", "parent": null, "created": "2026-10-18T13:40:25.030988"}
 {"id": "blk_7a105ea6", "type": "code", "content": "if (key==0) return -1; // 다빈치 스케치: 잠금", "parent": null, "created": "2026-10-18T13:40:25.031099"}
 {"id": "blk_10ae7edc", "type": "text", "content": "f=AES(key, b64) // 오일러 기호", "parent": null, "created": "2026-10-18T13:40:25.031181"}
+{"id": "blk_b158e117", "type": "text", "content": "# 4명 조합 테스트\n\n## 증거\n- 함수 3개\n- 문자열 ['http://c2.evil.com', 'license check failed']\n\n결론: CONFIRMED — 외부 LLM(openrouter_free_generic) + 로컬 도구로 분석", "parent": null, "created": "2026-10-18T14:16:14.543897"}

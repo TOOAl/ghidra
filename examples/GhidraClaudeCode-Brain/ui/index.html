@@ -3,22 +3,30 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>GhidraClaudeCode-Brain — Notion + Obsidian UI</title>
+<title>GhidraClaudeCode-Brain — 웹 프로그램</title>
 <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
 <header>
   <h1>🧠 GhidraClaudeCode-Brain</h1>
-  <small>외부 LLM(무료) + 로컬 두뇌 — 블록·DB·그래프</small>
+  <small>외부 LLM(무료) + 로컬 두뇌 — 한 글자 진화</small>
+  <div class="runbar">
+    <input id="binary" placeholder="바이너리: /bin/ls 또는 Notion app.asar" value="/bin/ls"/>
+    <input id="task" placeholder="작업: 예) 4명 조합으로 C2 찾아줘" value="4명 조합으로 C2 찾아줘"/>
+    <select id="model"></select>
+    <button onclick="run()" id="runBtn">▶ 실행</button>
+  </div>
   <div class="tabs">
-    <button onclick="show('blocks')" class="active">📄 블록 (Notion)</button>
+    <button onclick="show('report')" class="active">📝 보고서</button>
+    <button onclick="show('blocks')">📄 블록 (Notion)</button>
     <button onclick="show('database')">🗃️ DB (Notion)</button>
     <button onclick="show('graph')">🕸️ 그래프 (Obsidian)</button>
-    <button onclick="show('queue')">📡 큐 (오프라인)</button>
+    <button onclick="show('queue')">📡 큐</button>
   </div>
 </header>
 <main>
-  <section id="blocks" class="panel active"></section>
+  <section id="report" class="panel active"><p>위에서 작업을 입력하고 ▶ 실행을 누르세요.</p></section>
+  <section id="blocks" class="panel"></section>
   <section id="database" class="panel"></section>
   <section id="graph" class="panel"><canvas id="c" width="800" height="400"></canvas></section>
   <section id="queue" class="panel"></section>

@@ -22,3 +22,4 @@
 {"task": "2023 SVB 재예측 2023", "hindsight": "속도 10배 11D 추가 → 89→94% +5%, 파산 LIKELY 70% 상향, 24시간 적중"}
 {"task": "2023 SVB 재재예측 2023 집중도", "hindsight": "집중도 47 12D → 94→95% +1%, 파산 75%+전염 60%, 95% 천장 달성"}
 {"task": "2017 WannaCry 재재예측 B 사이버", "hindsight": "킬스위치 13D → 92→97% +5%, 사이버 본업 최고, 킬스위치 40% 적중"}
+{"task": "2017 WannaCry Ghidra 실전 B-2", "hindsight": "Ghidra 5도구 킬스위치 직접 추출 → 97→98% +1%, InternetOpenUrlA LIKELY 90%"}

@@ -97,19 +97,38 @@ def run_task(task: str, binary: str, preset: str):
         ev = {}
         ev["list_functions"] = r.dispatch("list_functions", {"limit": 5})
         ev["list_strings"] = r.dispatch("list_strings", {"filter": "http"})
-        # 모순 검사
+        ev["get_xrefs"] = r.dispatch("get_xrefs", {"name": "main"})
+        from brain.reasoning import reason
+        re = reason(task, ev)
+        try:
+            from ml.analysis import analyze
+            an = analyze(20)
+        except: an = {"insight": "분석 대기", "pattern": ""}
+        try:
+            from ml.learn import train, predict
+            tr = train()
+            pr = predict(task, list(ev.keys()))
+        except: tr, pr = {"accuracy": 0, "insight": ""}, {"prediction": "?"}
+        de = None
+        if any(k in task for k in ["설계", "만들어", "구조"]):
+            try:
+                from notion.design import design
+                de = design(task)
+            except: pass
         from brain.contradiction import check_contradiction
-        report = f"# {task}\n\n## 증거\n- 함수 {len(ev['list_functions'].get('functions',[]))}개\n- 문자열 {ev['list_strings'].get('strings',[])[:2]}\n\n결론: CONFIRMED — 외부 LLM({preset or 'mock'}) + 로컬 도구로 분석"
+        report = f"# {task}\n\n## 1. 추론\n- {'✅ ' + ' | '.join(re.get('steps',[])) if re['ok'] else '❌ ' + re.get('reason','')}\n\n## 2. 분석\n- {an.get('insight','')} ({an.get('pattern','')})\n\n## 3. 학습\n- {tr.get('insight','')} | 예측: {pr.get('prediction','')}\n"
+        if de:
+            report += f"\n## 4. 설계\n- {de.get('insight','')} → {de.get('blocks',[])}\n"
+        report += f"\n## 증거\n- 함수 {len(ev['list_functions'].get('functions',[]))}개, 문자열 {ev['list_strings'].get('strings',[])[:2]}\n- 외부 LLM({preset or 'mock'}) + 로컬\n"
         contra = check_contradiction(report, ev)
+        report += f"\n## 모순 검사\n- {contra['summary']}\n"
         if not contra["ok"]:
-            report += f"\n\n[모순] {contra['summary']} → {contra['suggested_downgrades']}"
-        # Notion 블록 + 세션 저장
-        create_block(report[:400], type="text")
-        # session 저장
+            report += f"- 강등: {contra['suggested_downgrades']}\n"
+        create_block(report[:600], type="text")
         (MEM / "session.jsonl").parent.mkdir(parents=True, exist_ok=True)
         with open(MEM / "session.jsonl", "a", encoding="utf-8") as f:
-            f.write(json.dumps({"task": task, "binary": binary, "preset": preset, "report": report[:800]}, ensure_ascii=False)+"\n")
-        return {"ok": True, "report": report, "contradiction": contra, "preset": preset or "mock"}
+            f.write(json.dumps({"task": task, "binary": binary, "preset": preset, "report": report[:1000], "reasoning": re, "analysis": an, "train": tr}, ensure_ascii=False)+"\n")
+        return {"ok": True, "report": report, "contradiction": contra, "reasoning": re, "analysis": an, "train": tr, "preset": preset or "mock"}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 

@@ -28,7 +28,11 @@ async function run(){
   try{
     const r=await fetch('/api/run', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({task,binary,preset})});
     const j=await r.json();
-    rep.innerHTML = `<pre>${esc(j.report||j.error||'')}</pre>` + (j.contradiction? `<p><small>모순: ${esc(j.contradiction.summary)}</small></p>`:'');
+    let extra = '';
+    if(j.reasoning) extra += `<p><small>🧠 추론: ${esc(j.reasoning.steps? j.reasoning.steps.join(' → '): j.reasoning.reason||'')}</small></p>`;
+    if(j.analysis) extra += `<p><small>📊 분석: ${esc(j.analysis.insight||'')} (${esc(j.analysis.pattern||'')})</small></p>`;
+    if(j.train) extra += `<p><small>📚 학습: ${esc(j.train.insight||'')} | 예측: ${esc(j.train.prediction||'')}</small></p>`;
+    rep.innerHTML = `<pre>${esc(j.report||j.error||'')}</pre>` + extra + (j.contradiction? `<p><small>모순: ${esc(j.contradiction.summary)}</small></p>`:'');
     show('report');
   }catch(e){ rep.innerHTML='<p>실패: '+esc(e.message)+'</p>'; }
   btn.disabled=false; btn.textContent='▶ 실행';

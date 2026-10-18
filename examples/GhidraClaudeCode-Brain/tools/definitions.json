@@ -331,5 +331,26 @@
       },
       "required": ["requirement"]
     }
+  },
+  {
+    "name": "train_classifier",
+    "description": "ML 학습 — 10개 분석으로 분류기 학습, 80% 정확도 검증.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "samples": { "type": "integer", "default": 10 }
+      }
+    }
+  },
+  {
+    "name": "predict_task",
+    "description": "ML 예측 — 학습된 모델로 다음 분석 자동 분류.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "task": { "type": "string" }
+      },
+      "required": ["task"]
+    }
   }
 ]

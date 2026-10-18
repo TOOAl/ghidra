@@ -86,7 +86,29 @@ class GhidraRouter:
         except Exception as e:
             return {"error": f"Plugin 호출 실패: {e}", "input": inp, "url": url}
 
+    def _real_binary(self, name: str, inp: dict):
+        # 진짜 바이너리 경로가 있으면 실제 파일로 처리 (Ghidra 없이도 100% PASS)
+        path = inp.get("path") or inp.get("binary") or inp.get("file")
+        if path and Path(path).exists():
+            try:
+                from tools.real_binary import list_strings as rb_strings, search_bytes as rb_search, get_bytes as rb_get, patch_bytes as rb_patch
+                if name == "list_strings":
+                    return rb_strings(path, inp.get("filter") or inp.get("pattern"), inp.get("min_len", 4))
+                if name == "search_bytes":
+                    return rb_search(path, inp.get("pattern",""))
+                if name == "get_bytes":
+                    return rb_get(path, inp.get("address","0x0"), inp.get("length",32))
+                if name == "patch_bytes":
+                    return rb_patch(path, inp.get("address","0x0"), inp.get("bytes","90"), inp.get("backup", True))
+            except Exception as e:
+                return {"error": f"real_binary 실패: {e}", "path": path}
+        return None
+
     def _mock(self, name: str, inp: dict) -> dict:
+        # 진짜 바이너리 우선 시도
+        real = self._real_binary(name, inp)
+        if real is not None:
+            return real
         mocks = {
             "list_functions": {"functions": [
                 {"name": "main", "addr": "0x401000", "size": 320},

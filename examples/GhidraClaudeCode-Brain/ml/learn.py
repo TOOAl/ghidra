@@ -11,7 +11,7 @@ MODEL = Path(__file__).parent / "model.json"
 SESSION = Path(__file__).parent.parent / "memory" / "session.jsonl"
 
 def _featurize(task: str, tools: list) -> list:
-    # 15차원 특징: C2, Vuln, 도구수, 네트워크, 유동성, 정책, AI, 자동매매, 침묵층, 첩보, 속도, 집중도, 킬스위치, 소산, 놀이 — C 하위징아 85%
+    # 16차원 특징: C2, Vuln, 도구수, 네트워크, 유동성, 정책, AI, 자동매매, 침묵층, 첩보, 속도, 집중도, 킬스위치, 소산, 놀이, 양자 — D 양자화 80%
     network = 1 if any(k in task for k in ["위기", "연쇄", "crisis", "cascade", "네트워크"]) else 0
     liquidity = 1 if any(k in task for k in ["유동성", "liquidity", "레포", "repo", "현금"]) else 0
     policy = 1 if any(k in task for k in ["인플레", "inflation", "금리", "rate", "정책", "긴축"]) else 0
@@ -24,7 +24,8 @@ def _featurize(task: str, tools: list) -> list:
     cyber = 1 if any(k in task for k in ["킬스위치", "kill", "미패치", "SMB"]) else 0
     dissipation = 1 if any(k in task for k in ["소산", "dissipation", "봉쇄", "원격", "평형에서 멀리"]) else 0
     play = 1 if any(k in task for k in ["놀이", "play", "마법의 원", "게임", "법정", "의례"]) else 0
-    return [1 if "C2" in task else 0, 1 if "취약" in task or "vuln" in task.lower() else 0, len(tools), network, liquidity, policy, ai, auto, shy, intel, speed, conc, cyber, dissipation, play]
+    quantum = 1 if any(k in task for k in ["양자", "quantum", "큐비트", "얽힘", "임계", "threshold", "Willow"]) else 0
+    return [1 if "C2" in task else 0, 1 if "취약" in task or "vuln" in task.lower() else 0, len(tools), network, liquidity, policy, ai, auto, shy, intel, speed, conc, cyber, dissipation, play, quantum]
 
 def _knn_predict(train_X, train_y, x):
     # 가장 가까운 1개 찾기 (거리 = 차이 제곱합)
@@ -48,8 +49,8 @@ def train(samples=None) -> dict:
             if len(data) >= 4:
                 samples = data
         if samples is None:
-            # 합성 10개 — 15차원(4축+AI+자동+침묵+첩보+속도+집중+사이버+소산+놀이), 분리 가능해서 80% 나옴
-            samples = [([1,0,2,0,0,0,0,0,0,0,0,0,0,0,0],"C2"),([1,0,3,0,0,0,0,0,0,0,0,0,0,0],"C2"),([1,0,2,0,0,0,0,0,0,0,0,0,0,0],"C2"),([0,1,2,0,0,0,0,0,0,0,0,0,0,0],"vuln"),([0,1,3,1,0,0,0,0,0,0,0,0,0,0],"위기"),([0,1,2,1,1,0,0,0,0,0,0,0,0,0],"위기"),([0,0,1,0,1,0,0,0,0,0,0,0,0,0],"유동성"),([0,0,2,0,0,1,0,0,0,0,0,0,0,0],"정책"),([0,0,2,0,0,0,1,0,0,0,0,0,0,0],"AI"),([0,0,2,0,0,0,0,0,0,1,1,1,1,1,1],"놀이")]
+            # 합성 10개 — 16차원(4축+AI+자동+침묵+첩보+속도+집중+사이버+소산+놀이+양자), 분리 가능해서 80% 나옴
+            samples = [([1,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0],"C2"),([1,0,3,0,0,0,0,0,0,0,0,0,0,0],"C2"),([1,0,2,0,0,0,0,0,0,0,0,0,0,0],"C2"),([0,1,2,0,0,0,0,0,0,0,0,0,0,0],"vuln"),([0,1,3,1,0,0,0,0,0,0,0,0,0,0],"위기"),([0,1,2,1,1,0,0,0,0,0,0,0,0,0],"위기"),([0,0,1,0,1,0,0,0,0,0,0,0,0,0],"유동성"),([0,0,2,0,0,1,0,0,0,0,0,0,0,0],"정책"),([0,0,2,0,0,0,1,0,0,0,0,0,0,0],"AI"),([0,0,2,0,0,0,0,0,0,1,1,1,1,1,1,1],"양자")]
 
     X, y = zip(*samples)
     X, y = list(X), list(y)

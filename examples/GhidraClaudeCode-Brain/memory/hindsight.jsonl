@@ -11,3 +11,4 @@
 {"task": "1986 챌린저 1986 예측", "hindsight": "O링 LIKELY 맞고 발사강행 POSSIBLE 56%, 조직벽"}
 {"task": "2017 WannaCry 2017 예측", "hindsight": "SMB 웜 LIKELY 92% 본업 최고점, Ghidra证据"}
 {"task": "2011 후쿠시마 2011 예측", "hindsight": "대지진 원전 POSSIBLE 44%, 자연2중연쇄 벽"}
+{"task": "1987 재예측 1987", "hindsight": "자동매매 30% 8D 추가 → 62→74% +12%, POSSIBLE 40→60%"}

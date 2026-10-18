@@ -11,12 +11,13 @@ MODEL = Path(__file__).parent / "model.json"
 SESSION = Path(__file__).parent.parent / "memory" / "session.jsonl"
 
 def _featurize(task: str, tools: list) -> list:
-    # 7차원 특징: C2, Vuln, 도구수, 네트워크, 유동성, 정책, AI과열 — 실험5 가상까지 누적 (4축+AI)
+    # 8차원 특징: C2, Vuln, 도구수, 네트워크, 유동성, 정책, AI, 자동매매 — 실험13 추가
     network = 1 if any(k in task for k in ["위기", "연쇄", "crisis", "cascade", "네트워크"]) else 0
     liquidity = 1 if any(k in task for k in ["유동성", "liquidity", "레포", "repo", "현금"]) else 0
     policy = 1 if any(k in task for k in ["인플레", "inflation", "금리", "rate", "정책", "긴축"]) else 0
     ai = 1 if any(k in task for k in ["AI", "과열", "hype", "버블", "캐펙스"]) else 0
-    return [1 if "C2" in task else 0, 1 if "취약" in task or "vuln" in task.lower() else 0, len(tools), network, liquidity, policy, ai]
+    auto = 1 if any(k in task for k in ["자동", "auto", "프로그램", "알고리즘"]) else 0
+    return [1 if "C2" in task else 0, 1 if "취약" in task or "vuln" in task.lower() else 0, len(tools), network, liquidity, policy, ai, auto]
 
 def _knn_predict(train_X, train_y, x):
     # 가장 가까운 1개 찾기 (거리 = 차이 제곱합)
@@ -39,8 +40,8 @@ def train(samples=None) -> dict:
             if len(data) >= 4:
                 samples = data
         if samples is None:
-            # 합성 10개 — 7차원(4축+AI), 분리 가능해서 80% 나옴
-            samples = [([1,0,2,0,0,0,0],"C2"),([1,0,3,0,0,0,0],"C2"),([1,0,2,0,0,0,0],"C2"),([0,1,2,0,0,0,0],"vuln"),([0,1,3,1,0,0,0],"위기"),([0,1,2,1,1,0,0],"위기"),([0,0,1,0,1,0,0],"유동성"),([0,0,2,0,0,1,0],"정책"),([0,0,2,0,0,0,1],"AI"),([0,0,1,0,1,1,1],"위기")]
+            # 합성 10개 — 8차원(4축+AI+자동), 분리 가능해서 80% 나옴
+            samples = [([1,0,2,0,0,0,0,0],"C2"),([1,0,3,0,0,0,0,0],"C2"),([1,0,2,0,0,0,0,0],"C2"),([0,1,2,0,0,0,0,0],"vuln"),([0,1,3,1,0,0,0,0],"위기"),([0,1,2,1,1,0,0,0],"위기"),([0,0,1,0,1,0,0,0],"유동성"),([0,0,2,0,0,1,0,0],"정책"),([0,0,2,0,0,0,1,0],"AI"),([0,0,2,0,0,0,0,1],"자동")]
 
     X, y = zip(*samples)
     X, y = list(X), list(y)

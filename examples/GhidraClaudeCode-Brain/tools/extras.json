@@ -1,0 +1,16 @@
+[
+  "list_imports",
+  "search_bytes",
+  "get_bytes",
+  "patch_bytes",
+  "list_js_modules",
+  "get_js_source",
+  "list_ipc_channels",
+  "list_dotnet_info",
+  "list_firmware_info",
+  "get_website_structure",
+  "create_block",
+  "query_database",
+  "queue_sync",
+  "check_contradiction"
+]

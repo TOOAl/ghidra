@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>GhidraClaudeCode-Brain — Notion + Obsidian UI</title>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<header>
+  <h1>🧠 GhidraClaudeCode-Brain</h1>
+  <small>외부 LLM(무료) + 로컬 두뇌 — 블록·DB·그래프</small>
+  <div class="tabs">
+    <button onclick="show('blocks')" class="active">📄 블록 (Notion)</button>
+    <button onclick="show('database')">🗃️ DB (Notion)</button>
+    <button onclick="show('graph')">🕸️ 그래프 (Obsidian)</button>
+    <button onclick="show('queue')">📡 큐 (오프라인)</button>
+  </div>
+</header>
+<main>
+  <section id="blocks" class="panel active"></section>
+  <section id="database" class="panel"></section>
+  <section id="graph" class="panel"><canvas id="c" width="800" height="400"></canvas></section>
+  <section id="queue" class="panel"></section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,3 +1,8 @@
 {"id": "blk_e8e038ab", "type": "callout", "content": "C2 분석 보고서 — http://c2.evil.com 발견", "parent": null, "created": "2026-10-18T13:32:20.170487"}
 {"id": "blk_02c46a81", "type": "code", "content": "다빈치 스케치", "parent": null, "created": "2026-10-18T13:37:40.596952"}
 {"id": "blk_780dbefe", "type": "code", "content": "if(key==0) return -1; // 스케치", "parent": null, "created": "2026-10-18T13:37:50.452964"}
+{"id": "blk_f2c43331", "type": "text", "content": "상태: main(S1) --[auth]--> fail(S2) // 튜링 형식화", "parent": null, "created": "2026-10-18T13:39:17.625527"}
+{"id": "blk_1e2050dd", "type": "text", "content": "f(x)=AES_decrypt(key,data) // 오일러 기호", "parent": null, "created": "2026-10-18T13:39:17.625729"}
+{"id": "blk_f851ca7d", "type": "text", "content": "상태: S1 --UPX--> S2 --AES--> S3 // 튜링 형식화", "parent": null, "created": "2026-10-18T13:40:25.030988"}
+{"id": "blk_7a105ea6", "type": "code", "content": "if (key==0) return -1; // 다빈치 스케치: 잠금", "parent": null, "created": "2026-10-18T13:40:25.031099"}
+{"id": "blk_10ae7edc", "type": "text", "content": "f=AES(key, b64) // 오일러 기호", "parent": null, "created": "2026-10-18T13:40:25.031181"}

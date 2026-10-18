@@ -28,6 +28,13 @@ SYSTEM_PROMPT = """\
 - rename_function: 함수명 복구 (의미있는 이름으로)
 - set_comment: 주석
 - search_memory: 과거 기억 검색 (비슷한 함수/버그 찾음)
+
+천재 모드 (task에 트리거 단어 있으면 해당 사고 3단계 자동 추가):
+- 다빈치: 관찰→스케치→연결
+- 퀴리: 측정→반복→실패로그
+- 튜링: 형식화→해독→모방검증
+- 오일러: 기호→일반화→우아한 계산
+모순 검사: 보고서 전 check_contradiction으로 CONFIRMED 강등 여부 확인
 """
 
 class BrainAgent:
@@ -95,29 +102,74 @@ class BrainAgent:
         else:
             report = "(최대 턴 초과)"
 
-        # 3. 평가
+        # 3. 모순 검사 (통합) — 보고서 전 자동
+        print("\n[Brain] 모순 검사 중...")
+        contra = self._contradiction_check(report, tool_log)
+        print(f"[Brain] 모순: {contra['summary']}")
+        if not contra["ok"]:
+            print(f"[Brain] 강등 제안: {contra['suggested_downgrades']}")
+            report += f"\n\n[모순 검사] {contra['summary']}\n"
+            for d in contra["suggested_downgrades"]:
+                report += f"- {d['from']}→{d['to']} ({d['reason']})\n"
+
+        # 4. 평가
         print("\n[Brain] 자체 평가 중...")
         evaluation = evaluate(self.adapter, task, report, tool_log)
         print(f"[Brain] 평가: {evaluation}")
 
-        # 4. 세션 저장 (자가학습)
+        # 5. 블록 저장 (Notion 흡수) — 보고서 1개 = 블록 1개
+        try:
+            from notion.blocks import create_block
+            create_block(report[:500], type="text")
+        except Exception:
+            pass
+
+        # 6. 세션 저장 (자가학습)
         self._save_session(task, plan, tool_log, report, evaluation)
 
         return {"report": report, "tool_log": tool_log, "plan": plan, "evaluation": evaluation}
 
+    def _genius_prompt(self, task: str) -> str:
+        low = task.lower()
+        inject = []
+        if any(k in low for k in ["다빈치", "da vinci", "관찰", "스케치"]):
+            inject.append("[다빈치] 관찰→스케치(code 블록)→연결 3문장 필수")
+        if any(k in low for k in ["퀴리", "curie", "측정", "반복"]):
+            inject.append("[퀴리] 측정 숫자3개→반복 차이→실패로그 1문장 필수")
+        if any(k in low for k in ["튜링", "turing", "형식화", "해독"]):
+            inject.append("[튜링] 형식화 상태도→해독 논리식→모방 반증 1문장 필수")
+        if any(k in low for k in ["오일러", "euler", "일반화", "기호"]):
+            inject.append("[오일러] 기호 수식→일반화 n개→우아한 2바이트 1문장 필수")
+        if "4명" in low or "조합" in low or all(k in low for k in ["다빈치", "퀴리"]):
+            inject.append("[조합] 4명 각각 1문장 + 모순 검사로 교차 검증")
+        return "\n".join(inject) if inject else ""
+
+    def _contradiction_check(self, report: str, tool_log: list) -> dict:
+        try:
+            from .contradiction import check_contradiction
+            evidence = {t["tool"]: t["input"] for t in tool_log}
+            # tool result_preview도 증거에 포함
+            for t in tool_log:
+                evidence[t["tool"] + "_result"] = t.get("result_preview", "")
+            return check_contradiction(report, evidence)
+        except Exception as e:
+            return {"contradictions": [], "ok": True, "summary": f"검사 실패: {e}"}
+
     def _build_initial_prompt(self, task: str, plan: dict = None) -> str:
         parts = [f"작업: {task}"]
+        genius = self._genius_prompt(task)
+        if genius:
+            parts.append(f"\n[천재 모드]\n{genius}")
         if plan:
             parts.append(f"\n계획:\n{json.dumps(plan, ensure_ascii=False, indent=2)}")
         if self.memory:
-            # 관련 기억 미리 주입
             try:
                 recalled = self.memory.search(task, k=3)
                 if recalled:
                     parts.append(f"\n[기억에서 찾은 유사 사례]\n{json.dumps(recalled, ensure_ascii=False)[:2000]}")
             except Exception:
                 pass
-        parts.append("\n위 계획대로 도구를 사용해 분석을 시작해라.")
+        parts.append("\n위 계획대로 도구를 사용해 분석을 시작해라. 보고서 전 check_contradiction으로 검증하라.")
         return "\n".join(parts)
 
     def _save_session(self, task, plan, tool_log, report, evaluation):

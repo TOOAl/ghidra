@@ -239,5 +239,42 @@
       },
       "required": ["report"]
     }
+  },
+  {
+    "name": "computer_use",
+    "description": "cua 흡수 — 컴퓨터 화면을 보고 클릭/타이핑. Ghidra/웹 UI 조종.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "action": { "type": "string", "enum": ["screenshot", "click", "type", "key"], "default": "screenshot" },
+        "x": { "type": "integer", "description": "click x" },
+        "y": { "type": "integer", "description": "click y" },
+        "text": { "type": "string", "description": "type/key 텍스트" }
+      },
+      "required": ["action"]
+    }
+  },
+  {
+    "name": "live_debug",
+    "description": "raddebugger 흡수 — 프로세스에 붙어 10줄 추적, 정적 vs 동적 비교.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "action": { "type": "string", "enum": ["attach", "trace", "detach"], "default": "trace" },
+        "address": { "type": "string", "description": "추적 시작 주소" },
+        "steps": { "type": "integer", "default": 10 }
+      }
+    }
+  },
+  {
+    "name": "openrig_team",
+    "description": "openrig 흡수 — 천재 4명을 팀(역할)으로 협업, 공유 컨텍스트로 합의.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "task": { "type": "string", "description": "팀 작업 (예: C2 분석)" }
+      },
+      "required": ["task"]
+    }
   }
 ]

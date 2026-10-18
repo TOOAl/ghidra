@@ -1,0 +1,20 @@
+{
+  "name": "ghidra-brain-marketplace",
+  "description": "GhidraClaudeCode-Brain 스킬 마켓 — knowledge-work-plugins 포맷",
+  "skills": [
+    {"name": "find_c2", "description": "C2 찾기", "triggers": ["C2"]},
+    {"name": "find_vuln", "description": "취약점 찾기", "triggers": ["vuln"]},
+    {"name": "find_crypto", "description": "암호 찾기", "triggers": ["crypto"]},
+    {"name": "unpack_upx", "description": "UPX 언패킹", "triggers": ["UPX"]},
+    {"name": "analyze_notion", "description": "Notion 흡수", "triggers": ["notion"]},
+    {"name": "genius_da_vinci", "description": "다빈치", "triggers": ["다빈치"]},
+    {"name": "genius_curie", "description": "퀴리", "triggers": ["퀴리"]},
+    {"name": "genius_turing", "description": "튜링", "triggers": ["튜링"]},
+    {"name": "genius_euler", "description": "오일러", "triggers": ["오일러"]},
+    {"name": "cua_computer_use", "description": "컴퓨터 조종", "triggers": ["cua"]},
+    {"name": "knowledge_work", "description": "공식 포맷", "triggers": ["knowledge"]},
+    {"name": "openrig_team", "description": "팀 협업", "triggers": ["openrig"]},
+    {"name": "agent_memory", "description": "기억+회고", "triggers": ["memory"]},
+    {"name": "rad_debug", "description": "라이브 디버거", "triggers": ["debug"]}
+  ]
+}

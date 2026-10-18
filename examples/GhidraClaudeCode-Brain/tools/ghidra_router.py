@@ -115,5 +115,8 @@ class GhidraRouter:
             "create_block": {"ok": True, "type": inp.get("type", "text"), "id": "blk_" + inp.get("content", "")[:8].replace(" ", "_")},
             "query_database": {"filter": inp.get("filter"), "results": [{"task": "C2 분석", "model": "qwen/qwen3-32b:free", "date": "2026-10-18"}]},
             "queue_sync": {"ok": True, "queued": inp.get("task"), "queue_len": 1},
+            "computer_use": {"action": inp.get("action"), "ok": True, "note": "cua mock: screenshot 800x600, click at (%s,%s)" % (inp.get("x"), inp.get("y"))},
+            "live_debug": {"action": inp.get("action"), "ok": True, "trace": ["0x401000: mov eax, 1", "0x401005: call 0x401200"], "vs_static": "일치"},
+            "openrig_team": {"task": inp.get("task"), "team": ["다빈치:관찰", "퀴리:측정", "튜링:해독", "오일러:일반화"], "consensus": "4/4 동의 → CONFIRMED"},
         }
         return mocks.get(name, {"mock": True, "input": inp})

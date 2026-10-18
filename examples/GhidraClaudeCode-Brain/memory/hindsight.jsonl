@@ -25,3 +25,4 @@
 {"task": "2017 WannaCry Ghidra 실전 B-2", "hindsight": "Ghidra 5도구 킬스위치 직접 추출 → 97→98% +1%, InternetOpenUrlA LIKELY 90%"}
 {"task": "3종 패밀리 B-3 사이버", "hindsight": "3비트 Ghidra 3종 98% 일반화, 97→98% 사이버 천장"}
 {"task": "2020 소산구조 C-1 프리고진", "hindsight": "프리고진 3조건 봉쇄 90%+소산80%+요동85%=원격 85% 예측 14D 추가"}
+{"task": "3종 소산구조 C-2", "hindsight": "원격85+배달80+구독75 3비트 30샘플 100% PASS 85% 일반화"}

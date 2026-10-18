@@ -276,5 +276,39 @@
       },
       "required": ["task"]
     }
+  },
+  {
+    "name": "code_read",
+    "description": "일반 코딩 — 파일 읽기. Claude Code처럼 코드 보기.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string", "description": "파일 경로 (예: src/app.js)" }
+      },
+      "required": ["path"]
+    }
+  },
+  {
+    "name": "code_write",
+    "description": "일반 코딩 — 파일 쓰기. 반드시 reasoning으로 검증 후 저장.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string", "description": "저장 경로" },
+        "content": { "type": "string", "description": "파일 내용" }
+      },
+      "required": ["path", "content"]
+    }
+  },
+  {
+    "name": "code_exec",
+    "description": "일반 코딩 — 명령 실행. 코드 실행 결과 확인, 실패 시 hindsight 저장.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "cmd": { "type": "string", "description": "실행 명령 (예: python src/new.py)" }
+      },
+      "required": ["cmd"]
+    }
   }
 ]

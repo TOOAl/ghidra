@@ -118,5 +118,26 @@ class GhidraRouter:
             "computer_use": {"action": inp.get("action"), "ok": True, "note": "cua mock: screenshot 800x600, click at (%s,%s)" % (inp.get("x"), inp.get("y"))},
             "live_debug": {"action": inp.get("action"), "ok": True, "trace": ["0x401000: mov eax, 1", "0x401005: call 0x401200"], "vs_static": "일치"},
             "openrig_team": {"task": inp.get("task"), "team": ["다빈치:관찰", "퀴리:측정", "튜링:해독", "오일러:일반화"], "consensus": "4/4 동의 → CONFIRMED"},
+            "code_read": {"path": inp.get("path"), "content": f"// mock read {inp.get('path')}", "ok": True},
+            "code_write": {"path": inp.get("path"), "ok": True, "note": "mock write ok"},
+            "code_exec": {"cmd": inp.get("cmd"), "ok": True, "output": "mock exec ok"},
         }
+        # 실제 로컬 동작 — mock 전에 진짜 시도 (Arena 샌드박스=실제 파일)
+        if name in ("code_read", "code_write", "code_exec"):
+            try:
+                if name == "code_read":
+                    p = Path(inp.get("path", ""))
+                    if p.exists():
+                        return {"path": str(p), "content": p.read_text()[:8000], "ok": True}
+                if name == "code_write":
+                    p = Path(inp.get("path", ""))
+                    p.parent.mkdir(parents=True, exist_ok=True)
+                    p.write_text(inp.get("content", ""))
+                    return {"path": str(p), "ok": True, "bytes": len(inp.get("content", ""))}
+                if name == "code_exec":
+                    import subprocess
+                    r = subprocess.run(inp.get("cmd", ""), shell=True, capture_output=True, text=True, timeout=10)
+                    return {"cmd": inp.get("cmd"), "ok": r.returncode == 0, "stdout": r.stdout[:2000], "stderr": r.stderr[:1000], "code": r.returncode}
+            except Exception as e:
+                return {"error": str(e), "ok": False}
         return mocks.get(name, {"mock": True, "input": inp})

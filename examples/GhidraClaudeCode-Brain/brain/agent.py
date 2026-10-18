@@ -102,7 +102,18 @@ class BrainAgent:
         else:
             report = "(최대 턴 초과)"
 
-        # 3. 모순 검사 (통합) — 보고서 전 자동
+        # 3. 추론 검증 — 측정 가능한 완벽 (모순0, 증거100%, 반복0)
+        print("\n[Brain] 추론 검증 중 (reasoning.py 3단계)...")
+        try:
+            from brain.reasoning import reason as brain_reason
+            evidence = {t["tool"]: t.get("result_preview", "") for t in tool_log}
+            r = brain_reason(task, evidence)
+            print(f"[Brain] 추론: {r}")
+            if not r["ok"]:
+                report += f"\n\n[추론 검증 실패] {r['reason']}\n"
+        except Exception as e:
+            print(f"[Brain] 추론 검증 실패: {e}")
+        # 4. 모순 검사 (통합) — 보고서 전 자동
         print("\n[Brain] 모순 검사 중...")
         contra = self._contradiction_check(report, tool_log)
         print(f"[Brain] 모순: {contra['summary']}")
@@ -112,19 +123,19 @@ class BrainAgent:
             for d in contra["suggested_downgrades"]:
                 report += f"- {d['from']}→{d['to']} ({d['reason']})\n"
 
-        # 4. 평가
+        # 5. 평가
         print("\n[Brain] 자체 평가 중...")
         evaluation = evaluate(self.adapter, task, report, tool_log)
         print(f"[Brain] 평가: {evaluation}")
 
-        # 5. 블록 저장 (Notion 흡수) — 보고서 1개 = 블록 1개
+        # 6. 블록 저장 (Notion 흡수) — 보고서 1개 = 블록 1개
         try:
             from notion.blocks import create_block
             create_block(report[:500], type="text")
         except Exception:
             pass
 
-        # 6. 세션 저장 (자가학습)
+        # 7. 세션 저장 (자가학습)
         self._save_session(task, plan, tool_log, report, evaluation)
 
         return {"report": report, "tool_log": tool_log, "plan": plan, "evaluation": evaluation}

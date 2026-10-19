@@ -104,11 +104,20 @@ function updateCursor(){
 
 // Preview (reuse app.js logic)
 function showTab(id){
-  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.preview-tabs button').forEach(b=>b.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-  document.querySelector(`[data-tab="${id}"]`).classList.add('active');
-  if(id==='blocks')loadBlocks(); if(id==='graph')loadGraph(); if(id==='terminal'){} if(id==='git')loadGit(); if(id==='test')loadTests();
+  document.querySelectorAll('.preview .panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.pv-tabs button, .preview-tabs button').forEach(b=>b.classList.remove('active'));
+  const el=document.getElementById(id);
+  if(el) el.classList.add('active');
+  const tab=document.querySelector(`[data-tab="${id}"]`);
+  if(tab) tab.classList.add('active');
+  if(id==='blocks')loadBlocks(); if(id==='graph')loadGraph();
+}
+function showBottom(id){
+  document.querySelectorAll('.bpanel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));
+  document.getElementById('b-'+id)?.classList.add('active');
+  document.querySelector(`[data-btab="${id}"]`)?.classList.add('active');
+  if(id==='git') loadGit(); if(id==='test') loadTests();
 }
 function clearConsole(){document.getElementById('consoleLog').textContent='콘솔 지움 — 다음 로그부터 표시';}
 function quick(t){document.getElementById('task').value=t;toast('작업: '+t)}

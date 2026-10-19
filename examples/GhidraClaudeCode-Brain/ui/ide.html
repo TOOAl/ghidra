@@ -3,180 +3,167 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>🧠 Claude Code-like IDE — 왼쪽 코딩 → 오른쪽 결과</title>
+<title>Claude Code IDE — Ghidra Brain</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.css"/>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/dracula.min.css"/>
-<link rel="stylesheet" href="ide.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/material-darker.min.css"/>
+<link rel="stylesheet" href="/ui/ide.css"/>
 </head>
 <body>
-<div id="statusBar" class="status-bar">
-  <span id="statusDot" class="dot"></span>
-  <span id="statusText">서버 확인 중...</span>
-  <span id="statusRight">
-    <a href="/" class="link-btn">← 클래식 모드</a>
-    <span>v1.0 · IDE</span>
-  </span>
+<!-- Top status -->
+<div id="statusBar" class="topbar">
+  <div class="topbar-left">
+    <span class="logo">◉ Brain IDE</span>
+    <span id="statusDot" class="dot"></span>
+    <span id="statusText">연결 확인 중…</span>
+  </div>
+  <div class="topbar-right">
+    <span id="modelHint" class="hint"></span>
+    <select id="model" class="model-select"></select>
+    <a href="/" class="ghost-link">클래식 →</a>
+  </div>
 </div>
 
-<div class="ide-layout">
-  <!-- LEFT: Code -->
-  <div class="pane pane-left" id="paneLeft">
-    <div class="pane-head">
-      <div class="pane-title">
-        <span>📁 파일</span>
-        <button onclick="refreshFiles()" class="icon-btn" title="새로고침">🔄</button>
-        <input id="fileSearch" placeholder="검색..." oninput="filterFiles()" style="flex:1; min-width:80px"/>
-      </div>
-      <div class="file-tree" id="fileTree">로딩 중...</div>
+<div class="ide">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="paneLeft">
+    <div class="sb-head">
+      <span class="sb-title">EXPLORER</span>
+      <button onclick="refreshFiles()" class="sb-btn" title="새로고침">↻</button>
     </div>
-    <div class="editor-wrap" id="editorWrap">
-      <div class="editor-head">
-        <span id="currentFile">파일을 선택해</span>
-        <span id="saveStatus" class="save-status">저장됨</span>
-        <span class="editor-actions">
-          <button onclick="saveFile()" class="btn-small" id="saveBtn">💾 저장 <small>Ctrl+S</small></button>
-          <button onclick="runFromEditor()" class="btn-primary-sm" title="저장 후 바로 실행">▶ 저장+실행</button>
-        </span>
-      </div>
-      <textarea id="codeArea" placeholder="왼쪽에서 파일을 선택하면 여기에 코드가 뜬다&#10;수정 → Ctrl+S 저장 → 오른쪽에 결과 바로 반영"></textarea>
-      <div class="editor-foot">
-        <span id="cursorPos">Ln 1, Col 1</span>
-        <span id="fileInfo">UTF-8 · Python</span>
-        <span class="kbd">Ctrl+S 저장 · Ctrl+Enter 실행</span>
-      </div>
+    <input id="fileSearch" class="sb-search" placeholder="파일 검색…" oninput="filterFiles()"/>
+    <div id="fileTree" class="file-tree">불러오는 중…</div>
+    <div class="sb-foot">
+      <span id="fileInfo">—</span>
+      <span id="cursorPos">Ln 1, Col 1</span>
     </div>
-  </div>
+  </aside>
 
-  <!-- Splitter -->
-  <div class="splitter" id="splitter" title="드래그해서 크기 조절"></div>
-
-  <!-- RIGHT: Preview -->
-  <div class="pane pane-right" id="paneRight">
-    <div class="runbar">
-      <div class="runbar-field">
-        <label>📁 바이너리</label>
-        <input id="binary" value="/bin/ls" placeholder="/bin/ls"/>
-      </div>
-      <div class="runbar-field runbar-task">
-        <label>💬 작업</label>
-        <input id="task" value="C2 찾아줘" placeholder="예: C2 찾아줘"/>
-      </div>
-      <div class="runbar-field runbar-model">
-        <label>🤖 모델</label>
-        <select id="model"></select>
-        <div id="modelHint" class="model-hint"></div>
-      </div>
-      <div class="runbar-actions">
-        <button onclick="run()" id="runBtn" class="btn-primary">▶ 실행 <small>Ctrl+Enter</small></button>
-        <button onclick="clearAll()" class="btn-ghost">🗑</button>
+  <!-- Center: Editor -->
+  <main class="center">
+    <div class="ed-head">
+      <span id="currentFile" class="ed-file">파일을 선택하세요</span>
+      <span id="saveStatus" class="badge">저장됨</span>
+      <div class="ed-actions">
+        <button onclick="saveFile()" id="saveBtn" class="btn btn-ghost">저장 <span class="kbd">⌘S</span></button>
+        <button onclick="runFromEditor()" class="btn btn-primary">저장 후 실행 ▸</button>
       </div>
     </div>
-    <div class="quick-examples">
-      <span class="quick-label">💡 바로 해보기:</span>
-      <button onclick="quick('C2 찾아줘')" class="chip">C2</button>
-      <button onclick="quick('취약점 찾아줘')" class="chip">취약점</button>
-      <button onclick="quick('4명 조합으로 분석해줘')" class="chip chip-wide">4명 조합</button>
-      <button onclick="quick('양자 오류정정 분석해줘')" class="chip chip-wide">양자</button>
+    <div class="ed-wrap">
+      <textarea id="codeArea"></textarea>
     </div>
-
-    <div class="preview-tabs">
-      <button onclick="showTab('report')" class="active" data-tab="report">📝 보고서</button>
-      <button onclick="showTab('terminal')" data-tab="terminal">💻 터미널</button>
-      <button onclick="showTab('git')" data-tab="git">🌿 Git Diff</button>
-      <button onclick="showTab('test')" data-tab="test">✅ 테스트</button>
-      <button onclick="showTab('console')" data-tab="console">📋 콘솔</button>
-      <button onclick="showTab('blocks')" data-tab="blocks">📄 블록</button>
-      <button onclick="showTab('graph')" data-tab="graph">🕸️ 그래프</button>
+    <!-- Bottom terminal (inside center) -->
+    <div class="bottom">
+      <div class="tabs">
+        <button onclick="showBottom('terminal')" data-btab="terminal" class="active">TERMINAL</button>
+        <button onclick="showBottom('git')" data-btab="git">GIT</button>
+        <button onclick="showBottom('test')" data-btab="test">TEST</button>
+        <button onclick="showBottom('console')" data-btab="console">LOG</button>
+      </div>
+      <div class="bottom-body">
+        <section id="b-terminal" class="bpanel active">
+          <div class="term-line">
+            <span class="prompt">$</span>
+            <input id="termInput" placeholder="ls, git status, python verify_local.py --all --mock-ghidra" onkeydown="if(event.key==='Enter') runTerminal()"/>
+            <button onclick="runTerminal()" class="btn btn-ghost btn-sm">실행</button>
+          </div>
+          <div class="term-chips">
+            <button onclick="termQuick('ls -lh brain/ tools/')" class="chip">ls</button>
+            <button onclick="termQuick('git status --short')" class="chip">git status</button>
+            <button onclick="termQuick('python verify_local.py --all --mock-ghidra')" class="chip">verify</button>
+            <button onclick="termQuick('git diff --stat')" class="chip">diff</button>
+            <button onclick="clearTerminal()" class="chip chip-ghost">clear</button>
+          </div>
+          <pre id="termOutput" class="mono pre-dark">터미널 준비 — 명령을 입력하세요</pre>
+        </section>
+        <section id="b-git" class="bpanel">
+          <div class="git-head">
+            <span class="meta">BRANCH <b id="gitBranch">—</b></span>
+            <button onclick="loadGit()" class="btn btn-ghost btn-sm">새로고침</button>
+            <button onclick="gitCommitPrompt()" class="btn btn-primary btn-sm">Commit</button>
+          </div>
+          <div class="git-grid">
+            <div>
+              <div class="lbl">STATUS</div><pre id="gitStatus" class="pre-dark sm"></pre>
+              <div class="lbl">LOG</div><pre id="gitLog" class="pre-dark sm"></pre>
+            </div>
+            <div>
+              <div class="lbl">DIFF <button onclick="loadGitDiff()" class="btn btn-ghost btn-xs">전체</button></div>
+              <pre id="gitDiff" class="pre-dark sm diff"></pre>
+            </div>
+          </div>
+        </section>
+        <section id="b-test" class="bpanel">
+          <div class="test-head">
+            <label class="check"><input type="checkbox" id="autoTest" checked onchange="toggleAutoTest()"/> 저장 시 자동 실행</label>
+            <button onclick="runTest('verify')" class="btn btn-primary btn-sm">▶ verify 3/3</button>
+            <button onclick="loadTests()" class="btn btn-ghost btn-sm">목록</button>
+          </div>
+          <div id="testList" class="chip-row"></div>
+          <pre id="testOutput" class="mono pre-dark">테스트 준비 — 저장 시 자동 실행됩니다</pre>
+        </section>
+        <section id="b-console" class="bpanel">
+          <pre id="consoleLog" class="mono pre-dark">로그 — 파일 열기/저장/실행 내역이 여기에 표시됩니다</pre>
+        </section>
+      </div>
     </div>
+  </main>
 
-    <div class="preview-body">
+  <!-- Right: Preview -->
+  <aside class="preview" id="paneRight">
+    <div class="pv-head">
+      <div class="pv-inputs">
+        <input id="binary" class="pv-in" value="/bin/ls" placeholder="/bin/ls"/>
+        <input id="task" class="pv-in pv-in-task" value="C2 찾아줘" placeholder="작업을 입력하세요"/>
+        <button onclick="run()" id="runBtn" class="btn btn-primary">▶ Run</button>
+      </div>
+      <div class="pv-quick">
+        <button onclick="quick('C2 찾아줘')" class="chip">C2</button>
+        <button onclick="quick('취약점 찾아줘')" class="chip">취약점</button>
+        <button onclick="quick('4명 조합으로 분석해줘')" class="chip">4명 조합</button>
+        <button onclick="quick('양자 오류정정 분석해줘')" class="chip">양자</button>
+      </div>
+    </div>
+    <div class="pv-tabs">
+      <button onclick="showTab('report')" data-tab="report" class="active">Report</button>
+      <button onclick="showTab('blocks')" data-tab="blocks">Blocks</button>
+      <button onclick="showTab('graph')" data-tab="graph">Graph</button>
+    </div>
+    <div class="pv-body">
       <section id="report" class="panel active">
-        <div id="reportActions" class="panel-actions" style="display:none">
-          <button onclick="copyReport()" class="btn-small">📋 복사</button>
-          <button onclick="downloadReport()" class="btn-small">⬇ 다운로드</button>
+        <div id="reportActions" class="row" style="display:none">
+          <button onclick="copyReport()" class="btn btn-ghost btn-sm">Copy</button>
+          <button onclick="downloadReport()" class="btn btn-ghost btn-sm">Download</button>
           <span id="reportMeta" class="meta"></span>
         </div>
-        <div id="reportContent" class="report-empty">
-          <div class="empty-icon">👈</div>
-          <h3>왼쪽에서 코드 고치고 ▶ 실행을 눌러봐</h3>
-          <p>예: <code>brain/reasoning.py</code>에서 문구 바꾸고 <kbd>Ctrl+S</kbd> → <kbd>Ctrl+Enter</kbd></p>
+        <div id="reportContent" class="empty">
+          <div class="empty-icon">›</div>
+          <h3>왼쪽에서 파일을 열고 코드를 수정하세요</h3>
+          <p><code>brain/reasoning.py</code> 수정 → <span class="kbd">⌘S</span> → <span class="kbd">⌘↩</span> 실행</p>
         </div>
         <div id="reportBody"></div>
         <div id="reportExtras"></div>
       </section>
-      <section id="console" class="panel">
-        <div class="console-head"><strong>📋 콘솔</strong><button onclick="clearConsole()" class="btn-small">지우기</button></div>
-        <pre id="consoleLog" class="console-log">콘솔 준비 — 저장/실행 로그가 여기에 뜬다
-왼쪽에서 파일을 고치고 Ctrl+S → 오른쪽에 결과가 바로 반영된다
-</pre>
-      </section>
-      <section id="terminal" class="panel">
-        <div class="panel-head"><h3>💻 터미널 — 브라우저에서 바로 명령</h3>
-          <span class="meta">프로젝트 루트에서 실행 (15초 제한)</span>
-          <button onclick="clearTerminal()" class="btn-small">지우기</button>
-        </div>
-        <div class="term-bar">
-          <span class="term-prompt">$</span>
-          <input id="termInput" placeholder="예: ls brain/  또는  git status  또는  python verify_local.py --all --mock-ghidra" onkeydown="if(event.key==='Enter') runTerminal()"/>
-          <button onclick="runTerminal()" class="btn-small">실행</button>
-        </div>
-        <div class="term-quick">
-          <button onclick="termQuick('ls -lh brain/ tools/')" class="chip">ls</button>
-          <button onclick="termQuick('git status --short')" class="chip">git status</button>
-          <button onclick="termQuick('python verify_local.py --all --mock-ghidra')" class="chip">verify 3/3</button>
-          <button onclick="termQuick('python -c &quot;import brain.reasoning; print(brain.reasoning.reason(\'test\', {\'a\':1}))&quot;')" class="chip">reason test</button>
-          <button onclick="termQuick('pip list | grep openai')" class="chip">pip</button>
-        </div>
-        <pre id="termOutput" class="console-log" style="min-height:160px">터미널 준비 — 위에 명령을 쓰고 Enter
-예: git diff, pytest, ls, cat brain/reasoning.py
-</pre>
-      </section>
-      <section id="git" class="panel">
-        <div class="panel-head"><h3>🌿 Git — Diff 보기 & 커밋</h3>
-          <button onclick="loadGit()" class="btn-small">🔄 새로고침</button>
-          <button onclick="gitCommitPrompt()" class="btn-primary-sm">💾 커밋</button>
-        </div>
-        <div class="git-grid">
-          <div class="git-col">
-            <div class="git-title">상태 <small id="gitBranch"></small></div>
-            <pre id="gitStatus" class="git-pre">로딩...</pre>
-            <div class="git-title">최근 로그</div>
-            <pre id="gitLog" class="git-pre">로딩...</pre>
-          </div>
-          <div class="git-col git-diff-col">
-            <div class="git-title">Diff <button onclick="loadGitDiff()" class="btn-small">전체</button> <span class="meta">파일 클릭 시 해당 파일 diff</span></div>
-            <pre id="gitDiff" class="git-pre diff">git diff 로딩...</pre>
-          </div>
-        </div>
-      </section>
-      <section id="test" class="panel">
-        <div class="panel-head"><h3>✅ 테스트 — 저장하자마자 자동 실행</h3>
-          <label class="check"><input type="checkbox" id="autoTest" onchange="toggleAutoTest()" checked/> 저장 시 자동 테스트</label>
-          <button onclick="runTest('verify')" class="btn-primary-sm">▶ verify 3/3 실행</button>
-          <button onclick="loadTests()" class="btn-small">목록</button>
-        </div>
-        <div id="testList" class="test-list"></div>
-        <pre id="testOutput" class="console-log" style="min-height:180px">테스트 준비 — 위에서 ▶ 누르거나 왼쪽에서 저장하면 자동 실행된다
-</pre>
-        <div class="test-foot meta">자동 테스트는 저장 시 <code>verify_local.py --all --mock-ghidra</code> 를 15초 안헤 실행</div>
-      </section>
       <section id="blocks" class="panel">
-        <div class="panel-head"><h3>📄 블록</h3><button onclick="loadBlocks()" class="btn-small">🔄</button></div>
+        <div class="row"><span class="lbl">BLOCKS</span><button onclick="loadBlocks()" class="btn btn-ghost btn-sm">refresh</button></div>
         <div id="blocksList"></div>
       </section>
       <section id="graph" class="panel">
-        <div class="panel-head"><h3>🕸️ 그래프</h3><button onclick="loadGraph()" class="btn-small">🔄</button></div>
-        <canvas id="c" width="900" height="320"></canvas>
+        <div class="row"><span class="lbl">GRAPH</span><button onclick="loadGraph()" class="btn btn-ghost btn-sm">refresh</button></div>
+        <canvas id="c" width="800" height="300"></canvas>
       </section>
     </div>
-  </div>
+  </aside>
+
+  <div id="splitter" class="splitter" title="드래그로 크기 조절"></div>
+  <div id="splitter2" class="splitter2" title="드래그로 크기 조절"></div>
 </div>
 
 <div id="toast" class="toast"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/python/python.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/edit/closebrackets.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/edit/matchbrackets.min.js"></script>
-<script src="ide.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/yaml/yaml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/markdown/markdown.min.js"></script>
+<script src="/ui/ide.js"></script>
 </body>
 </html>

@@ -24,6 +24,15 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self.json_response(load_models())
         if path == "/api/status":
             return self.json_response(get_status())
+        if path == "/api/files":
+            return self.json_response(list_files())
+        if path == "/api/file":
+            qs = urllib.parse.urlparse(self.path).query
+            params = urllib.parse.parse_qs(qs)
+            p = params.get("path", [""])[0]
+            return self.json_response(read_file_api(p))
+        if path == "/ide":
+            path = "/ui/ide.html"
         if path == "/":
             path = "/ui/index.html"
         self.directory = str(ROOT)
@@ -47,6 +56,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             preset = data.get("preset", "")
             ok = set_default_model(preset)
             return self.json_response({"ok": ok, "preset": preset})
+        if path == "/api/file":
+            p = data.get("path", "")
+            content = data.get("content", "")
+            return self.json_response(write_file_api(p, content))
         self.send_error(404)
 
     def json_response(self, obj):
@@ -67,6 +80,53 @@ def read_jsonl(p: pathlib.Path):
             try: out.append(json.loads(line))
             except: out.append({"raw": line})
     return out[-50:]
+
+ALLOWED_DIRS = ["brain", "tools", "notion", "ml", "config", "memory", "ui", "skills", "experiments"]
+ALLOWED_EXTS = {".py", ".md", ".yaml", ".yml", ".json", ".jsonl", ".txt", ".html", ".css", ".js"}
+
+def safe_path(rel: str) -> pathlib.Path:
+    # traversal 방지 — ROOT 안에서만
+    p = (ROOT / rel).resolve()
+    if not str(p).startswith(str(ROOT.resolve())):
+        raise ValueError("허용되지 않은 경로")
+    return p
+
+def list_files():
+    files=[]
+    for d in ALLOWED_DIRS:
+        dp = ROOT / d
+        if not dp.exists(): continue
+        for f in dp.rglob("*"):
+            if f.is_file() and f.suffix in ALLOWED_EXTS and "__pycache__" not in str(f) and ".pyc" not in f.name:
+                rel = str(f.relative_to(ROOT))
+                files.append({"path": rel, "name": f.name, "dir": d, "size": f.stat().st_size})
+    files.sort(key=lambda x: (x["dir"], x["path"]))
+    return {"files": files, "root": str(ROOT)}
+
+def read_file_api(rel: str):
+    try:
+        if not rel: return {"ok": False, "error": "path 필요"}
+        p = safe_path(rel)
+        if not p.exists(): return {"ok": False, "error": "파일 없음"}
+        if p.stat().st_size > 200_000: return {"ok": False, "error": "파일 너무 큼 (200KB 제한)"}
+        return {"ok": True, "path": rel, "content": p.read_text(encoding="utf-8", errors="replace"), "size": p.stat().st_size}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+def write_file_api(rel: str, content: str):
+    try:
+        if not rel: return {"ok": False, "error": "path 필요"}
+        p = safe_path(rel)
+        if p.suffix not in ALLOWED_EXTS: return {"ok": False, "error": f"허용되지 않은 확장자 {p.suffix}"}
+        # syntax check for .py — 저장 전 간단 파싱
+        if p.suffix == ".py":
+            try: compile(content, str(p), "exec")
+            except SyntaxError as se: return {"ok": False, "error": f"파이썬 문법 오류 {se.lineno}줄: {se.msg}", "line": se.lineno}
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(content, encoding="utf-8")
+        return {"ok": True, "path": rel, "size": len(content.encode("utf-8"))}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 def load_models():
     try:

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>🧠 Claude Code-like IDE — 왼쪽 코딩 → 오른쪽 결과</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/dracula.min.css"/>
+<link rel="stylesheet" href="ide.css"/>
+</head>
+<body>
+<div id="statusBar" class="status-bar">
+  <span id="statusDot" class="dot"></span>
+  <span id="statusText">서버 확인 중...</span>
+  <span id="statusRight">
+    <a href="/" class="link-btn">← 클래식 모드</a>
+    <span>v1.0 · IDE</span>
+  </span>
+</div>
+
+<div class="ide-layout">
+  <!-- LEFT: Code -->
+  <div class="pane pane-left" id="paneLeft">
+    <div class="pane-head">
+      <div class="pane-title">
+        <span>📁 파일</span>
+        <button onclick="refreshFiles()" class="icon-btn" title="새로고침">🔄</button>
+        <input id="fileSearch" placeholder="검색..." oninput="filterFiles()" style="flex:1; min-width:80px"/>
+      </div>
+      <div class="file-tree" id="fileTree">로딩 중...</div>
+    </div>
+    <div class="editor-wrap" id="editorWrap">
+      <div class="editor-head">
+        <span id="currentFile">파일을 선택해</span>
+        <span id="saveStatus" class="save-status">저장됨</span>
+        <span class="editor-actions">
+          <button onclick="saveFile()" class="btn-small" id="saveBtn">💾 저장 <small>Ctrl+S</small></button>
+          <button onclick="runFromEditor()" class="btn-primary-sm" title="저장 후 바로 실행">▶ 저장+실행</button>
+        </span>
+      </div>
+      <textarea id="codeArea" placeholder="왼쪽에서 파일을 선택하면 여기에 코드가 뜬다&#10;수정 → Ctrl+S 저장 → 오른쪽에 결과 바로 반영"></textarea>
+      <div class="editor-foot">
+        <span id="cursorPos">Ln 1, Col 1</span>
+        <span id="fileInfo">UTF-8 · Python</span>
+        <span class="kbd">Ctrl+S 저장 · Ctrl+Enter 실행</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Splitter -->
+  <div class="splitter" id="splitter" title="드래그해서 크기 조절"></div>
+
+  <!-- RIGHT: Preview -->
+  <div class="pane pane-right" id="paneRight">
+    <div class="runbar">
+      <div class="runbar-field">
+        <label>📁 바이너리</label>
+        <input id="binary" value="/bin/ls" placeholder="/bin/ls"/>
+      </div>
+      <div class="runbar-field runbar-task">
+        <label>💬 작업</label>
+        <input id="task" value="C2 찾아줘" placeholder="예: C2 찾아줘"/>
+      </div>
+      <div class="runbar-field runbar-model">
+        <label>🤖 모델</label>
+        <select id="model"></select>
+        <div id="modelHint" class="model-hint"></div>
+      </div>
+      <div class="runbar-actions">
+        <button onclick="run()" id="runBtn" class="btn-primary">▶ 실행 <small>Ctrl+Enter</small></button>
+        <button onclick="clearAll()" class="btn-ghost">🗑</button>
+      </div>
+    </div>
+    <div class="quick-examples">
+      <span class="quick-label">💡 바로 해보기:</span>
+      <button onclick="quick('C2 찾아줘')" class="chip">C2</button>
+      <button onclick="quick('취약점 찾아줘')" class="chip">취약점</button>
+      <button onclick="quick('4명 조합으로 분석해줘')" class="chip chip-wide">4명 조합</button>
+      <button onclick="quick('양자 오류정정 분석해줘')" class="chip chip-wide">양자</button>
+    </div>
+
+    <div class="preview-tabs">
+      <button onclick="showTab('report')" class="active" data-tab="report">📝 보고서</button>
+      <button onclick="showTab('console')" data-tab="console">💻 콘솔</button>
+      <button onclick="showTab('blocks')" data-tab="blocks">📄 블록</button>
+      <button onclick="showTab('graph')" data-tab="graph">🕸️ 그래프</button>
+    </div>
+
+    <div class="preview-body">
+      <section id="report" class="panel active">
+        <div id="reportActions" class="panel-actions" style="display:none">
+          <button onclick="copyReport()" class="btn-small">📋 복사</button>
+          <button onclick="downloadReport()" class="btn-small">⬇ 다운로드</button>
+          <span id="reportMeta" class="meta"></span>
+        </div>
+        <div id="reportContent" class="report-empty">
+          <div class="empty-icon">👈</div>
+          <h3>왼쪽에서 코드 고치고 ▶ 실행을 눌러봐</h3>
+          <p>예: <code>brain/reasoning.py</code>에서 문구 바꾸고 <kbd>Ctrl+S</kbd> → <kbd>Ctrl+Enter</kbd></p>
+        </div>
+        <div id="reportBody"></div>
+        <div id="reportExtras"></div>
+      </section>
+      <section id="console" class="panel">
+        <div class="console-head"><strong>💻 콘솔</strong><button onclick="clearConsole()" class="btn-small">지우기</button></div>
+        <pre id="consoleLog" class="console-log">콘솔 준비 — 저장/실행 로그가 여기에 뜬다
+왼쪽에서 파일을 고치고 Ctrl+S → 오른쪽에 결과가 바로 반영된다
+</pre>
+      </section>
+      <section id="blocks" class="panel">
+        <div class="panel-head"><h3>📄 블록</h3><button onclick="loadBlocks()" class="btn-small">🔄</button></div>
+        <div id="blocksList"></div>
+      </section>
+      <section id="graph" class="panel">
+        <div class="panel-head"><h3>🕸️ 그래프</h3><button onclick="loadGraph()" class="btn-small">🔄</button></div>
+        <canvas id="c" width="900" height="320"></canvas>
+      </section>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/edit/closebrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/edit/matchbrackets.min.js"></script>
+<script src="ide.js"></script>
+</body>
+</html>

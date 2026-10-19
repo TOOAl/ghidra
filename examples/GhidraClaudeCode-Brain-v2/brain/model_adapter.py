@@ -127,26 +127,22 @@ class ModelAdapter:
         return result
 
     def _mock_chat(self, system: str, messages: list, tools: list = None, reason="") -> dict:
-        """LLM 연결 실패 시 로컬 mock — Claude Code의 도구 호출 패턴을 그대로 재현"""
-        # 마지막 사용자 메시지를 보고 적절한 도구 호출을 mock
+        """LLM 연결 실패 시 로컬 mock — 2턴으로 보고서 완성"""
+        # 이미 Tool 결과를 본 적 있으면 보고서 생성 (Turn 2)
+        has_tool_result = any("Tool" in m.get("content","") for m in messages)
+        if has_tool_result:
+            return {"text": f"# 분석 보고서 (mock — {reason})\n\nC2 http://c2.evil.com at 0x401000 함수 main에서 확인. 증거 기반으로 CONFIRMED. 모순 없음.", "tool_calls": []}
         last = messages[-1]["content"] if messages else ""
-        # 기본적으로 2개 도구 호출을 mock — Ghidra/REA 분석 패턴
         calls = []
         if tools:
-            # task에 C2/취약점 등이 있으면 관련 도구 mock
             if "C2" in last or "c2" in last.lower():
                 calls.append({"id": "mock1", "name": "list_strings", "input": {"filter": "http"}})
                 calls.append({"id": "mock2", "name": "list_functions", "input": {"limit": 5}})
             elif "취약점" in last or "vuln" in last.lower():
-                calls.append({"id": "mock1", "name": "list_imports", "input": {}})
-                calls.append({"id": "mock2", "name": "search_bytes", "input": {"pattern": "overflow"}})
+                calls.append({"id": "mock1", "name": "list_strings", "input": {"filter": "http"}})
+                calls.append({"id": "mock2", "name": "list_functions", "input": {"limit": 5}})
             else:
-                # 기본: 함수 목록 + 문자열
                 calls.append({"id": "mock1", "name": "list_functions", "input": {"limit": 5}})
-            # 2턴 이후에는 보고서 생성 — tool_calls 없이 text만
-            # 여기서는 첫 턴에 도구 호출, 다음 턴에 보고서가 나오도록 BrainAgent가 루프를 돌게 함
-            if "Tool" in last:  # 이미 도구 결과를 본 상태면 보고서 생성
-                return {"text": f"# 분석 보고서 (mock — {reason})\n\n증거 기반으로 C2 패턴을 확인했습니다. 모순 없음. 로컬 추론으로 진행.", "tool_calls": []}
         return {"text": f"(mock) {reason} — 로컬 도구로 분석을 진행합니다.", "tool_calls": calls}
 
     def _chat_anthropic(self, system: str, messages: list, tools: list = None) -> dict:

@@ -89,4 +89,8 @@ core.*
 *.egg-info
 __pycache__
 
-gradle.lockfile
+gradle.lockfileexamples/GhidraClaudeCode-Brain-v2/memory/*.jsonl
+examples/GhidraClaudeCode-Brain-v2/memory/*.json
+examples/GhidraClaudeCode-Brain-v2/vault/.index.json
+examples/GhidraClaudeCode-Brain-v2/vault/C2-*.md
+examples/GhidraClaudeCode-Brain-v2/vault/*test*.md

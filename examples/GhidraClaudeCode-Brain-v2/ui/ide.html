@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Claude Code IDE — Ghidra Brain</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/material-darker.min.css"/>
+<link rel="stylesheet" href="/ui/ide.css"/>
+</head>
+<body>
+<div id="statusBar" class="topbar">
+  <div class="topbar-left">
+    <span class="logo">◉ Brain IDE</span>
+    <span id="statusDot" class="dot"></span>
+    <span id="statusText">연결 확인 중…</span>
+  </div>
+  <div class="topbar-right">
+    <span id="modelHint" class="hint"></span>
+    <select id="model" class="model-select"></select>
+    <a href="/" class="ghost-link">클래식 →</a>
+  </div>
+</div>
+
+<div class="ide">
+  <aside class="sidebar" id="paneLeft">
+    <div class="sb-head">
+      <span class="sb-title">EXPLORER</span>
+      <button onclick="refreshFiles()" class="sb-btn" title="새로고침">↻</button>
+    </div>
+    <input id="fileSearch" class="sb-search" placeholder="파일 검색…" oninput="filterFiles()"/>
+    <div id="fileTree" class="file-tree">불러오는 중…</div>
+    <div class="sb-foot">
+      <span id="fileInfo">—</span><span id="cursorPos">Ln 1, Col 1</span>
+    </div>
+  </aside>
+
+  <main class="center">
+    <div class="ed-head">
+      <span id="currentFile" class="ed-file">파일을 선택하세요</span>
+      <span id="saveStatus" class="badge">저장됨</span>
+      <div class="ed-actions">
+        <button onclick="saveFile()" id="saveBtn" class="btn btn-ghost">저장 <span class="kbd">⌘S</span></button>
+        <button onclick="runFromEditor()" class="btn btn-primary">저장 후 실행 ▸</button>
+      </div>
+    </div>
+    <div class="ed-wrap"><textarea id="codeArea"></textarea></div>
+    <div class="bottom">
+      <div class="tabs">
+        <button onclick="showBottom('terminal')" data-btab="terminal" class="active">TERMINAL</button>
+        <button onclick="showBottom('git')" data-btab="git">GIT</button>
+        <button onclick="showBottom('test')" data-btab="test">TEST</button>
+        <button onclick="showBottom('console')" data-btab="console">LOG</button>
+      </div>
+      <div class="bottom-body">
+        <section id="b-terminal" class="bpanel active">
+          <div class="term-line"><span class="prompt">$</span><input id="termInput" placeholder="ls, git status, python verify_local.py --all --mock-ghidra" onkeydown="if(event.key==='Enter') runTerminal()"/><button onclick="runTerminal()" class="btn btn-ghost btn-sm">실행</button></div>
+          <div class="term-chips">
+            <button onclick="termQuick('ls -lh brain/ tools/')" class="chip">ls</button>
+            <button onclick="termQuick('git status --short')" class="chip">git status</button>
+            <button onclick="termQuick('python verify_local.py --all --mock-ghidra')" class="chip">verify</button>
+            <button onclick="termQuick('git diff --stat')" class="chip">diff</button>
+            <button onclick="clearTerminal()" class="chip chip-ghost">clear</button>
+          </div>
+          <pre id="termOutput" class="mono pre-dark">터미널 준비 — 명령을 입력하세요</pre>
+        </section>
+        <section id="b-git" class="bpanel">
+          <div class="git-head"><span class="meta">BRANCH <b id="gitBranch">—</b></span><button onclick="loadGit()" class="btn btn-ghost btn-sm">새로고침</button><button onclick="gitCommitPrompt()" class="btn btn-primary btn-sm">Commit</button></div>
+          <div class="git-grid"><div><div class="lbl">STATUS</div><pre id="gitStatus" class="pre-dark sm"></pre><div class="lbl">LOG</div><pre id="gitLog" class="pre-dark sm"></pre></div><div><div class="lbl">DIFF <button onclick="loadGitDiff()" class="btn btn-ghost btn-xs">전체</button></div><pre id="gitDiff" class="pre-dark sm diff"></pre></div></div>
+        </section>
+        <section id="b-test" class="bpanel">
+          <div class="test-head"><label class="check"><input type="checkbox" id="autoTest" checked onchange="toggleAutoTest()"/> 저장 시 자동 실행</label><button onclick="runTest('verify')" class="btn btn-primary btn-sm">▶ verify 3/3</button><button onclick="loadTests()" class="btn btn-ghost btn-sm">목록</button></div>
+          <div id="testList" class="chip-row"></div>
+          <pre id="testOutput" class="mono pre-dark">테스트 준비 — 저장 시 자동 실행됩니다</pre>
+        </section>
+        <section id="b-console" class="bpanel"><pre id="consoleLog" class="mono pre-dark">로그 — 파일 열기/저장/실행 내역</pre></section>
+      </div>
+    </div>
+  </main>
+
+  <!-- Right: Claude Code-like Chat -->
+  <aside class="chat" id="paneRight">
+    <div class="chat-head">
+      <span class="chat-title">대화</span>
+      <span class="meta">Claude Code 스타일 — 질문하면 바로 코드 반영</span>
+      <button onclick="clearChat()" class="btn btn-ghost btn-xs">대화 지우기</button>
+    </div>
+    <div id="chatHistory" class="chat-history">
+      <div class="chat-empty">
+        <div class="chat-empty-icon">◉</div>
+        <h3>무엇을 도와드릴까요?</h3>
+        <p>예: <code>C2 찾아줘</code> — 왼쪽 코드는 바로 반영됩니다</p>
+        <div class="chat-suggest">
+          <button onclick="quickChat('C2 찾아줘')" class="chip">C2 찾아줘</button>
+          <button onclick="quickChat('취약점 찾아줘')" class="chip">취약점 찾아줘</button>
+          <button onclick="quickChat('4명 조합으로 분석해줘')" class="chip">4명 조합</button>
+          <button onclick="quickChat('brain/reasoning.py를 더 간결하게 고쳐줘')" class="chip">코드 리팩터</button>
+        </div>
+      </div>
+    </div>
+    <div class="chat-input">
+      <div class="chat-meta">
+        <input id="binary" class="chat-bin" value="/bin/ls" placeholder="/bin/ls"/>
+        <span id="chatModel" class="meta"></span>
+      </div>
+      <div class="chat-bar">
+        <textarea id="task" class="chat-text" rows="1" placeholder="메시지를 입력하세요… (Enter 전송, Shift+Enter 줄바꿈)"></textarea>
+        <button onclick="run()" id="runBtn" class="btn btn-primary btn-send">↑</button>
+      </div>
+      <div class="chat-hint"><span class="kbd">↵</span> 전송 <span class="kbd">⇧↵</span> 줄바꿈 <span class="kbd">⌘S</span> 저장 <span class="kbd">⌘↩</span> 실행</div>
+    </div>
+    <!-- Notion + Obsidian tabs (3기둥 통합) -->
+    <div class="chat-tabs">
+      <button onclick="showTab('blocks')" data-tab="blocks" class="tab-link">Blocks(Notion)</button>
+      <button onclick="showTab('vault')" data-tab="vault" class="tab-link">Graph(Obsidian)</button>
+    </div>
+    <div class="pv-body" style="display:none">
+      <section id="blocks" class="panel"><div class="row"><span class="lbl">BLOCKS</span><button onclick="loadBlocks()" class="btn btn-ghost btn-sm">refresh</button></div><div id="blocksList" class="pre-dark sm"></div></section>
+      <section id="vault" class="panel"><div class="row"><span class="lbl">VAULT GRAPH</span><button onclick="loadVaultGraph()" class="btn btn-ghost btn-sm">refresh</button></div><canvas id="vaultCanvas" width="800" height="320" style="width:100%;height:320px;background:#0f172a;border-radius:8px"></canvas><div class="hint">클릭하면 노트 열림 — [[wikilink]]로 연결</div></section>
+      <section id="graph" class="panel"><div class="row"><span class="lbl">GRAPH(legacy)</span><button onclick="loadGraph()" class="btn btn-ghost btn-sm">refresh</button></div><canvas id="c" width="800" height="300"></canvas></section>
+    </div>
+  </aside>
+
+  <div id="splitter" class="splitter"></div><div id="splitter2" class="splitter2"></div>
+</div>
+
+<div id="toast" class="toast"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/yaml/yaml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/markdown/markdown.min.js"></script>
+<script src="/ui/ide.js?v=20261019c"></script>
+<script src="/ui/vault_graph.js?v=20261019c"></script>
+</body>
+</html>

@@ -37,14 +37,21 @@ def create_block(type: str, content: str, parent_id: str = None, extra: dict = N
     _append_op("create", block)
     return {"ok": True, "block": block}
 
-def get_block(bid: str) -> dict:
+def _build_latest():
+    latest={}
     for op in _read_ops():
-        if op.get("op") == "create" and op.get("block", {}).get("id") == bid:
-            return {"ok": True, "block": op["block"]}
+        bid=op.get("block",{}).get("id")
+        if bid:
+            latest[bid]=op["block"]
+    return latest
+
+def get_block(bid: str) -> dict:
+    latest=_build_latest()
+    if bid in latest:
+        return {"ok": True, "block": latest[bid]}
     return {"ok": False, "error": f"블록 없음: {bid}"}
 
 def list_children(parent_id: str) -> dict:
-    # parent의 children 순서대로 블록 반환
     parent = get_block(parent_id)
     if not parent["ok"]:
         return {"ok": False, "error": parent["error"]}
@@ -57,21 +64,16 @@ def list_children(parent_id: str) -> dict:
     return {"ok": True, "parent": parent["block"], "children": blocks}
 
 def list_blocks(limit=50) -> list:
-    ops = _read_ops()
-    blocks = [o["block"] for o in ops if o.get("op") == "create"]
-    return blocks[-limit:]
+    latest=_build_latest()
+    return list(latest.values())[-limit:]
 
 def _append_child(parent_id: str, child_id: str):
-    # 부모 블록을 찾아 children 갱신 — append-only이므로 update operation으로 기록
-    # 간단히: 기존 블록을 읽어 children 추가 후 update op로 저장 (실제 Notion은 CRDT이지만 v2는 last-write-wins)
-    for op in _read_ops():
-        if op.get("op") == "create" and op["block"]["id"] == parent_id:
-            # 기존 children에 추가
-            updated = dict(op["block"])
-            updated["children"] = updated.get("children", []) + [child_id]
-            _append_op("update", updated)
-            return
-    # 부모를 못 찾으면 무시 (orphan 허용)
+    latest=_build_latest()
+    if parent_id not in latest:
+        return  # 부모 없음 → orphan 허용
+    updated=dict(latest[parent_id])
+    updated["children"]=updated.get("children",[])+[child_id]
+    _append_op("update", updated)
 
 def _append_op(op: str, block: dict):
     p = MEM / "blocks.jsonl"

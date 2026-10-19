@@ -15,8 +15,8 @@ def check_contradiction(report: str, evidence: dict) -> dict:
     contradictions = []
     evidence_text = str(evidence).lower()
 
-    # 룰 1: C2 CONFIRMED인데 strings에 http 없음
-    if re.search(r"CONFIRMED.*c2", report, re.I):
+    # 룰 1: C2 CONFIRMED인데 strings에 http 없음 (순서 무관)
+    if "c2" in report.lower() and "confirmed" in report.lower():
         if "http" not in evidence_text and "c2.evil" not in evidence_text:
             contradictions.append({
                 "rule": "C2_claim_without_string",

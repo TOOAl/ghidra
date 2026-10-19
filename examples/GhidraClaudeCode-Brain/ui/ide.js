@@ -70,6 +70,11 @@ async function saveFile(){
     toast('저장 완료: '+currentPath);
     log(`저장: ${currentPath} (${j.size}B)`);
     refreshFiles();
+    // 자동 테스트
+    if(document.getElementById('autoTest')?.checked){
+      log('자동 테스트 실행 중...');
+      runTest('verify');
+    }
   }catch(e){toast('저장 실패: '+e,3000);log('저장 실패: '+e)}
   document.getElementById('saveBtn').textContent='💾 저장 Ctrl+S';
 }
@@ -103,7 +108,7 @@ function showTab(id){
   document.querySelectorAll('.preview-tabs button').forEach(b=>b.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   document.querySelector(`[data-tab="${id}"]`).classList.add('active');
-  if(id==='blocks')loadBlocks(); if(id==='graph')loadGraph();
+  if(id==='blocks')loadBlocks(); if(id==='graph')loadGraph(); if(id==='terminal'){} if(id==='git')loadGit(); if(id==='test')loadTests();
 }
 function clearConsole(){document.getElementById('consoleLog').textContent='콘솔 지움 — 다음 로그부터 표시';}
 function quick(t){document.getElementById('task').value=t;toast('작업: '+t)}
@@ -133,6 +138,85 @@ function copyReport(){if(!lastReport) return toast('복사할 보고서 없음')
 function downloadReport(){if(!lastReport) return toast('다운로드할 보고서 없음'); const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([lastReport],{type:'text/markdown'}));a.download=(lastTask||'report').replace(/\s+/g,'_')+'.md';a.click();toast('다운로드 시작')}
 async function loadBlocks(){const el=document.getElementById('blocksList');el.innerHTML='<div class="loading"><span class="spinner"></span> 로딩...</div>';try{const r=await fetch('/api/blocks');const j=await r.json();el.innerHTML=(j.blocks||[]).slice(-10).reverse().map(x=>`<div class="block"><small>${esc(x.type)} · ${esc(x.id)}</small><div>${esc(x.content).slice(0,600)}</div></div>`).join('')||'<div class="block">블록 없음</div>'}catch{el.innerHTML='API 연결 안 됨'}}
 async function loadGraph(){const c=document.getElementById('c');if(!c) return;const ctx=c.getContext('2d'),dpr=window.devicePixelRatio||1,w=c.clientWidth||600,h=320;c.width=w*dpr;c.height=h*dpr;c.style.width=w+'px';c.style.height=h+'px';ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);try{const [b,d]=await Promise.all([fetch('/api/blocks').then(r=>r.json()),fetch('/api/database').then(r=>r.json())]);const nodes=[...b.blocks.slice(-6).map(x=>({label:x.id.slice(0,6),x:Math.random()*(w-80)+40,y:Math.random()*(h-60)+30,c:'#6366f1'})),...d.results.slice(-6).map(x=>({label:(x.task||'?').slice(0,6),x:Math.random()*(w-80)+40,y:Math.random()*(h-60)+30,c:'#06b6d4'}))];if(!nodes.length){ctx.fillStyle='#64748b';ctx.fillText('데이터 없음 — ▶ 실행하면 연결된다',20,40);return}ctx.strokeStyle='#e2e8f0';for(let i=1;i<nodes.length;i++){ctx.beginPath();ctx.moveTo(nodes[i-1].x,nodes[i-1].y);ctx.lineTo(nodes[i].x,nodes[i].y);ctx.stroke()}nodes.forEach(n=>{ctx.fillStyle=n.c;ctx.beginPath();ctx.arc(n.x,n.y,10,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fff';ctx.font='bold 9px sans-serif';ctx.textAlign='center';ctx.fillText(n.label[0]||'●',n.x,n.y+3)})}catch{ctx.fillStyle='#f87171';ctx.fillText('API 연결 안 됨',20,40)}}
+
+// Terminal
+async function runTerminal(){
+  const inp=document.getElementById('termInput'), out=document.getElementById('termOutput');
+  const cmd=inp.value.trim(); if(!cmd) return toast('명령을 써봐');
+  out.textContent+=`\n$ ${cmd}\n... 실행 중 ...`;
+  log(`터미널: $ ${cmd}`);
+  try{
+    const r=await fetch('/api/terminal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cmd})});
+    const j=await r.json();
+    out.textContent+=`\n${j.output||j.error||''}\n[exit ${j.exit}]`;
+    out.scrollTop=out.scrollHeight;
+    log(`터미널 완료 exit=${j.exit}`);
+  }catch(e){ out.textContent+=`\n실패: ${e}`; toast('터미널 실패: '+e)}
+}
+function termQuick(cmd){document.getElementById('termInput').value=cmd;runTerminal()}
+function clearTerminal(){document.getElementById('termOutput').textContent='터미널 지움 — 새 명령을 써봐';}
+
+// Git
+async function loadGit(){
+  const s=document.getElementById('gitStatus'), lg=document.getElementById('gitLog'), br=document.getElementById('gitBranch');
+  s.textContent='로딩...'; lg.textContent='로딩...';
+  try{
+    const [st, log] = await Promise.all([fetch('/api/git/status').then(r=>r.json()), fetch('/api/git/log').then(r=>r.json())]);
+    s.textContent=st.status||st.error||''; br.textContent=st.branch? `(${st.branch})`:''; lg.textContent=log.log||log.error||'';
+    loadGitDiff();
+  }catch(e){s.textContent='로드 실패: '+e}
+}
+async function loadGitDiff(){
+  const el=document.getElementById('gitDiff'); el.textContent='diff 로딩...';
+  try{
+    const r=await fetch('/api/git/diff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});
+    const j=await r.json();
+    el.textContent=j.diff||j.error||'(변경 없음)';
+    // 파일 클릭 시 해당 diff
+    // 색상 하이라이트는 CSS로 .add/.del 처리하려면 줄별 span 필요하지만 pre로 간단 처리
+  }catch(e){el.textContent='diff 실패: '+e}
+}
+function gitDiffForFile(path){
+  fetch('/api/git/diff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path})})
+    .then(r=>r.json()).then(j=>{document.getElementById('gitDiff').textContent=j.diff||j.error; showTab('git')});
+}
+async function gitCommitPrompt(){
+  const msg=prompt('커밋 메시지 (3자 이상):','IDE에서 수정 — 자동 커밋');
+  if(!msg) return;
+  const el=document.getElementById('gitDiff');
+  el.textContent='커밋 중...';
+  try{
+    const r=await fetch('/api/git/commit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg})});
+    const j=await r.json();
+    el.textContent=j.output||j.error||JSON.stringify(j);
+    toast(j.ok?'커밋 완료':'커밋 실패: '+(j.output||j.error));
+    loadGit();
+  }catch(e){el.textContent='커밋 실패: '+e}
+}
+
+// Test
+async function loadTests(){
+  try{
+    const r=await fetch('/api/test/list'); const j=await r.json();
+    const el=document.getElementById('testList');
+    el.innerHTML=(j.tests||[]).map(t=>`<button class="test-item" onclick="runTest('${t.path}')" title="${t.path}">${esc(t.id)} <small>${t.type}</small></button>`).join('') || '테스트 없음';
+  }catch(e){document.getElementById('testList').textContent='로드 실패: '+e}
+}
+async function runTest(target){
+  const out=document.getElementById('testOutput');
+  out.textContent=`▶ ${target} 실행 중...\n`;
+  log(`테스트: ${target}`);
+  showTab('test');
+  try{
+    const r=await fetch('/api/test/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target})});
+    const j=await r.json();
+    out.textContent=`$ ${j.cmd||target}\n${j.output||j.error||''}\n[exit ${j.exit}] ${j.ok?'✅ PASS':'❌ FAIL'}`;
+    out.scrollTop=out.scrollHeight;
+    toast(j.ok?'✅ 테스트 PASS':'❌ 테스트 FAIL — 콘솔 확인');
+    log(`테스트 ${j.ok?'PASS':'FAIL'}: ${target}`);
+  }catch(e){out.textContent='테스트 실패: '+e}
+}
+function toggleAutoTest(){const v=document.getElementById('autoTest').checked; toast(v?'자동 테스트 ON — 저장 시 verify 실행':'자동 테스트 OFF'); log(`자동 테스트 ${v?'ON':'OFF}`)}
 
 // Splitter
 function initSplitter(){

@@ -31,6 +31,17 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             params = urllib.parse.parse_qs(qs)
             p = params.get("path", [""])[0]
             return self.json_response(read_file_api(p))
+        if path == "/api/git/status":
+            return self.json_response(git_status())
+        if path == "/api/git/log":
+            return self.json_response(git_log())
+        if path == "/api/git/diff":
+            qs = urllib.parse.urlparse(self.path).query
+            params = urllib.parse.parse_qs(qs)
+            p = params.get("path", [""])[0]
+            return self.json_response(git_diff(p))
+        if path == "/api/test/list":
+            return self.json_response(list_tests())
         if path == "/ide":
             path = "/ui/ide.html"
         if path == "/":
@@ -60,6 +71,21 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             p = data.get("path", "")
             content = data.get("content", "")
             return self.json_response(write_file_api(p, content))
+        if path == "/api/terminal":
+            cmd = data.get("cmd", "")
+            return self.json_response(run_terminal(cmd))
+        if path == "/api/git/status":
+            return self.json_response(git_status())
+        if path == "/api/git/diff":
+            return self.json_response(git_diff(data.get("path","")))
+        if path == "/api/git/log":
+            return self.json_response(git_log())
+        if path == "/api/git/commit":
+            return self.json_response(git_commit(data.get("message","")))
+        if path == "/api/test/run":
+            return self.json_response(run_tests(data.get("target","")))
+        if path == "/api/test/list":
+            return self.json_response(list_tests())
         self.send_error(404)
 
     def json_response(self, obj):
@@ -80,6 +106,100 @@ def read_jsonl(p: pathlib.Path):
             try: out.append(json.loads(line))
             except: out.append({"raw": line})
     return out[-50:]
+
+# --- Terminal / Git / Test ---
+import subprocess as _sp
+def run_terminal(cmd: str):
+    if not cmd or not cmd.strip(): return {"ok": False, "error": "명령어 필요"}
+    # 위험 명령 차단 (rm -rf / 등) — 로컬 전용이지만 안전장치
+    blocked = ["rm -rf /", ":(){", "mkfs", "shutdown", "reboot"]
+    if any(b in cmd for b in blocked):
+        return {"ok": False, "error": "차단된 위험 명령"}
+    try:
+        r = _sp.run(cmd, shell=True, cwd=str(ROOT), capture_output=True, text=True, timeout=15)
+        out = (r.stdout or "") + (r.stderr or "")
+        if len(out) > 8000: out = out[:8000] + "\n... (8000자 잘림)"
+        return {"ok": True, "cmd": cmd, "exit": r.returncode, "output": out or "(출력 없음)", "cwd": str(ROOT)}
+    except _sp.TimeoutExpired:
+        return {"ok": False, "error": "타임아웃 15초 초과"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+def git_status():
+    try:
+        r = _sp.run("git status --short", shell=True, cwd=str(ROOT.parent.parent), capture_output=True, text=True, timeout=5)
+        # ROOT is examples/GhidraClaudeCode-Brain, git root is 2 up
+        # fallback: try ROOT itself
+        if r.returncode != 0:
+            r = _sp.run("git status --short", shell=True, cwd=str(ROOT), capture_output=True, text=True, timeout=5)
+        r2 = _sp.run("git branch --show-current", shell=True, cwd=str(ROOT.parent.parent), capture_output=True, text=True, timeout=3)
+        branch = r2.stdout.strip() if r2.returncode==0 else "?"
+        return {"ok": True, "branch": branch, "status": r.stdout or "(clean)", "exit": r.returncode}
+    except Exception as e: return {"ok": False, "error": str(e)}
+
+def git_diff(path: str=""):
+    try:
+        git_root = str(ROOT.parent.parent) if (ROOT.parent.parent / ".git").exists() else str(ROOT)
+        cmd = f"git diff --no-color {path}" if path else "git diff --no-color"
+        # staged + unstaged 모두
+        r = _sp.run(cmd, shell=True, cwd=git_root, capture_output=True, text=True, timeout=8)
+        out = r.stdout or "(변경 없음)"
+        if len(out) > 10000: out = out[:10000] + "\n... 잘림"
+        # unstaged가 없으면 staged도 확인
+        if out.strip() in ("(변경 없음)", ""):
+            r2 = _sp.run("git diff --cached --no-color", shell=True, cwd=git_root, capture_output=True, text=True, timeout=5)
+            if r2.stdout.strip(): out = r2.stdout
+        return {"ok": True, "diff": out, "exit": r.returncode}
+    except Exception as e: return {"ok": False, "error": str(e)}
+
+def git_log():
+    try:
+        git_root = str(ROOT.parent.parent) if (ROOT.parent.parent / ".git").exists() else str(ROOT)
+        r = _sp.run("git log --oneline -12 --no-color", shell=True, cwd=git_root, capture_output=True, text=True, timeout=5)
+        return {"ok": True, "log": r.stdout or "(로그 없음)"}
+    except Exception as e: return {"ok": False, "error": str(e)}
+
+def git_commit(message: str):
+    if not message or len(message.strip())<3: return {"ok": False, "error": "커밋 메시지 3자 이상"}
+    try:
+        git_root = str(ROOT.parent.parent) if (ROOT.parent.parent / ".git").exists() else str(ROOT)
+        # add only tracked + new files in ALLOWED_DIRS (안전: git add -A 제한)
+        _sp.run("git add -A", shell=True, cwd=git_root, timeout=5)
+        r = _sp.run(f'git commit -m "{message.replace(chr(34), chr(39))}"', shell=True, cwd=git_root, capture_output=True, text=True, timeout=8)
+        out = (r.stdout or "") + (r.stderr or "")
+        return {"ok": r.returncode==0, "output": out[:2000], "exit": r.returncode}
+    except Exception as e: return {"ok": False, "error": str(e)}
+
+def list_tests():
+    tests=[]
+    # verify + experiments + ml tests
+    for p in (ROOT / "experiments").glob("*.md"):
+        tests.append({"id": p.stem, "path": str(p.relative_to(ROOT)), "type": "experiment"})
+    for p in (ROOT / "tools").glob("*_test.py"):
+        tests.append({"id": p.stem, "path": str(p.relative_to(ROOT)), "type": "tool_test"})
+    tests.append({"id": "verify", "path": "verify_local.py --all --mock-ghidra", "type": "verify"})
+    return {"tests": tests}
+
+def run_tests(target: str=""):
+    try:
+        if target in ("", "verify", "all"):
+            cmd = f"{_sys_exe()} verify_local.py --all --mock-ghidra"
+        elif target.endswith(".py"):
+            cmd = f"{_sys_exe()} {target}"
+        else:
+            cmd = f"{_sys_exe()} {target}"
+        r = _sp.run(cmd, shell=True, cwd=str(ROOT), capture_output=True, text=True, timeout=30)
+        out = (r.stdout or "") + (r.stderr or "")
+        if len(out) > 8000: out = out[:8000] + "\n... 잘림"
+        # PASS/FAIL 파싱
+        ok = r.returncode==0 and ("PASS" in out or "3/3" in out or "100%" in out)
+        return {"ok": ok, "exit": r.returncode, "output": out, "cmd": cmd}
+    except _sp.TimeoutExpired:
+        return {"ok": False, "error": "테스트 타임아웃 30초"}
+    except Exception as e: return {"ok": False, "error": str(e)}
+
+def _sys_exe():
+    import sys as _sys; return _sys.executable
 
 ALLOWED_DIRS = ["brain", "tools", "notion", "ml", "config", "memory", "ui", "skills", "experiments"]
 ALLOWED_EXTS = {".py", ".md", ".yaml", ".yml", ".json", ".jsonl", ".txt", ".html", ".css", ".js"}

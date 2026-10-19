@@ -81,7 +81,10 @@
 
     <div class="preview-tabs">
       <button onclick="showTab('report')" class="active" data-tab="report">📝 보고서</button>
-      <button onclick="showTab('console')" data-tab="console">💻 콘솔</button>
+      <button onclick="showTab('terminal')" data-tab="terminal">💻 터미널</button>
+      <button onclick="showTab('git')" data-tab="git">🌿 Git Diff</button>
+      <button onclick="showTab('test')" data-tab="test">✅ 테스트</button>
+      <button onclick="showTab('console')" data-tab="console">📋 콘솔</button>
       <button onclick="showTab('blocks')" data-tab="blocks">📄 블록</button>
       <button onclick="showTab('graph')" data-tab="graph">🕸️ 그래프</button>
     </div>
@@ -102,10 +105,60 @@
         <div id="reportExtras"></div>
       </section>
       <section id="console" class="panel">
-        <div class="console-head"><strong>💻 콘솔</strong><button onclick="clearConsole()" class="btn-small">지우기</button></div>
+        <div class="console-head"><strong>📋 콘솔</strong><button onclick="clearConsole()" class="btn-small">지우기</button></div>
         <pre id="consoleLog" class="console-log">콘솔 준비 — 저장/실행 로그가 여기에 뜬다
 왼쪽에서 파일을 고치고 Ctrl+S → 오른쪽에 결과가 바로 반영된다
 </pre>
+      </section>
+      <section id="terminal" class="panel">
+        <div class="panel-head"><h3>💻 터미널 — 브라우저에서 바로 명령</h3>
+          <span class="meta">프로젝트 루트에서 실행 (15초 제한)</span>
+          <button onclick="clearTerminal()" class="btn-small">지우기</button>
+        </div>
+        <div class="term-bar">
+          <span class="term-prompt">$</span>
+          <input id="termInput" placeholder="예: ls brain/  또는  git status  또는  python verify_local.py --all --mock-ghidra" onkeydown="if(event.key==='Enter') runTerminal()"/>
+          <button onclick="runTerminal()" class="btn-small">실행</button>
+        </div>
+        <div class="term-quick">
+          <button onclick="termQuick('ls -lh brain/ tools/')" class="chip">ls</button>
+          <button onclick="termQuick('git status --short')" class="chip">git status</button>
+          <button onclick="termQuick('python verify_local.py --all --mock-ghidra')" class="chip">verify 3/3</button>
+          <button onclick="termQuick('python -c &quot;import brain.reasoning; print(brain.reasoning.reason(\'test\', {\'a\':1}))&quot;')" class="chip">reason test</button>
+          <button onclick="termQuick('pip list | grep openai')" class="chip">pip</button>
+        </div>
+        <pre id="termOutput" class="console-log" style="min-height:160px">터미널 준비 — 위에 명령을 쓰고 Enter
+예: git diff, pytest, ls, cat brain/reasoning.py
+</pre>
+      </section>
+      <section id="git" class="panel">
+        <div class="panel-head"><h3>🌿 Git — Diff 보기 & 커밋</h3>
+          <button onclick="loadGit()" class="btn-small">🔄 새로고침</button>
+          <button onclick="gitCommitPrompt()" class="btn-primary-sm">💾 커밋</button>
+        </div>
+        <div class="git-grid">
+          <div class="git-col">
+            <div class="git-title">상태 <small id="gitBranch"></small></div>
+            <pre id="gitStatus" class="git-pre">로딩...</pre>
+            <div class="git-title">최근 로그</div>
+            <pre id="gitLog" class="git-pre">로딩...</pre>
+          </div>
+          <div class="git-col git-diff-col">
+            <div class="git-title">Diff <button onclick="loadGitDiff()" class="btn-small">전체</button> <span class="meta">파일 클릭 시 해당 파일 diff</span></div>
+            <pre id="gitDiff" class="git-pre diff">git diff 로딩...</pre>
+          </div>
+        </div>
+      </section>
+      <section id="test" class="panel">
+        <div class="panel-head"><h3>✅ 테스트 — 저장하자마자 자동 실행</h3>
+          <label class="check"><input type="checkbox" id="autoTest" onchange="toggleAutoTest()" checked/> 저장 시 자동 테스트</label>
+          <button onclick="runTest('verify')" class="btn-primary-sm">▶ verify 3/3 실행</button>
+          <button onclick="loadTests()" class="btn-small">목록</button>
+        </div>
+        <div id="testList" class="test-list"></div>
+        <pre id="testOutput" class="console-log" style="min-height:180px">테스트 준비 — 위에서 ▶ 누르거나 왼쪽에서 저장하면 자동 실행된다
+</pre>
+        <div class="test-foot meta">자동 테스트는 저장 시 <code>verify_local.py --all --mock-ghidra</code> 를 15초 안헤 실행</div>
       </section>
       <section id="blocks" class="panel">
         <div class="panel-head"><h3>📄 블록</h3><button onclick="loadBlocks()" class="btn-small">🔄</button></div>

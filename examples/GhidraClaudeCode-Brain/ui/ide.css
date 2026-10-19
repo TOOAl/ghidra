@@ -85,3 +85,22 @@
 canvas{background:var(--card);border:1px solid var(--line);border-radius:8px;max-width:100%}
 .toast{position:fixed;left:50%;bottom:16px;transform:translateX(-50%) translateY(80px);opacity:0;background:var(--ink);color:#fff;padding:8px 14px;border-radius:20px;font-size:12px;font-weight:700;transition:.3s;z-index:99}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+/* Terminal */
+.term-bar{display:flex;gap:8px;padding:8px;background:var(--card);border:1px solid var(--line);border-radius:8px;margin-bottom:8px;align-items:center}
+.term-prompt{font-weight:800;color:var(--primary);font-size:14px}
+.term-bar input{flex:1;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-family:ui-monospace,monospace;font-size:12px}
+.term-quick{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.check{font-size:12px;font-weight:700;display:flex;gap:6px;align-items:center;cursor:pointer}
+/* Git */
+.git-grid{display:grid;grid-template-columns:1fr 1.4fr;gap:12px}
+@media(max-width:900px){.git-grid{grid-template-columns:1fr}}
+.git-col{display:flex;flex-direction:column;gap:8px}
+.git-title{font-weight:800;font-size:12px;color:var(--muted);display:flex;gap:8px;align-items:center}
+.git-pre{background:#0b1020;color:#e2e8f0;padding:10px;border-radius:8px;overflow:auto;max-height:220px;white-space:pre-wrap;word-break:break-all;font-size:11px;line-height:1.5}
+.git-pre.diff{max-height:420px}
+.git-pre.diff .add{color:#4ade80}
+.git-pre.diff .del{color:#f87171}
+.test-list{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.test-item{padding:6px 10px;background:var(--card);border:1px solid var(--line);border-radius:20px;font-size:11px;font-weight:700;cursor:pointer}
+.test-item:hover{border-color:var(--primary)}
+.test-foot{margin-top:8px}

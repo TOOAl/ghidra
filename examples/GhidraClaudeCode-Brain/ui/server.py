@@ -22,6 +22,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self.json_response({"queue": read_jsonl(MEM / "sync_queue.jsonl")})
         if path == "/api/models":
             return self.json_response(load_models())
+        if path == "/api/status":
+            return self.json_response(get_status())
         if path == "/":
             path = "/ui/index.html"
         self.directory = str(ROOT)
@@ -36,14 +38,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         except:
             data = {}
         if path == "/api/run":
-            # 작업 실행 — 외부 LLM(mock) + 로컬 도구 + 블록 저장
             task = data.get("task", "")
             binary = data.get("binary", "/bin/ls")
             preset = data.get("preset", "")
             result = run_task(task, binary, preset)
             return self.json_response(result)
         if path == "/api/set_model":
-            # 한 글자 진화 — config/models.yaml default 변경 (로컬에만)
             preset = data.get("preset", "")
             ok = set_default_model(preset)
             return self.json_response({"ok": ok, "preset": preset})
@@ -77,6 +77,43 @@ def load_models():
         return {"default": "qwen3:14b (모형)", "presets": ["qwen3:14b", "deepseek-r1:free", "gpt-4o-mini"]}
     except: return {"default": "qwen3:14b", "presets": ["qwen3:14b"]}
 
+def get_status():
+    """모델/서버 상태 — UI에서 '왜 모형인지' 바로 보이게"""
+    status = load_models()
+    # LLM 연결 상태 확인
+    llm_status = {"mode": "unknown", "detail": ""}
+    try:
+        from brain.model_adapter import ModelAdapter
+        cfg_path = str(ROOT / "config/models.yaml")
+        adapter = ModelAdapter.from_yaml(cfg_path)
+        # 키/URL 체크 (실제 호출은 안 함, 설정만)
+        key = adapter.config.resolved_api_key()
+        provider = adapter.config.provider
+        if provider == "ollama":
+            import socket
+            s = socket.socket()
+            s.settimeout(1)
+            try:
+                s.connect(("127.0.0.1", 11434))
+                s.close()
+                llm_status = {"mode": "real", "detail": f"ollama 연결됨 → {adapter.config.model}"}
+            except:
+                llm_status = {"mode": "mock", "detail": f"ollama 꺼짐 (http://localhost:11434 연결 실패) → 모형으로 동작. Ollama 설치: https://ollama.com"}
+        elif provider in ("openrouter", "groq", "openai", "anthropic", "openai_compatible"):
+            if not key:
+                llm_status = {"mode": "mock", "detail": f"{provider} API 키 없음 ({adapter.config.api_key_env or 'API_KEY'} 환경변수) → 모형으로 동작. 키 발급 후 export {adapter.config.api_key_env}=sk-..."}
+            else:
+                llm_status = {"mode": "real", "detail": f"{provider}/{adapter.config.model} 키 있음 → 실제 LLM 호출 가능"}
+        else:
+            llm_status = {"mode": "mock", "detail": f"알 수 없는 provider: {provider}"}
+        llm_status["provider"] = provider
+        llm_status["model"] = adapter.config.model
+    except Exception as e:
+        llm_status = {"mode": "mock", "detail": f"상태 확인 실패: {e}"}
+    status["llm"] = llm_status
+    status["status"] = llm_status
+    return status
+
 def set_default_model(preset: str):
     try:
         import yaml
@@ -91,13 +128,31 @@ def set_default_model(preset: str):
     except: pass
     return False
 
+def try_llm_think(task: str, evidence: dict, preset: str) -> dict:
+    """생각 빌리기 — 진짜 LLM에 물어보기, 실패 시 모형으로 폴백"""
+    try:
+        from brain.model_adapter import ModelAdapter
+        cfg_path = str(ROOT / "config/models.yaml")
+        if preset and preset in (load_models().get("presets") or []):
+            adapter = ModelAdapter.from_yaml(cfg_path, preset=preset)
+        else:
+            adapter = ModelAdapter.from_yaml(cfg_path)
+        ev_summary = "; ".join([f"{k}: {str(v)[:200]}" for k, v in list(evidence.items())[:3]])
+        system = "너는 리버스 엔지니어링 어시스턴트다. 증거 요약을 보고 2문장으로 핵심 인사이트를 한국어로 답해라."
+        messages = [{"role": "user", "content": f"작업: {task}\n증거 요약: {ev_summary}"}]
+        resp = adapter.chat(system=system, messages=messages)
+        return {"ok": True, "text": resp.get("text", "")[:800], "model": adapter.config.model, "provider": adapter.config.provider, "mode": "real"}
+    except ImportError as e:
+        return {"ok": False, "mode": "mock", "reason": f"패키지 없음: {e} → pip install openai pyyaml"}
+    except Exception as e:
+        return {"ok": False, "mode": "mock", "reason": f"{type(e).__name__}: {str(e)[:300]}"}
+
 def run_task(task: str, binary: str, preset: str):
-    # 최소 실행 — 데모 하이브리드와 동일, mock LLM + 로컬 도구
+    # 하이브리드 — 로컬 도구 + 생각 빌리기(LLM) + 모순 검사
     try:
         from tools.ghidra_router import GhidraRouter
         from notion.blocks import create_block
         r = GhidraRouter()
-        # 간단 증거 수집 (실제 agent 루프 대신 최소 시연)
         ev = {}
         ev["list_functions"] = r.dispatch("list_functions", {"limit": 5})
         ev["list_strings"] = r.dispatch("list_strings", {"filter": "http"})
@@ -113,12 +168,10 @@ def run_task(task: str, binary: str, preset: str):
             tr = train()
             pr = predict(task, list(ev.keys()))
         except: tr, pr = {"accuracy": 0, "insight": ""}, {"prediction": "?"}
-        # 우선순위 2: 팀 토론 3턴 12문장
         try:
             from brain.team import discuss
             tm = discuss(task, ev, turns=3)
         except: tm = {"consensus": "?", "insight": ""}
-        # 우선순위 3: 귀 감성
         try:
             from brain.listener import listen
             ear = listen(task)
@@ -130,10 +183,16 @@ def run_task(task: str, binary: str, preset: str):
                 de = design(task)
             except: pass
         from brain.contradiction import check_contradiction
-        report = f"# {task}\n\n## 1. 추론 (눈 100개)\n- {'✅ ' + ' | '.join(re.get('steps',[])) if re['ok'] else '❌ ' + re.get('reason','')}\n\n## 2. 분석 (100개)\n- {an.get('insight','')} ({an.get('pattern','')})\n\n## 3. 학습 (100개)\n- {tr.get('insight','')} | 예측: {pr.get('prediction','')}\n\n## 4. 팀 토론 (3턴)\n- {tm.get('insight','')} | 합의 {tm.get('consensus','')}\n\n## 5. 귀 감성\n- {ear.get('insight','')} (score {ear.get('score','')})\n"
+        # 생각 빌리기 — 진짜 LLM 호출 (실패 시 모형)
+        llm = try_llm_think(task, ev, preset)
+        if llm["mode"] == "real":
+            llm_line = f"🧠 생각 빌리기 ✅ {llm['provider']}/{llm['model']}: {llm['text'][:200]}"
+        else:
+            llm_line = f"🧠 생각 빌리기 ⏸ 모형(mock): {llm.get('reason','키/서버 없음')} → 로컬 추론으로 진행"
+        report = f"# {task}\n\n## 0. 생각 빌리기 (LLM)\n- {llm_line}\n\n## 1. 추론 (눈 100개)\n- {'✅ ' + ' | '.join(re.get('steps',[])) if re['ok'] else '❌ ' + re.get('reason','')}\n\n## 2. 분석 (100개)\n- {an.get('insight','')} ({an.get('pattern','')})\n\n## 3. 학습 (100개)\n- {tr.get('insight','')} | 예측: {pr.get('prediction','')}\n\n## 4. 팀 토론 (3턴)\n- {tm.get('insight','')} | 합의 {tm.get('consensus','')}\n\n## 5. 귀 감성\n- {ear.get('insight','')} (score {ear.get('score','')})\n"
         if de:
             report += f"\n## 6. 설계\n- {de.get('insight','')} → {de.get('blocks',[])}\n"
-        report += f"\n## 증거\n- 함수 {len(ev['list_functions'].get('functions',[]))}개, 문자열 {ev['list_strings'].get('strings',[])[:2]}\n- 외부 LLM({preset or 'mock'}) + 로컬 + 팀+귀\n"
+        report += f"\n## 증거\n- 함수 {len(ev['list_functions'].get('functions',[]))}개, 문자열 {ev['list_strings'].get('strings',[])[:2]}\n- {'외부 LLM '+llm.get('model','mock') if llm['mode']=='real' else '모형(mock)+로컬'} + 팀+귀\n"
         contra = check_contradiction(report, ev)
         report += f"\n## 모순 검사\n- {contra['summary']}\n"
         if not contra["ok"]:
@@ -141,10 +200,11 @@ def run_task(task: str, binary: str, preset: str):
         create_block(report[:800], type="text")
         (MEM / "session.jsonl").parent.mkdir(parents=True, exist_ok=True)
         with open(MEM / "session.jsonl", "a", encoding="utf-8") as f:
-            f.write(json.dumps({"task": task, "binary": binary, "preset": preset, "report": report[:1200], "reasoning": re, "analysis": an, "train": tr, "team": tm, "ear": ear}, ensure_ascii=False)+"\n")
-        return {"ok": True, "report": report, "contradiction": contra, "reasoning": re, "analysis": an, "train": tr, "team": tm, "ear": ear, "preset": preset or "mock"}
+            f.write(json.dumps({"task": task, "binary": binary, "preset": preset, "report": report[:1200], "reasoning": re, "analysis": an, "train": tr, "team": tm, "ear": ear, "llm": llm}, ensure_ascii=False)+"\n")
+        return {"ok": True, "report": report, "contradiction": contra, "reasoning": re, "analysis": an, "train": tr, "team": tm, "ear": ear, "llm": llm, "preset": preset or "mock"}
     except Exception as e:
-        return {"ok": False, "error": str(e)}
+        import traceback
+        return {"ok": False, "error": str(e), "trace": traceback.format_exc()[:1000]}
 
 if __name__ == "__main__":
     addr = ("127.0.0.1", 8090)

@@ -3,7 +3,7 @@
 body{margin:0;font-family:"Pretendard",system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",sans-serif;background:var(--bg);color:var(--ink);line-height:1.6;-webkit-font-smoothing:antialiased}
 .status-bar{display:flex;align-items:center;gap:8px;padding:8px 16px;font-size:13px;background:var(--ink);color:#cbd5e1}
 .status-bar .dot{width:9px;height:9px;border-radius:50%;background:#fbbf24;flex-shrink:0;animation:pulse 1.5s infinite}
-.status-bar .dot.ok{background:#34d399;animation:none}.status-bar .dot.bad{background:#f87171;animation:none}
+.status-bar .dot.ok{background:#34d399;animation:none}.status-bar .dot.bad{background:#f87171;animation:none}.status-bar .dot.warn{background:#fbbf24;animation:none}
 .status-bar #statusRight{margin-left:auto;opacity:.8}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
 header{padding:18px 20px 16px;background:var(--card);border-bottom:1px solid var(--line);box-shadow:var(--shadow);position:sticky;top:0;z-index:10}

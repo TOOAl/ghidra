@@ -3,7 +3,7 @@
 brain_repl.py — Python에서 Claude Code처럼 (대화형 코딩 + 오른쪽 실시간 실행)
 
 실행:
-  cd E:\ghidra\examples\GhidraClaudeCode-Brain
+  cd E:\\ghidra\\examples\\GhidraClaudeCode-Brain
   python brain_repl.py
   >>> C2 찾아줘
   >>> /code brain/reasoning.py

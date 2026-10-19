@@ -314,7 +314,29 @@ document.addEventListener('DOMContentLoaded',()=>{
   initEditor();initSplitter();refreshFiles();loadModels();checkHealth();setInterval(checkHealth,8000);
   setupChatInput();
   log('IDE 준비 — 왼쪽 파일 선택 → 코딩 → Ctrl+S → Enter(대화)');
-  // binary Enter도 대화 전송
   const bin=document.getElementById('binary');
-  if(bin) bin.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); run() }})
+  if(bin) bin.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); run() }});
+  // Python brain_repl.py에서 POST한 세션을 폴링해서 채팅에 자동 반영
+  let lastCount=0;
+  async function pollChat(){
+    try{
+      const r=await fetch('/api/database'); const j=await r.json();
+      const rows=j.results||[];
+      if(rows.length > lastCount){
+        if(lastCount===0){ lastCount=rows.length; return; }
+        for(let i=lastCount; i<rows.length; i++){
+          const s=rows[i];
+          if(s.task && s.report){
+            const hist=document.getElementById('chatHistory');
+            const already=[...hist.querySelectorAll('.msg-bubble')].some(b=> b.textContent.includes(s.task.slice(0,8)));
+            if(!already) addChat('assistant', s.report, s.task+' · '+(s.preset||''));
+          }
+        }
+        lastCount = rows.length;
+      }
+    }catch{}
+  }
+  setTimeout(async()=>{ try{ const r=await fetch('/api/database'); const j=await r.json(); lastCount=(j.results||[]).length; }catch{} }, 1000);
+  setInterval(pollChat, 2000);
+  setTimeout(()=>{ const ft=document.getElementById('fileTree'); if(ft && ft.textContent.includes('불러오는')) refreshFiles(); }, 3000);
 });

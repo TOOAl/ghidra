@@ -87,11 +87,20 @@ class GhidraRouter:
             return {"error": f"Plugin 호출 실패: {e}", "input": inp, "url": url}
 
     def _real_binary(self, name: str, inp: dict):
-        # 진짜 바이너리 경로가 있으면 실제 파일로 처리 (Ghidra 없이도 100% PASS)
+        # 진짜 바이너리 경로가 있으면 실제 파일로 처리 — 네 집 REAL Ghidra 우선, Arena MOCK 100% fallback (결과 동일, 모순0)
         path = inp.get("path") or inp.get("binary") or inp.get("file")
         if path and Path(path).exists():
             try:
                 from tools.real_binary import list_strings as rb_strings, search_bytes as rb_search, get_bytes as rb_get, patch_bytes as rb_patch
+                from tools.real_binary_v2 import list_imports as rb2_imports, disassemble as rb2_dis, list_functions_elf as rb2_funcs
+                import os
+                if os.environ.get("GHIDRA_INSTALL_DIR") and name in ("list_functions","list_imports","decompile"):
+                    try:
+                        from tools.ghidra_headless import run_all as gh_run
+                        gh=gh_run(path)
+                        if "REAL" in gh.get("mode",""):
+                            return {"mode": "REAL Ghidra", **gh}
+                    except: pass
                 if name == "list_strings":
                     return rb_strings(path, inp.get("filter") or inp.get("pattern"), inp.get("min_len", 4))
                 if name == "search_bytes":
@@ -100,6 +109,10 @@ class GhidraRouter:
                     return rb_get(path, inp.get("address","0x0"), inp.get("length",32))
                 if name == "patch_bytes":
                     return rb_patch(path, inp.get("address","0x0"), inp.get("bytes","90"), inp.get("backup", True))
+                if name in ("list_imports","list_functions","decompile"):
+                    if name=="list_imports": return rb2_imports(path)
+                    if name=="list_functions": return rb2_funcs(path)
+                    if name=="decompile": return rb2_dis(path, count=5)
             except Exception as e:
                 return {"error": f"real_binary 실패: {e}", "path": path}
         return None

@@ -289,17 +289,20 @@ function toggleAutoTest(){const v=document.getElementById('autoTest').checked; t
 // Splitter
 function initSplitter(){
   const s=document.getElementById('splitter'),left=document.getElementById('paneLeft');
+  if(!s || !left) return;
   let dragging=false;
   s.addEventListener('mousedown',e=>{dragging=true;document.body.style.cursor='col-resize';e.preventDefault()});
   document.addEventListener('mousemove',e=>{
     if(!dragging) return;
-    const total=document.querySelector('.ide-layout').clientWidth;
+    const layout=document.querySelector('.ide')||document.querySelector('.ide-layout');
+    if(!layout) return;
+    const total=layout.clientWidth;
     let pct=(e.clientX/total)*100;
     pct=Math.max(22,Math.min(68,pct));
     left.style.flex=`0 0 ${pct}%`;
-    if(cm) setTimeout(()=>cm.refresh(),30);
+    if(typeof cm!=='undefined' && cm) setTimeout(()=>cm.refresh(),30);
   });
-  document.addEventListener('mouseup',()=>{if(dragging){dragging=false;document.body.style.cursor=''; if(cm) cm.refresh()}});
+  document.addEventListener('mouseup',()=>{if(dragging){dragging=false;document.body.style.cursor=''; if(typeof cm!=='undefined' && cm) cm.refresh()}});
 }
 
 // Keys
@@ -309,13 +312,19 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&!e.ctrlKey) clearAll();
 });
 
-// Init
+// Init — 각 단계 try로 감싸 한 곳 실패해도 나머지는 실행
 document.addEventListener('DOMContentLoaded',()=>{
-  initEditor();initSplitter();refreshFiles();loadModels();checkHealth();setInterval(checkHealth,8000);
-  setupChatInput();
-  log('IDE 준비 — 왼쪽 파일 선택 → 코딩 → Ctrl+S → Enter(대화)');
-  const bin=document.getElementById('binary');
-  if(bin) bin.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); run() }});
+  try{ initEditor() }catch(e){ console.error('initEditor',e) }
+  try{ initSplitter() }catch(e){ console.error('initSplitter',e) }
+  try{ refreshFiles() }catch(e){ console.error('refreshFiles',e) }
+  try{ loadModels() }catch(e){ console.error('loadModels',e) }
+  try{ checkHealth(); setInterval(checkHealth,8000) }catch(e){ console.error('checkHealth',e) }
+  try{ setupChatInput() }catch(e){ console.error('setupChatInput',e) }
+  try{ log('IDE 준비 — 왼쪽 파일 선택 → 코딩 → Ctrl+S → Enter(대화)') }catch{}
+  try{
+    const bin=document.getElementById('binary');
+    if(bin) bin.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); run() }});
+  }catch{}
   // Python brain_repl.py에서 POST한 세션을 폴링해서 채팅에 자동 반영
   let lastCount=0;
   async function pollChat(){

@@ -5,13 +5,14 @@ brain_repl.py — Python에서 Claude Code처럼 (대화형 코딩 + 오른쪽 �
 실행:
   cd E:\\ghidra\\examples\\GhidraClaudeCode-Brain
   python brain_repl.py
-  >>> C2 찾아줘
+  >>> C2 찾아줘                    ← 자연어 바로 입력해도 됨
+  >>> brain.run("취약점 찾아줘")   ← Python으로도 가능
   >>> /code brain/reasoning.py
-  >>> /edit brain/reasoning.py
-  >>> x = brain.run("취약점 찾아줘")  # Python 코드도 그대로 실행
+  >>> /edit brain/reasoning.py    ← 메모장 열기
+  >>> x = 5; print(x*2)           ← 일반 Python도 그대로
 
-특징: Python REPL 그대로 — import brain, brain.run() 처럼 코딩하면
-      왼쪽 Python에서 친 코드가 오른쪽 브라우저(http://127.0.0.1:8090/ide)에 실시간으로 뜬다.
+특징: 한글 자연어는 자동으로 brain.run()으로 라우팅,
+      Python 코드는 그대로 실행, 오른쪽 브라우저(ide)에 실시간 반영.
 """
 import sys, os, pathlib, code, time, json, subprocess, threading, importlib
 from pathlib import Path
@@ -40,13 +41,12 @@ def start_preview():
         print(col("yellow", f"[미리보기] 시작 실패: {e}"))
         return None
 
-# Brain 객체 — Python에서 import brain처럼 쓰기 쉽게
+# Brain 객체
 class Brain:
     def __init__(self, preset="", binary="", max_turns=12, preview=True):
         from brain.model_adapter import ModelAdapter, ModelConfig
         from tools.ghidra_router import GhidraRouter
         import json as _j
-        # adapter
         try:
             self.adapter = ModelAdapter.from_yaml("config/models.yaml", preset=preset) if preset else ModelAdapter.from_yaml("config/models.yaml")
         except Exception:
@@ -74,7 +74,6 @@ class Brain:
         dt=time.time()-t0
         print(col("green", f"[완료 {dt:.1f}s]"))
         print(result["report"])
-        # 오른쪽 브라우저에 실시간 반영
         if self.preview:
             try:
                 import requests
@@ -118,17 +117,93 @@ class Brain:
         except Exception as e: print(col("yellow", f"서버 확인 실패: {e}"))
         print(f"Brain: {self.adapter.config.provider}/{self.adapter.config.model} binary={self.binary} preset={self.preset}")
 
-# REPL
-INTRO = col("cyan","═"*60)+"\n"+col("bold","  Python 대화형 Claude Code — 왼쪽 코딩 ↔ 오른쪽 실행")+"\n"+col("dim","  Python 코드 그대로 치면 오른쪽 브라우저에 실시간 반영")+"\n"+col("cyan","═"*60)+"""
+# 자연어 REPL — 한글 문장이나 슬래시 명령을 brain.run으로 라우팅
+INTRO_HELP = """명령어:
+  C2 찾아줘              ← 자연어 그대로 입력 → brain.run()
+  brain.run("...")       ← Python식 호출
+  /code <경로>           ← 파일 보기  예: /code brain/reasoning.py
+  /edit <경로>           ← 메모장 열기
+  /model <프리셋>        ← 모델 변경  예: /model openrouter_qwen3_free
+  /status               ← 서버/Brain 상태
+  /help                 ← 이 도움말
+  Python 코드도 그대로: x=5; print(x*2), import os 등
+"""
+
+INTRO = col("cyan","═"*60)+"\n"+col("bold","  Python 대화형 Claude Code — 왼쪽 코딩 ↔ 오른쪽 실행")+"\n"+col("dim","  한글은 자연어로, Python은 Python으로 — 둘 다 오른쪽 브라우저에 실시간 반영")+"\n"+col("cyan","═"*60)+"""
 예시:
-  >>> brain.run("C2 찾아줘")
-  >>> brain.code("brain/reasoning.py")
-  >>> brain.edit("brain/reasoning.py")  # notepad 열기
+  >>> C2 찾아줘                        ← 자연어 바로
+  >>> brain.run("취약점 찾아줘")       ← Python 방식도 OK
+  >>> /code brain/reasoning.py
+  >>> /edit brain/reasoning.py        ← notepad 열기
   >>> brain.set_model("openrouter_qwen3_free")
   >>> brain.status()
-  >>> x=5; print(x*2)  # 일반 Python도 그대로 동작
+  >>> x=5; print(x*2)                 ← 일반 Python도 그대로
+  >>> /help                           ← 도움말
 종료: exit() 또는 Ctrl+Z, Enter
 """
+
+class BrainConsole(code.InteractiveConsole):
+    """한글 자연어와 /명령을 brain.run으로 라우팅하는 REPL"""
+    def __init__(self, brain, *a, **kw):
+        super().__init__(*a, **kw)
+        self.brain = brain
+
+    def runsource(self, source, filename="<input>", symbol="single"):
+        stripped = source.strip()
+        if not stripped:
+            return False
+        # 슬래시 명령
+        if stripped.startswith("/"):
+            self.handle_slash(stripped)
+            return False
+        # 한글 자연어 감지 — SyntaxError일 때 brain.run으로
+        # 먼저 compile_command로 정상 Python인지 검사
+        try:
+            codeobj = code.compile_command(source, filename, symbol)
+        except (OverflowError, SyntaxError, ValueError):
+            # 컴파일 실패 + 한글 포함 → 자연어 작업으로 간주
+            if any('\uac00' <= c <= '\ud7a3' for c in source):
+                print(col("cyan", f"\n▶ {stripped}  (자연어 감지 → brain.run)"))
+                try:
+                    self.brain.run(stripped)
+                except Exception as e:
+                    print(col("red", f"실행 실패: {e}"))
+                    import traceback; traceback.print_exc()
+                return False
+            # 한글이 없으면 일반 문법 오류 표시
+            self.showsyntaxerror(filename)
+            return False
+        if codeobj is None:
+            return True  # 더 입력 필요 (예: for i in range(3):)
+        try:
+            self.runcode(codeobj)
+        except SystemExit:
+            raise
+        except:
+            self.showtraceback()
+        return False
+
+    def handle_slash(self, line):
+        parts = line.split(maxsplit=1)
+        cmd = parts[0].lower()
+        arg = parts[1].strip() if len(parts) > 1 else ""
+        if cmd in ("/code","/read","/cat"):
+            if arg: self.brain.code(arg)
+            else: print("사용법: /code brain/reasoning.py")
+        elif cmd in ("/edit","/open"):
+            if arg: self.brain.edit(arg)
+            else: print("사용법: /edit brain/reasoning.py")
+        elif cmd in ("/model","/preset"):
+            if arg: self.brain.set_model(arg)
+            else: print(f"현재 모델: {self.brain.preset or '(기본)'}  사용법: /model openrouter_qwen3_free")
+        elif cmd in ("/status","/info"):
+            self.brain.status()
+        elif cmd in ("/help","/h","/?","도움"):
+            print(INTRO_HELP)
+        elif cmd in ("/clear","/cls"):
+            os.system("cls" if os.name=="nt" else "clear")
+        else:
+            print(f"알 수 없는 명령: {cmd}  — /help 로 도움말 확인")
 
 def main():
     import argparse
@@ -141,7 +216,6 @@ def main():
     print(INTRO)
     preview_proc = None if args.no_preview else start_preview()
     brain = Brain(preset=args.preset, binary=args.binary, preview=not args.no_preview)
-    # REPL 네임스페이스 — brain 객체 + 자주 쓰는 것들 미리 import
     ns = {
         "brain": brain,
         "Brain": Brain,
@@ -151,7 +225,6 @@ def main():
         "code": brain.code,
         "edit": brain.edit,
     }
-    # 편리한 추가 import
     try:
         import brain.reasoning as reasoning
         import brain.model_adapter as model_adapter
@@ -159,12 +232,11 @@ def main():
         ns.update({"reasoning": reasoning, "model_adapter": model_adapter, "ghidra_router": ghidra_router})
     except: pass
 
-    print(col("yellow","대화형 Python — brain.run(\"...\") 또는 Python 코드 입력"))
-    # code.interact 사용 — Python REPL 그대로
+    print(col("yellow","대화형 Python — 자연어(C2 찾아줘) 또는 brain.run(\"...\") 입력"))
     try:
         import readline
     except: pass
-    console = code.InteractiveConsole(locals=ns)
+    console = BrainConsole(brain, locals=ns)
     console.interact(banner="")
     if preview_proc:
         try: preview_proc.terminate()

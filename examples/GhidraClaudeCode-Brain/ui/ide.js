@@ -5,7 +5,19 @@ function log(msg){const el=document.getElementById('consoleLog');const ts=new Da
 function setStatus(ok,t){const d=document.getElementById('statusDot'),x=document.getElementById('statusText');d.className='dot '+(ok===true?'ok':ok===false?'bad':ok==='warn'?'warn':'');x.textContent=t}
 async function checkHealth(){try{const r=await fetch('/api/status');const j=await r.json();const llm=j.llm||{};if(llm.mode==='real')setStatus(true,'● 서버 + 🧠 ON ('+llm.model+')');else if(llm.mode==='mock')setStatus('warn','● 서버 + ⏸ 모형: '+llm.detail);else setStatus(true,'● 서버 연결됨')}catch{setStatus(false,'● 서버 안 켜짐 — python ui/server.py')}
 }
-async function loadModels(){try{const r=await fetch('/api/status');const j=await r.json();const s=document.getElementById('model');const hint=document.getElementById('modelHint');s.innerHTML=(j.presets||[]).map(p=>`<option value="${p}" ${p===j.default?'selected':''}>${p}</option>`).join('');if(j.llm&&j.llm.detail)hint.textContent=(j.llm.mode==='mock'?'⏸ ':'🧠 ')+j.llm.detail; s.onchange=async()=>{await fetch('/api/set_model',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({preset:s.value})});toast('모델: '+s.value);checkHealth()}}catch(e){setStatus(false,'모델 로드 실패')}
+async function loadModels(){try{const r=await fetch('/api/status');const j=await r.json();const s=document.getElementById('model');const hint=document.getElementById('modelHint');const cmodel=document.getElementById('chatModel');s.innerHTML=(j.presets||[]).map(p=>`<option value="${p}" ${p===j.default?'selected':''}>${p}</option>`).join('');const detail=j.llm&&j.llm.detail? (j.llm.mode==='mock'?'⏸ ':'🧠 ')+j.llm.detail : ''; if(hint) hint.textContent=detail; if(cmodel) cmodel.textContent=(j.default||'')+' · '+(j.llm?j.llm.mode:''); s.onchange=async()=>{await fetch('/api/set_model',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({preset:s.value})});toast('모델: '+s.value);checkHealth()}}catch(e){setStatus(false,'모델 로드 실패')}
+}
+function setupChatInput(){
+  const ta=document.getElementById('task');
+  if(!ta) return;
+  ta.addEventListener('keydown', e=>{
+    if(e.key==='Enter' && !e.shiftKey){
+      e.preventDefault(); run();
+    }
+  });
+  ta.addEventListener('input', ()=>{
+    ta.style.height='auto'; ta.style.height=Math.min(100, ta.scrollHeight)+'px';
+  });
 }
 
 // File tree
@@ -104,12 +116,20 @@ function updateCursor(){
 
 // Preview (reuse app.js logic)
 function showTab(id){
-  document.querySelectorAll('.preview .panel').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.pv-tabs button, .preview-tabs button').forEach(b=>b.classList.remove('active'));
+  const chatTabs=document.querySelector('.pv-body');
+  document.querySelectorAll('.pv-body .panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.chat-tabs button').forEach(b=>b.classList.remove('active'));
   const el=document.getElementById(id);
   if(el) el.classList.add('active');
   const tab=document.querySelector(`[data-tab="${id}"]`);
   if(tab) tab.classList.add('active');
+  // show pv-body when blocks/graph requested
+  if(id==='blocks' || id==='graph'){
+    if(chatTabs) chatTabs.style.display='block';
+    document.querySelector('.chat').style.display='none';
+  } else {
+    if(chatTabs) chatTabs.style.display='none';
+  }
   if(id==='blocks')loadBlocks(); if(id==='graph')loadGraph();
 }
 function showBottom(id){
@@ -120,27 +140,66 @@ function showBottom(id){
   if(id==='git') loadGit(); if(id==='test') loadTests();
 }
 function clearConsole(){document.getElementById('consoleLog').textContent='콘솔 지움 — 다음 로그부터 표시';}
-function quick(t){document.getElementById('task').value=t;toast('작업: '+t)}
-function clearAll(){document.getElementById('task').value='';document.getElementById('reportBody').innerHTML='';document.getElementById('reportExtras').innerHTML='';document.getElementById('reportContent').style.display='block';toast('지웠다')}
+function quick(t){const el=document.getElementById('task'); if(el){el.value=t; el.dispatchEvent(new Event('input')); el.focus()} toast('작업: '+t)}
+function quickChat(t){const el=document.getElementById('task'); if(el){el.value=t; el.dispatchEvent(new Event('input')); el.focus()} toast('작업: '+t)}
+function clearAll(){document.getElementById('task').value='';document.getElementById('reportBody').innerHTML='';document.getElementById('reportExtras').innerHTML='';const ec=document.getElementById('reportContent'); if(ec) ec.style.display='block'; toast('지웠다')}
+function clearChat(){document.getElementById('chatHistory').innerHTML='<div class="chat-empty"><div class="chat-empty-icon">◉</div><h3>무엇을 도와드릴까요?</h3><p>예: <code>C2 찾아줘</code></p></div>'; toast('대화 지움')}
+function quickChat(t){document.getElementById('task').value=t; document.getElementById('task').dispatchEvent(new Event('input')); document.getElementById('task').focus()}
+function addChat(role, text, meta=''){
+  const hist=document.getElementById('chatHistory');
+  // remove empty placeholder
+  const emp=hist.querySelector('.chat-empty'); if(emp) emp.remove();
+  const wrap=document.createElement('div');
+  wrap.className='msg '+(role==='user'?'msg-user':'msg-assistant');
+  const avatar=role==='user'?'나':'◉';
+  // render markdown-lite: ```code``` → pre, ## → bold, - → list
+  let html=esc(text);
+  html=html.replace(/```(\w+)?\n?([\s\S]*?)```/g,'<pre>$2</pre>');
+  html=html.replace(/\n/g,'<br>');
+  wrap.innerHTML=`<div class="msg-avatar">${avatar}</div><div><div class="msg-bubble">${html}</div>${meta?'<div class="msg-meta">'+esc(meta)+'</div>':''}</div>`;
+  hist.appendChild(wrap);
+  hist.scrollTop=hist.scrollHeight;
+  return wrap;
+}
 async function run(){
   const b=document.getElementById('runBtn'),task=document.getElementById('task').value.trim(),binary=document.getElementById('binary').value.trim()||'/bin/ls',preset=document.getElementById('model').value;
-  if(!task){toast('작업 칸에 써봐');document.getElementById('task').focus();return}
-  lastTask=task; b.disabled=true; b.textContent='⏳ 실행 중...';
-  const body=document.getElementById('reportBody'),extras=document.getElementById('reportExtras'),empty=document.getElementById('reportContent'),actions=document.getElementById('reportActions');
-  empty.style.display='none'; body.innerHTML='<div class="loading"><span class="spinner"></span> 외부 LLM에 물어보고 로컬 4개 도구 실행 중...</div>'; extras.innerHTML=''; actions.style.display='none'; showTab('report');
+  if(!task){toast('메시지를 입력하세요');document.getElementById('task').focus();return}
+  lastTask=task;
+  // Claude Code style: add user bubble instantly
+  addChat('user', task, binary+' · '+preset);
+  document.getElementById('task').value='';
+  const ta=document.getElementById('task'); if(ta) ta.style.height='36px';
+  b.disabled=true; b.textContent='…';
   log(`실행: ${task} | ${binary} | ${preset}`);
+  // show typing indicator
+  const typing=addChat('assistant','… 생각 중 …', preset);
   try{
     const r=await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({task,binary,preset})});
     if(!r.ok) throw new Error('서버 '+r.status);
     const j=await r.json();
     if(j.error&&!j.report) throw new Error(j.error);
     lastReport=j.report||'';
-    body.innerHTML=`<div class="report-card"><div class="report-head"><h3>📝 ${esc(task)}</h3><span class="badge ${j.contradiction&&j.contradiction.ok?'badge-green':'badge'}">${j.contradiction?esc(j.contradiction.summary):''}</span></div><pre>${esc(j.report||'')}</pre></div>`+(j.ok?'<div class="success-banner">✅ 보고서 저장 — 왼쪽 코드와 오른쪽 결과가 연결됐다</div>':'');
-    let h=''; if(j.reasoning)h+=card('🧠 추론',j.reasoning.ok?'ok':'bad',j.reasoning.steps?j.reasoning.steps.join(' → '):j.reasoning.reason); if(j.analysis)h+=card('📊 분석','ok',j.analysis.insight+' '+(j.analysis.pattern||'')); if(j.train)h+=card('📚 학습',j.train.ok?'ok':'bad',j.train.insight+' | 예측:'+j.train.prediction); if(j.team)h+=card('👥 팀 토론',j.team.consensus==='4/4'?'ok':'',j.team.insight+' | 합의 '+j.team.consensus); if(j.ear)h+=card('👂 귀 감성','',j.ear.insight+' (score '+j.ear.score+')'); if(j.contradiction)h+=card('✅ 모순',j.contradiction.ok?'ok':'bad',j.contradiction.summary); if(j.llm)h+=card('🧠 생각 빌리기',j.llm.mode==='real'?'ok':'',j.llm.mode==='real'? j.llm.provider+'/'+j.llm.model+': '+(j.llm.text||'') : '⏸ 모형: '+(j.llm.reason||''));
-    extras.innerHTML=`<div class="report-extra">${h}</div>`; actions.style.display='flex'; document.getElementById('reportMeta').textContent=`${j.preset} · ${new Date().toLocaleTimeString()}`;
-    toast('완료 — 오른쪽에 6섹션 떴다!'); log(`완료: ${task} → 모순 ${j.contradiction.summary} | LLM ${j.llm.mode}`);
-  }catch(e){body.innerHTML=`<div class="extra-card bad"><strong>❌ 실패</strong><p>${esc(e.message)}</p></div>`; toast('실패: '+e.message,2500); log('실행 실패: '+e.message)}
-  b.disabled=false; b.textContent='▶ 실행 Ctrl+Enter';
+    typing.remove();
+    // main report as chat bubble
+    const meta=`${j.preset} · ${new Date().toLocaleTimeString()} · ${j.contradiction?j.contradiction.summary:''}`;
+    addChat('assistant', j.report||'(보고서 없음)', meta);
+    // also update detailed report panel (hidden but for copy/download)
+    const body=document.getElementById('reportBody'), extras=document.getElementById('reportExtras'), empty=document.getElementById('reportContent'), actions=document.getElementById('reportActions');
+    if(body){
+      if(empty) empty.style.display='none';
+      body.innerHTML=`<div class="report-card"><div class="report-head"><h3>${esc(task)}</h3><span class="badge ${j.contradiction&&j.contradiction.ok?'badge-green':'badge'}">${j.contradiction?esc(j.contradiction.summary):''}</span></div><pre>${esc(j.report||'')}</pre></div>`;
+      let h=''; if(j.reasoning)h+=card('추론',j.reasoning.ok?'ok':'bad',j.reasoning.steps?j.reasoning.steps.join(' → '):j.reasoning.reason); if(j.analysis)h+=card('분석','ok',j.analysis.insight+' '+(j.analysis.pattern||'')); if(j.train)h+=card('학습',j.train.ok?'ok':'bad',j.train.insight+' | 예측:'+j.train.prediction); if(j.team)h+=card('팀 토론',j.team.consensus==='4/4'?'ok':'',j.team.insight+' | 합의 '+j.team.consensus); if(j.ear)h+=card('귀 감성','',j.ear.insight+' (score '+j.ear.score+')'); if(j.contradiction)h+=card('모순',j.contradiction.ok?'ok':'bad',j.contradiction.summary); if(j.llm)h+=card('생각 빌리기',j.llm.mode==='real'?'ok':'',j.llm.mode==='real'? j.llm.provider+'/'+j.llm.model+': '+(j.llm.text||'') : '⏸ 모형: '+(j.llm.reason||''));
+      if(extras) extras.innerHTML=`<div class="report-extra">${h}</div>`;
+      if(actions) actions.style.display='flex';
+      const metaEl=document.getElementById('reportMeta'); if(metaEl) metaEl.textContent=meta;
+    }
+    toast('완료 — 대화에 응답이 추가됐다'); log(`완료: ${task} → ${j.contradiction.summary} | ${j.llm.mode}`);
+  }catch(e){
+    typing.remove();
+    addChat('assistant','❌ 실패: '+e.message);
+    toast('실패: '+e.message,2500); log('실행 실패: '+e.message)
+  }
+  b.disabled=false; b.textContent='↑';
 }
 function card(t,k,b){return `<div class="extra-card ${k}"><strong>${t}</strong><p>${esc(b||'')}</p></div>`}
 function copyReport(){if(!lastReport) return toast('복사할 보고서 없음'); navigator.clipboard.writeText(lastReport).then(()=>toast('복사 완료'))}
@@ -251,11 +310,11 @@ document.addEventListener('keydown',e=>{
 });
 
 // Init
-document.addEventListener('DOMContentLoaded',()=>{initEditor();initSplitter();refreshFiles();loadModels();checkHealth();setInterval(checkHealth,8000);log('IDE 준비 — 왼쪽 파일 선택 → 코딩 → Ctrl+S → Ctrl+Enter')});
-// Ctrl+Enter on inputs
 document.addEventListener('DOMContentLoaded',()=>{
-  ['task','binary'].forEach(id=>{
-    const el=document.getElementById(id);
-    if(el) el.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.ctrlKey){ e.preventDefault(); run() }})
-  });
+  initEditor();initSplitter();refreshFiles();loadModels();checkHealth();setInterval(checkHealth,8000);
+  setupChatInput();
+  log('IDE 준비 — 왼쪽 파일 선택 → 코딩 → Ctrl+S → Enter(대화)');
+  // binary Enter도 대화 전송
+  const bin=document.getElementById('binary');
+  if(bin) bin.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); run() }})
 });

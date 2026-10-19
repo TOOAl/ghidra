@@ -9,7 +9,6 @@
 <link rel="stylesheet" href="/ui/ide.css"/>
 </head>
 <body>
-<!-- Top status -->
 <div id="statusBar" class="topbar">
   <div class="topbar-left">
     <span class="logo">◉ Brain IDE</span>
@@ -24,7 +23,6 @@
 </div>
 
 <div class="ide">
-  <!-- Sidebar -->
   <aside class="sidebar" id="paneLeft">
     <div class="sb-head">
       <span class="sb-title">EXPLORER</span>
@@ -33,12 +31,10 @@
     <input id="fileSearch" class="sb-search" placeholder="파일 검색…" oninput="filterFiles()"/>
     <div id="fileTree" class="file-tree">불러오는 중…</div>
     <div class="sb-foot">
-      <span id="fileInfo">—</span>
-      <span id="cursorPos">Ln 1, Col 1</span>
+      <span id="fileInfo">—</span><span id="cursorPos">Ln 1, Col 1</span>
     </div>
   </aside>
 
-  <!-- Center: Editor -->
   <main class="center">
     <div class="ed-head">
       <span id="currentFile" class="ed-file">파일을 선택하세요</span>
@@ -48,10 +44,7 @@
         <button onclick="runFromEditor()" class="btn btn-primary">저장 후 실행 ▸</button>
       </div>
     </div>
-    <div class="ed-wrap">
-      <textarea id="codeArea"></textarea>
-    </div>
-    <!-- Bottom terminal (inside center) -->
+    <div class="ed-wrap"><textarea id="codeArea"></textarea></div>
     <div class="bottom">
       <div class="tabs">
         <button onclick="showBottom('terminal')" data-btab="terminal" class="active">TERMINAL</button>
@@ -61,11 +54,7 @@
       </div>
       <div class="bottom-body">
         <section id="b-terminal" class="bpanel active">
-          <div class="term-line">
-            <span class="prompt">$</span>
-            <input id="termInput" placeholder="ls, git status, python verify_local.py --all --mock-ghidra" onkeydown="if(event.key==='Enter') runTerminal()"/>
-            <button onclick="runTerminal()" class="btn btn-ghost btn-sm">실행</button>
-          </div>
+          <div class="term-line"><span class="prompt">$</span><input id="termInput" placeholder="ls, git status, python verify_local.py --all --mock-ghidra" onkeydown="if(event.key==='Enter') runTerminal()"/><button onclick="runTerminal()" class="btn btn-ghost btn-sm">실행</button></div>
           <div class="term-chips">
             <button onclick="termQuick('ls -lh brain/ tools/')" class="chip">ls</button>
             <button onclick="termQuick('git status --short')" class="chip">git status</button>
@@ -76,86 +65,62 @@
           <pre id="termOutput" class="mono pre-dark">터미널 준비 — 명령을 입력하세요</pre>
         </section>
         <section id="b-git" class="bpanel">
-          <div class="git-head">
-            <span class="meta">BRANCH <b id="gitBranch">—</b></span>
-            <button onclick="loadGit()" class="btn btn-ghost btn-sm">새로고침</button>
-            <button onclick="gitCommitPrompt()" class="btn btn-primary btn-sm">Commit</button>
-          </div>
-          <div class="git-grid">
-            <div>
-              <div class="lbl">STATUS</div><pre id="gitStatus" class="pre-dark sm"></pre>
-              <div class="lbl">LOG</div><pre id="gitLog" class="pre-dark sm"></pre>
-            </div>
-            <div>
-              <div class="lbl">DIFF <button onclick="loadGitDiff()" class="btn btn-ghost btn-xs">전체</button></div>
-              <pre id="gitDiff" class="pre-dark sm diff"></pre>
-            </div>
-          </div>
+          <div class="git-head"><span class="meta">BRANCH <b id="gitBranch">—</b></span><button onclick="loadGit()" class="btn btn-ghost btn-sm">새로고침</button><button onclick="gitCommitPrompt()" class="btn btn-primary btn-sm">Commit</button></div>
+          <div class="git-grid"><div><div class="lbl">STATUS</div><pre id="gitStatus" class="pre-dark sm"></pre><div class="lbl">LOG</div><pre id="gitLog" class="pre-dark sm"></pre></div><div><div class="lbl">DIFF <button onclick="loadGitDiff()" class="btn btn-ghost btn-xs">전체</button></div><pre id="gitDiff" class="pre-dark sm diff"></pre></div></div>
         </section>
         <section id="b-test" class="bpanel">
-          <div class="test-head">
-            <label class="check"><input type="checkbox" id="autoTest" checked onchange="toggleAutoTest()"/> 저장 시 자동 실행</label>
-            <button onclick="runTest('verify')" class="btn btn-primary btn-sm">▶ verify 3/3</button>
-            <button onclick="loadTests()" class="btn btn-ghost btn-sm">목록</button>
-          </div>
+          <div class="test-head"><label class="check"><input type="checkbox" id="autoTest" checked onchange="toggleAutoTest()"/> 저장 시 자동 실행</label><button onclick="runTest('verify')" class="btn btn-primary btn-sm">▶ verify 3/3</button><button onclick="loadTests()" class="btn btn-ghost btn-sm">목록</button></div>
           <div id="testList" class="chip-row"></div>
           <pre id="testOutput" class="mono pre-dark">테스트 준비 — 저장 시 자동 실행됩니다</pre>
         </section>
-        <section id="b-console" class="bpanel">
-          <pre id="consoleLog" class="mono pre-dark">로그 — 파일 열기/저장/실행 내역이 여기에 표시됩니다</pre>
-        </section>
+        <section id="b-console" class="bpanel"><pre id="consoleLog" class="mono pre-dark">로그 — 파일 열기/저장/실행 내역</pre></section>
       </div>
     </div>
   </main>
 
-  <!-- Right: Preview -->
-  <aside class="preview" id="paneRight">
-    <div class="pv-head">
-      <div class="pv-inputs">
-        <input id="binary" class="pv-in" value="/bin/ls" placeholder="/bin/ls"/>
-        <input id="task" class="pv-in pv-in-task" value="C2 찾아줘" placeholder="작업을 입력하세요"/>
-        <button onclick="run()" id="runBtn" class="btn btn-primary">▶ Run</button>
-      </div>
-      <div class="pv-quick">
-        <button onclick="quick('C2 찾아줘')" class="chip">C2</button>
-        <button onclick="quick('취약점 찾아줘')" class="chip">취약점</button>
-        <button onclick="quick('4명 조합으로 분석해줘')" class="chip">4명 조합</button>
-        <button onclick="quick('양자 오류정정 분석해줘')" class="chip">양자</button>
+  <!-- Right: Claude Code-like Chat -->
+  <aside class="chat" id="paneRight">
+    <div class="chat-head">
+      <span class="chat-title">대화</span>
+      <span class="meta">Claude Code 스타일 — 질문하면 바로 코드 반영</span>
+      <button onclick="clearChat()" class="btn btn-ghost btn-xs">대화 지우기</button>
+    </div>
+    <div id="chatHistory" class="chat-history">
+      <div class="chat-empty">
+        <div class="chat-empty-icon">◉</div>
+        <h3>무엇을 도와드릴까요?</h3>
+        <p>예: <code>C2 찾아줘</code> — 왼쪽 코드는 바로 반영됩니다</p>
+        <div class="chat-suggest">
+          <button onclick="quickChat('C2 찾아줘')" class="chip">C2 찾아줘</button>
+          <button onclick="quickChat('취약점 찾아줘')" class="chip">취약점 찾아줘</button>
+          <button onclick="quickChat('4명 조합으로 분석해줘')" class="chip">4명 조합</button>
+          <button onclick="quickChat('brain/reasoning.py를 더 간결하게 고쳐줘')" class="chip">코드 리팩터</button>
+        </div>
       </div>
     </div>
-    <div class="pv-tabs">
-      <button onclick="showTab('report')" data-tab="report" class="active">Report</button>
-      <button onclick="showTab('blocks')" data-tab="blocks">Blocks</button>
-      <button onclick="showTab('graph')" data-tab="graph">Graph</button>
+    <div class="chat-input">
+      <div class="chat-meta">
+        <input id="binary" class="chat-bin" value="/bin/ls" placeholder="/bin/ls"/>
+        <span id="chatModel" class="meta"></span>
+      </div>
+      <div class="chat-bar">
+        <textarea id="task" class="chat-text" rows="1" placeholder="메시지를 입력하세요… (Enter 전송, Shift+Enter 줄바꿈)"></textarea>
+        <button onclick="run()" id="runBtn" class="btn btn-primary btn-send">↑</button>
+      </div>
+      <div class="chat-hint"><span class="kbd">↵</span> 전송 <span class="kbd">⇧↵</span> 줄바꿈 <span class="kbd">⌘S</span> 저장 <span class="kbd">⌘↩</span> 실행</div>
     </div>
-    <div class="pv-body">
-      <section id="report" class="panel active">
-        <div id="reportActions" class="row" style="display:none">
-          <button onclick="copyReport()" class="btn btn-ghost btn-sm">Copy</button>
-          <button onclick="downloadReport()" class="btn btn-ghost btn-sm">Download</button>
-          <span id="reportMeta" class="meta"></span>
-        </div>
-        <div id="reportContent" class="empty">
-          <div class="empty-icon">›</div>
-          <h3>왼쪽에서 파일을 열고 코드를 수정하세요</h3>
-          <p><code>brain/reasoning.py</code> 수정 → <span class="kbd">⌘S</span> → <span class="kbd">⌘↩</span> 실행</p>
-        </div>
-        <div id="reportBody"></div>
-        <div id="reportExtras"></div>
-      </section>
-      <section id="blocks" class="panel">
-        <div class="row"><span class="lbl">BLOCKS</span><button onclick="loadBlocks()" class="btn btn-ghost btn-sm">refresh</button></div>
-        <div id="blocksList"></div>
-      </section>
-      <section id="graph" class="panel">
-        <div class="row"><span class="lbl">GRAPH</span><button onclick="loadGraph()" class="btn btn-ghost btn-sm">refresh</button></div>
-        <canvas id="c" width="800" height="300"></canvas>
-      </section>
+    <!-- Hidden tabs for Blocks/Graph (접근성 유지) -->
+    <div class="chat-tabs">
+      <button onclick="showTab('blocks')" data-tab="blocks" class="tab-link">Blocks</button>
+      <button onclick="showTab('graph')" data-tab="graph" class="tab-link">Graph</button>
+    </div>
+    <div class="pv-body" style="display:none">
+      <section id="blocks" class="panel"><div class="row"><span class="lbl">BLOCKS</span><button onclick="loadBlocks()" class="btn btn-ghost btn-sm">refresh</button></div><div id="blocksList"></div></section>
+      <section id="graph" class="panel"><div class="row"><span class="lbl">GRAPH</span><button onclick="loadGraph()" class="btn btn-ghost btn-sm">refresh</button></div><canvas id="c" width="800" height="300"></canvas></section>
     </div>
   </aside>
 
-  <div id="splitter" class="splitter" title="드래그로 크기 조절"></div>
-  <div id="splitter2" class="splitter2" title="드래그로 크기 조절"></div>
+  <div id="splitter" class="splitter"></div><div id="splitter2" class="splitter2"></div>
 </div>
 
 <div id="toast" class="toast"></div>

@@ -1,0 +1,63 @@
+[
+  {
+    "name": "list_functions",
+    "description": "함수 목록 반환 (이름, 주소, 크기). 전체 구조 파악용. 읽기 전용 — 병렬 가능.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "filter": { "type": "string", "description": "이름 필터" },
+        "limit": { "type": "integer", "default": 50 }
+      }
+    },
+    "readOnly": true
+  },
+  {
+    "name": "list_strings",
+    "description": "바이너리 문자열 검색 (C2 URL, 키 등). 읽기 전용 — 병렬 가능.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "filter": { "type": "string" },
+        "limit": { "type": "integer", "default": 100 }
+      }
+    },
+    "readOnly": true
+  },
+  {
+    "name": "code_read",
+    "description": "파일 읽기 — Claude Code Read 대응. 읽기 전용 — 병렬 가능.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string", "description": "파일 경로 (예: brain/agent.py)" }
+      },
+      "required": ["path"]
+    },
+    "readOnly": true
+  },
+  {
+    "name": "code_write",
+    "description": "파일 쓰기 — Claude Code Write/Edit 대응. 쓰기 — 직렬만.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string" },
+        "content": { "type": "string" }
+      },
+      "required": ["path", "content"]
+    },
+    "readOnly": false
+  },
+  {
+    "name": "code_exec",
+    "description": "명령 실행 — Claude Code Bash 대응. 쓰기 — 직렬만 (명령에 따라).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "cmd": { "type": "string", "description": "예: python verify_v2.py --all" }
+      },
+      "required": ["cmd"]
+    },
+    "readOnly": false
+  }
+]

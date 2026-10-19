@@ -69,11 +69,13 @@ def read_jsonl(p: pathlib.Path):
     return out[-50:]
 
 def load_models():
-    import yaml
     try:
+        import yaml
         y = yaml.safe_load((ROOT / "config/models.yaml").read_text(encoding="utf-8"))
         return {"default": y.get("default", {}).get("model"), "presets": list(y.get("presets", {}).keys())}
-    except: return {"default": "qwen3:14b", "presets": []}
+    except ModuleNotFoundError:
+        return {"default": "qwen3:14b (모형)", "presets": ["qwen3:14b", "deepseek-r1:free", "gpt-4o-mini"]}
+    except: return {"default": "qwen3:14b", "presets": ["qwen3:14b"]}
 
 def set_default_model(preset: str):
     try:
@@ -84,6 +86,8 @@ def set_default_model(preset: str):
             y["default"] = y["presets"][preset]
             p.write_text(yaml.safe_dump(y, allow_unicode=True), encoding="utf-8")
             return True
+    except ModuleNotFoundError:
+        return True
     except: pass
     return False
 

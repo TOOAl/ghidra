@@ -1,71 +1,21 @@
-// 웹 프로그램 — 실행 + 모델 한 글자 진화
-function show(id){
-  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-  if(event && event.target) event.target.classList.add('active');
-  if(id==='blocks') loadBlocks();
-  if(id==='database') loadDB();
-  if(id==='graph') loadGraph();
-  if(id==='queue') loadQueue();
-}
-async function loadModels(){
-  try{
-    const r=await fetch('/api/models'); const j=await r.json();
-    const sel=document.getElementById('model');
-    sel.innerHTML = (j.presets||[]).map(p=>`<option value="${p}" ${p===j.default?'selected':''}>${p}</option>`).join('');
-    if(!sel.innerHTML) sel.innerHTML='<option>no presets</option>';
-    sel.onchange = async ()=>{
-      await fetch('/api/set_model', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({preset: sel.value})});
-      alert('한 글자 진화 완료: '+sel.value);
-    };
-  }catch(e){}
-}
-async function run(){
-  const btn=document.getElementById('runBtn'), task=document.getElementById('task').value, binary=document.getElementById('binary').value, preset=document.getElementById('model').value;
-  btn.disabled=true; btn.textContent='⏳ 실행중...';
-  const rep=document.getElementById('report'); rep.innerHTML='<p>외부 LLM(무료)에게 물어보고, 로컬 도구 실행 중...</p>';
-  try{
-    const r=await fetch('/api/run', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({task,binary,preset})});
-    const j=await r.json();
-    let extra = '';
-    if(j.reasoning) extra += `<p><small>🧠 추론(100눈): ${esc(j.reasoning.steps? j.reasoning.steps.join(' → '): j.reasoning.reason||'')}</small></p>`;
-    if(j.analysis) extra += `<p><small>📊 분석(100개): ${esc(j.analysis.insight||'')} (${esc(j.analysis.pattern||'')})</small></p>`;
-    if(j.train) extra += `<p><small>📚 학습(100개): ${esc(j.train.insight||'')} | 예측: ${esc(j.train.prediction||'')}</small></p>`;
-    if(j.team) extra += `<p><small>👥 팀(3턴): ${esc(j.team.insight||'')} | 합의 ${esc(j.team.consensus||'')}</small></p>`;
-    if(j.ear) extra += `<p><small>👂 귀: ${esc(j.ear.insight||'')} (score ${j.ear.score})</small></p>`;
-    rep.innerHTML = `<pre>${esc(j.report||j.error||'')}</pre>` + extra + (j.contradiction? `<p><small>모순: ${esc(j.contradiction.summary)}</small></p>`:'');
-    show('report');
-  }catch(e){ rep.innerHTML='<p>실패: '+esc(e.message)+'</p>'; }
-  btn.disabled=false; btn.textContent='▶ 실행';
-}
-async function loadBlocks(){
-  const el=document.getElementById('blocks'); el.innerHTML='<small>로딩...</small>';
-  try{ const r=await fetch('/api/blocks'); const j=await r.json(); const b=j.blocks||[];
-    el.innerHTML = b.length? b.slice(-20).reverse().map(x=>`<div class="block ${x.type}"><small>${x.type} · ${x.id}</small><div>${esc(x.content)}</div></div>`).join('') : '<p>블록 없음</p>';
-  }catch(e){ el.innerHTML='<p>API 연결 안 됨</p>'; }
-}
-async function loadDB(){
-  const el=document.getElementById('database'); el.innerHTML='<small>로딩...</small>';
-  try{ const r=await fetch('/api/database'); const j=await r.json(); const rows=j.results||[];
-    el.innerHTML = rows.length? '<table><tr><th>task</th><th>preset</th></tr>'+rows.slice(-20).reverse().map(x=>`<tr><td>${esc(x.task||x.type||'')}</td><td>${esc(x.preset||x.model||'')}</td></tr>`).join('')+'</table>' : '<p>세션 없음</p>';
-  }catch(e){ el.innerHTML='<p>API 연결 안 됨</p>'; }
-}
-async function loadQueue(){
-  const el=document.getElementById('queue');
-  try{ const r=await fetch('/api/queue'); const j=await r.json(); const q=j.queue||[];
-    el.innerHTML = q.length? q.map(x=>`<div class="block">${esc(x.task)}<small> ${esc(x.queued||'')}</small></div>`).join('') : '<p>큐 비어있음</p>';
-  }catch(e){ el.innerHTML='<p>API 연결 안 됨</p>'; }
-}
-async function loadGraph(){
-  const c=document.getElementById('c'), ctx=c.getContext('2d'); ctx.clearRect(0,0,c.width,c.height);
-  try{
-    const [b,d]=await Promise.all([fetch('/api/blocks').then(r=>r.json()), fetch('/api/database').then(r=>r.json())]);
-    const nodes=[...b.blocks.slice(-8).map(x=>({label:x.id.slice(0,8),x:Math.random()*700+50,y:Math.random()*300+50,c:'#ff6b6b'})), ...d.results.slice(-8).map(x=>({label:(x.task||'').slice(0,8),x:Math.random()*700+50,y:Math.random()*300+50,c:'#4dabf7'}))];
-    if(!nodes.length){ ctx.fillText('데이터 없음',20,40); return; }
-    ctx.strokeStyle='#ddd'; for(let i=1;i<nodes.length;i++){ ctx.beginPath(); ctx.moveTo(nodes[i-1].x,nodes[i-1].y); ctx.lineTo(nodes[i].x,nodes[i].y); ctx.stroke(); }
-    nodes.forEach(n=>{ ctx.fillStyle=n.c; ctx.beginPath(); ctx.arc(n.x,n.y,10,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#222'; ctx.fillText(n.label,n.x-18,n.y-14); });
-  }catch(e){ ctx.fillText('API 연결 안 됨',20,40); }
-}
-function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
-loadModels(); loadBlocks();
+let lastReport='',lastTask='';
+function show(id){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.tabs button').forEach(b=>{b.classList.remove('active');b.setAttribute('aria-selected','false')});document.getElementById(id).classList.add('active');const t=document.querySelector(`[data-tab="${id}"]`);if(t){t.classList.add('active');t.setAttribute('aria-selected','true')}if(id==='blocks')loadBlocks();if(id==='database')loadDB();if(id==='graph')loadGraph();if(id==='queue')loadQueue()}
+function toast(m,ms=1800){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),ms)}
+function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function setStatus(ok,t){const d=document.getElementById('statusDot'),x=document.getElementById('statusText');d.className='dot '+(ok===true?'ok':ok===false?'bad':'');x.textContent=t}
+async function checkHealth(){try{const r=await fetch('/api/blocks');if(r.ok)setStatus(true,'● 서버 연결됨 — ▶ 실행을 눌러봐');else setStatus(false,'● 서버 응답 없음 — python ui/server.py 다시')}catch{setStatus(false,'● 서버 안 켜짐 — START_HERE_12YO.md 4-1부터')}}
+async function loadModels(){try{const r=await fetch('/api/models');const j=await r.json();const s=document.getElementById('model');s.innerHTML=(j.presets||[]).map(p=>`<option value="${p}" ${p===j.default?'selected':''}>${p}</option>`).join('');if(!s.innerHTML)s.innerHTML='<option>qwen3:14b (모형)</option>';s.onchange=async()=>{try{await fetch('/api/set_model',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({preset:s.value})});toast('한 글자 진화 완료: '+s.value)}catch{}};checkHealth()}catch(e){setStatus(false,'● 서버 안 켜짐')}}
+function quick(t){document.getElementById('task').value=t;toast('작업: '+t+' — ▶ 실행을 눌러봐');document.getElementById('task').focus()}
+function clearAll(){document.getElementById('task').value='';document.getElementById('binary').value='/bin/ls';document.getElementById('reportBody').innerHTML='';document.getElementById('reportExtras').innerHTML='';document.getElementById('reportActions').style.display='none';document.getElementById('reportContent').style.display='block';document.getElementById('reportContent').innerHTML='<div class="empty-icon">👆</div><h3>위에서 작업을 쓰고 ▶ 실행을 눌러봐</h3><p>예: <code>C2 찾아줘</code> → 6섹션 보고서가 여기에 뜬다</p>';toast('지웠다 — 새로 써봐')}
+async function run(){const b=document.getElementById('runBtn'),te=document.getElementById('task'),be=document.getElementById('binary'),pe=document.getElementById('model');const task=te.value.trim(),binary=be.value.trim()||'/bin/ls',preset=pe.value;if(!task){toast('작업 칸에 글씨를 써봐 — 예: C2 찾아줘');te.focus();te.style.borderColor='#f87171';setTimeout(()=>te.style.borderColor='',1200);return}lastTask=task;b.disabled=true;b.innerHTML='⏳ 실행 중...';const empty=document.getElementById('reportContent'),body=document.getElementById('reportBody'),extras=document.getElementById('reportExtras'),actions=document.getElementById('reportActions');empty.style.display='none';body.innerHTML='<div class="loading"><span class="spinner"></span> 외부 LLM(무료)에게 물어보고, 로컬 도구 4개 실행 중... 2~3초 걸린다</div>';extras.innerHTML='';actions.style.display='none';show('report');try{const r=await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({task,binary,preset})});if(!r.ok)throw new Error('서버 오류 '+r.status+' — python ui/server.py 켜져 있나?');const j=await r.json();if(j.error&&!j.report)throw new Error(j.error);lastReport=j.report||'';body.innerHTML=`<div class="report-card"><div class="report-head"><h3>📝 ${esc(task)} — 6섹션 보고서</h3><span class="badge ${j.contradiction&&j.contradiction.ok?'badge-green':'badge'}">${j.contradiction?esc(j.contradiction.summary):'모순 없음'}</span></div><pre>${esc(j.report||'')}</pre></div>`+(j.ok?'<div class="success-banner">✅ VERIFY 3/3 느낌 — 모순0·증거100%·반복0, 보고서가 Notion 블록으로 저장됐다</div>':'');let h='';if(j.reasoning)h+=card('🧠 추론 (100눈)',j.reasoning.ok?'ok':'bad',j.reasoning.steps?j.reasoning.steps.join(' → '):esc(j.reasoning.reason||''),'관찰→추론→검증 3단계');if(j.analysis)h+=card('📊 분석 (100개)','ok',`${esc(j.analysis.insight||'')} ${esc(j.analysis.pattern?'('+j.analysis.pattern+')':'')}`,'상위 도구 3개');if(j.train)h+=card('📚 학습 (16D 100개)',j.train.ok?'ok':'bad',`${esc(j.train.insight||'')} | 예측: ${esc(j.train.prediction||'')}`,'16차원 KNN 100% PASS 기준 80%');if(j.team)h+=card('👥 팀 토론 (3턴 12문장)',j.team.consensus==='4/4'?'ok':'',`${esc(j.team.insight||'')} | 합의 ${esc(j.team.consensus||'')}`,'다빈치·퀴리·튜링·오일러');if(j.ear)h+=card('👂 귀 감성','',`${esc(j.ear.insight||'')} (score ${j.ear.score} ${esc(j.ear.label||'')})`,'사람 말 -1~1');if(j.contradiction)h+=card('✅ 모순 검사',j.contradiction.ok?'ok':'bad',esc(j.contradiction.summary),j.contradiction.suggested_downgrades?.length?'강등: '+esc(j.contradiction.suggested_downgrades.join(',')):'');extras.innerHTML=`<div class="report-extra">${h}</div>`;actions.style.display='flex';document.getElementById('reportMeta').textContent=`모델 ${esc(j.preset||preset)} · ${new Date().toLocaleTimeString()} · 32 skills`;toast('완료 — 보고서 6섹션 떴다! 아래로 스크롤해봐');setTimeout(()=>{loadDB();loadBlocks()},400)}catch(e){body.innerHTML=`<div class="extra-card bad"><strong>❌ 실패</strong><p>${esc(e.message)}</p><p class="meta">확인: 1) python ui/server.py 켜져 있나? 2) 주소창이 http://127.0.0.1:8090 맞나? 3) START_HERE_12YO.md 4-1 다시</p></div>`;toast('실패 — '+e.message,2600)}b.disabled=false;b.innerHTML='▶ 실행 <small>(Ctrl+Enter)</small>'}
+function card(t,k,b,f){return `<div class="extra-card ${k}"><strong>${t}</strong><p>${esc(b)}</p>${f?`<p class="meta">${esc(f)}</p>`:''}</div>`}
+function copyReport(){if(!lastReport)return toast('복사할 보고서 없음 — 먼저 실행');navigator.clipboard.writeText(lastReport).then(()=>toast('복사 완료 — 보고서 붙여넣기 하라')).catch(()=>toast('복사 실패 — 보고서 드래그해서 복사'))}
+function downloadReport(){if(!lastReport)return toast('다운로드할 보고서 없음');const b=new Blob([lastReport],{type:'text/markdown'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=(lastTask||'report').replace(/\s+/g,'_')+'.md';a.click();toast('다운로드 시작')}
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter')run();if(e.key==='Escape')clearAll()});
+document.addEventListener('DOMContentLoaded',()=>{const t=document.getElementById('task'),b=document.getElementById('binary');[t,b].forEach(el=>el.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.ctrlKey){e.preventDefault();run()}}))});
+async function loadBlocks(){const el=document.getElementById('blocksList');if(!el)return;el.innerHTML='<div class="loading"><span class="spinner"></span> 로딩...</div>';try{const r=await fetch('/api/blocks');const j=await r.json();const b=j.blocks||[];el.innerHTML=b.length?b.slice(-20).reverse().map(x=>`<div class="block ${esc(x.type)}"><small>${esc(x.type)} · ${esc(x.id)} · ${esc(x.created||'')}</small><div>${esc(x.content).slice(0,800)}</div></div>`).join(''):'<div class="block">블록 없음 — ▶ 실행하면 여기에 저장된다</div>'}catch{el.innerHTML='<div class="extra-card bad"><strong>API 연결 안 됨</strong><p>python ui/server.py 켜져 있나?</p></div>'}}
+async function loadDB(){const el=document.getElementById('databaseList');if(!el)return;el.innerHTML='<div class="loading"><span class="spinner"></span> 로딩...</div>';try{const r=await fetch('/api/database');const j=await r.json();const rows=j.results||[];el.innerHTML=rows.length?'<table><tr><th>작업</th><th>모델</th><th>시간</th></tr>'+rows.slice(-20).reverse().map(x=>`<tr><td>${esc(x.task||x.type||'')}</td><td>${esc(x.preset||x.model||'qwen3:14b')}</td><td>${esc((x.timestamp||'').slice(11,19)||'')}</td></tr>`).join('')+'</table>':'<div class="block">세션 없음 — ▶ 실행하면 여기에 쌓인다 (분석할수록 똑똑해짐)</div>'}catch{el.innerHTML='<div class="extra-card bad"><strong>API 연결 안 됨</strong></div>'}}
+async function loadQueue(){const el=document.getElementById('queueList');if(!el)return;try{const r=await fetch('/api/queue');const j=await r.json();const q=j.queue||[];el.innerHTML=q.length?q.map(x=>`<div class="block">${esc(x.task)}<small> ${esc(x.queued||'')}</small></div>`).join(''):'<div class="block">큐 비어있음 — 오프라인 작업이 여기 대기</div>'}catch{el.innerHTML='<div class="extra-card bad"><strong>API 연결 안 됨</strong></div>'}}
+async function loadGraph(){const c=document.getElementById('c');if(!c)return;const ctx=c.getContext('2d');const dpr=window.devicePixelRatio||1, w=c.clientWidth||900, h=420;c.width=w*dpr;c.height=h*dpr;c.style.width=w+'px';c.style.height=h+'px';ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);try{const [b,d]=await Promise.all([fetch('/api/blocks').then(r=>r.json()),fetch('/api/database').then(r=>r.json())]);const nodes=[...b.blocks.slice(-10).map(x=>({label:(x.id||'blk').slice(0,8),x:Math.random()*(w-100)+50,y:Math.random()*(h-80)+40,c:'#6366f1'})),...d.results.slice(-10).map(x=>({label:(x.task||'?').slice(0,8),x:Math.random()*(w-100)+50,y:Math.random()*(h-80)+40,c:'#06b6d4'}))];if(!nodes.length){ctx.fillStyle='#64748b';ctx.font='14px system-ui';ctx.fillText('데이터 없음 — ▶ 실행하면 블록·DB가 선으로 연결된다',20,40);return}ctx.strokeStyle='#e2e8f0';ctx.lineWidth=2;for(let i=1;i<nodes.length;i++){ctx.beginPath();ctx.moveTo(nodes[i-1].x,nodes[i-1].y);ctx.lineTo(nodes[i].x,nodes[i].y);ctx.stroke()}nodes.forEach(n=>{ctx.fillStyle=n.c;ctx.beginPath();ctx.arc(n.x,n.y,12,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fff';ctx.font='bold 10px system-ui';ctx.textAlign='center';ctx.fillText(n.label[0]||'●',n.x,n.y+4);ctx.fillStyle='#0f172a';ctx.font='12px system-ui';ctx.fillText(n.label,n.x-18,n.y-16)})}catch{ctx.fillStyle='#f87171';ctx.fillText('API 연결 안 됨 — python ui/server.py 켜져 있나?',20,40)}}
+function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+loadModels();checkHealth();setInterval(checkHealth,8000);

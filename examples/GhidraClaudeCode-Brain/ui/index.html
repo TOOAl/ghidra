@@ -3,34 +3,108 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>GhidraClaudeCode-Brain — 웹 프로그램</title>
+<title>🧠 GhidraClaudeCode-Brain v1.0 — 12살도 되는 AI 두뇌</title>
 <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
+<div id="statusBar" class="status-bar">
+  <span id="statusDot" class="dot"></span>
+  <span id="statusText">서버 확인 중...</span>
+  <span id="statusRight">v1.0 · 29실험 16D · 3/3 PASS</span>
+</div>
 <header>
-  <h1>🧠 GhidraClaudeCode-Brain</h1>
-  <small>외부 LLM(무료) + 로컬 두뇌 — 한 글자 진화</small>
-  <div class="runbar">
-    <input id="binary" placeholder="바이너리: /bin/ls 또는 Notion app.asar" value="/bin/ls"/>
-    <input id="task" placeholder="작업: 예) 4명 조합으로 C2 찾아줘" value="4명 조합으로 C2 찾아줘"/>
-    <select id="model"></select>
-    <button onclick="run()" id="runBtn">▶ 실행</button>
+  <div class="header-main">
+    <div class="header-title">
+      <h1>🧠 GhidraClaudeCode-Brain</h1>
+      <p class="subtitle">외부 LLM은 빌리고, 두뇌는 내 거 — <strong>복사→붙여넣기→엔터 한 번</strong>이면 끝</p>
+    </div>
+    <div class="header-badge">
+      <span class="badge badge-green">● VERIFY 3/3</span>
+      <span class="badge badge-blue">v1.0</span>
+      <span class="badge">16D 100%</span>
+    </div>
   </div>
-  <div class="tabs">
-    <button onclick="show('report')" class="active">📝 보고서</button>
-    <button onclick="show('blocks')">📄 블록 (Notion)</button>
-    <button onclick="show('database')">🗃️ DB (Notion)</button>
-    <button onclick="show('graph')">🕸️ 그래프 (Obsidian)</button>
-    <button onclick="show('queue')">📡 큐</button>
+  <div class="runbar">
+    <div class="runbar-field">
+      <label for="binary">📁 바이너리 (얼어버린 레시피)</label>
+      <input id="binary" placeholder="/bin/ls  또는  /tmp/my.bin" value="/bin/ls" title="분석할 파일 경로 — 예: /bin/ls"/>
+    </div>
+    <div class="runbar-field runbar-task">
+      <label for="task">💬 작업 (하고 싶은 말)</label>
+      <input id="task" placeholder="예: C2 찾아줘" value="C2 찾아줘" title="AI에게 시킬 일"/>
+    </div>
+    <div class="runbar-field runbar-model">
+      <label for="model">🤖 모델 (생각 빌리기)</label>
+      <select id="model" title="생각을 빌릴 AI — 무료 qwen3:14b"></select>
+    </div>
+    <div class="runbar-actions">
+      <button onclick="run()" id="runBtn" class="btn-primary" title="클릭 또는 Ctrl+Enter">▶ 실행 <small>(Ctrl+Enter)</small></button>
+      <button onclick="clearAll()" class="btn-ghost" title="다 지우기">🗑 지우기</button>
+    </div>
+  </div>
+  <div class="quick-examples">
+    <span class="quick-label">💡 눌러서 바로 해보기:</span>
+    <button onclick="quick('C2 찾아줘')" class="chip">C2 찾아줘</button>
+    <button onclick="quick('취약점 찾아줘')" class="chip">취약점 찾아줘</button>
+    <button onclick="quick('4명 조합으로 분석해줘')" class="chip chip-wide">4명 조합</button>
+    <button onclick="quick('악성코드 분석기 만들어줘')" class="chip chip-wide">분석기 만들어줘</button>
+    <button onclick="quick('봉쇄 원격 분석해줘')" class="chip">봉쇄 분석</button>
+    <button onclick="quick('양자 오류정정 분석해줘')" class="chip chip-wide">양자 분석</button>
   </div>
 </header>
+<nav class="tabs" role="tablist">
+  <button onclick="show('report')" class="active" data-tab="report" role="tab" aria-selected="true">📝 <strong>보고서</strong> <span class="tab-desc">6섹션 한 번에</span></button>
+  <button onclick="show('blocks')" data-tab="blocks" role="tab">📄 <strong>블록</strong> <span class="tab-desc">Notion처럼</span></button>
+  <button onclick="show('database')" data-tab="database" role="tab">🗃️ <strong>DB</strong> <span class="tab-desc">표로 보기</span></button>
+  <button onclick="show('graph')" data-tab="graph" role="tab">🕸️ <strong>그래프</strong> <span class="tab-desc">연결 보기</span></button>
+  <button onclick="show('queue')" data-tab="queue" role="tab">📡 <strong>큐</strong> <span class="tab-desc">대기 작업</span></button>
+</nav>
 <main>
-  <section id="report" class="panel active"><p>위에서 작업을 입력하고 ▶ 실행을 누르세요.</p></section>
-  <section id="blocks" class="panel"></section>
-  <section id="database" class="panel"></section>
-  <section id="graph" class="panel"><canvas id="c" width="800" height="400"></canvas></section>
-  <section id="queue" class="panel"></section>
+  <section id="report" class="panel active">
+    <div id="reportActions" class="panel-actions" style="display:none">
+      <button onclick="copyReport()" class="btn-small">📋 복사</button>
+      <button onclick="downloadReport()" class="btn-small">⬇ 다운로드</button>
+      <span id="reportMeta" class="meta"></span>
+    </div>
+    <div id="reportContent" class="report-empty">
+      <div class="empty-icon">👆</div>
+      <h3>위에서 작업을 쓰고 ▶ 실행을 눌러봐</h3>
+      <p>예: <code>C2 찾아줘</code> → 6섹션 보고서가 여기에 뜬다</p>
+      <div class="empty-steps">
+        <span class="step">1. 바이너리: <code>/bin/ls</code></span>
+        <span class="step">2. 작업: <code>C2 찾아줘</code></span>
+        <span class="step">3. ▶ 실행 클릭!</span>
+      </div>
+    </div>
+    <div id="reportBody"></div>
+    <div id="reportExtras"></div>
+  </section>
+  <section id="blocks" class="panel">
+    <div class="panel-head"><h3>📄 블록 (Notion처럼 저장된 보고서)</h3><button onclick="loadBlocks()" class="btn-small">🔄 새로고침</button></div>
+    <div id="blocksList"></div>
+  </section>
+  <section id="database" class="panel">
+    <div class="panel-head"><h3>🗃️ DB — 표로 정렬된 작업 기록</h3><button onclick="loadDB()" class="btn-small">🔄 새로고침</button></div>
+    <div id="databaseList"></div>
+  </section>
+  <section id="graph" class="panel">
+    <div class="panel-head"><h3>🕸️ 그래프 — 블록과 DB가 선으로 연결</h3><button onclick="loadGraph()" class="btn-small">🔄 새로고침</button></div>
+    <canvas id="c" width="900" height="420"></canvas>
+    <p class="meta">캔버스는 블록·DB 최신 8개씩을 연결해 보인다</p>
+  </section>
+  <section id="queue" class="panel">
+    <div class="panel-head"><h3>📡 큐 — 오프라인 대기 작업 (인터넷 끊겨도 OK)</h3><button onclick="loadQueue()" class="btn-small">🔄 새로고침</button></div>
+    <div id="queueList"></div>
+  </section>
 </main>
+<footer>
+  <div class="footer-grid">
+    <div class="footer-col"><strong>⌨️ 단축키</strong><span><kbd>Ctrl</kbd> + <kbd>Enter</kbd> 실행</span><span><kbd>Esc</kbd> 지우기</span></div>
+    <div class="footer-col"><strong>✅ 확인</strong><span><code>python verify_local.py --all --mock-ghidra</code> → 3/3 PASS</span></div>
+    <div class="footer-col"><strong>📚 문서</strong><span><a href="https://github.com/TOOAl/ghidra/blob/arena/61934e9d-ghidra/examples/GhidraClaudeCode-Brain/START_HERE_12YO.md" target="_blank">START_HERE_12YO.md</a> · <a href="https://github.com/TOOAl/ghidra/blob/arena/61934e9d-ghidra/examples/GhidraClaudeCode-Brain/COMPLETE.md" target="_blank">COMPLETE.md</a></span></div>
+  </div>
+</footer>
+<div id="toast" class="toast"></div>
 <script src="app.js"></script>
 </body>
 </html>

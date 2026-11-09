@@ -125,10 +125,17 @@ def make_handler(state: BrainState):
                 ctype += "; charset=utf-8"
 
             content = target.read_bytes()
+            if target.name == "index.html":
+                boot_json = json.dumps(state.full_status(), ensure_ascii=False)
+                inject = f"<script>window.__INITIAL_STATUS__ = {boot_json};</script>".encode("utf-8")
+                content = content.replace(b"<!--__INITIAL_STATE__-->", inject)
+
             self.send_response(HTTPStatus.OK)
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(content)))
-            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+            self.send_header("Pragma", "no-cache")
+            self.send_header("Expires", "0")
             self.end_headers()
             self.wfile.write(content)
 

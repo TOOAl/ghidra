@@ -4,324 +4,369 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>시냅스몽 · 나만의 양자화 AI 두뇌 연구소</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="ui-v3.css?v=3.0" />
+  <!--__INITIAL_STATE__-->
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <div class="brand-dot"></div>
+  <!-- 상단 글로벌 헤더 -->
+  <header class="app-header">
+    <div class="brand-group">
+      <div class="brand-mark" aria-hidden="true">✦</div>
       <div>
-        <h1>시냅스몽 AI 두뇌 연구소</h1>
-        <p class="subtitle">외장하드 포터블 서식지 · 마크다운 시냅스 위키 · 독자 양자화 두뇌 주조소</p>
+        <div class="brand-title-row">
+          <h1>시냅스몽 AI 두뇌 연구소</h1>
+          <span class="live-chip"><span class="live-dot"></span>외장하드 포터블 서식지</span>
+        </div>
+        <p class="brand-sub">데이터센터 없이 자라나는 마크다운 시냅스 위키 &amp; 독자 양자화 두뇌(.sbrain) 주조소</p>
       </div>
     </div>
-    <div class="roadmap-steps">
-      <span class="step-badge active">A단계 · 위키 기억 &amp; 자체 양자화 틀</span>
-      <span class="step-sep">→</span>
-      <span class="step-badge">B단계 · CPU 강화학습 체육관</span>
-      <span class="step-sep">→</span>
-      <span class="step-badge">C단계 · Ghidra 역공학 해부실</span>
+
+    <div class="stage-track" aria-label="통합 구축 단계">
+      <div class="stage-pill current"><strong>A단계</strong> 위키 기억 &amp; 자체 양자화</div>
+      <span class="stage-arrow">›</span>
+      <div class="stage-pill"><strong>B단계</strong> CPU 강화학습 체육관</div>
+      <span class="stage-arrow">›</span>
+      <div class="stage-pill"><strong>C단계</strong> Ghidra 역공학 해부실</div>
     </div>
   </header>
 
-  <main class="container">
-    <!-- 좌측: 시냅스몽 프로필 & 작업 환경 상태창 -->
-    <aside class="sidebar">
-      <section class="panel pet-panel">
-        <div class="pet-top">
-          <div>
-            <span class="level-tag" id="petStageBadge">Lv.1 ✦ 알에서 깨어난 꼬마 뉴런</span>
-            <h2 class="pet-title" id="petName">시냅스몽</h2>
+  <!-- 메인 2단 조종석 레이아웃 -->
+  <main class="cockpit">
+    <!-- 좌측: 시냅스몽 바이오 캡슐 -->
+    <aside class="bio-capsule">
+      <!-- 1. 캡슐 상단 이름표 -->
+      <div class="capsule-head">
+        <div>
+          <span class="level-pill" id="petStageBadge">Lv.1 ✦ 꼬마 뉴런</span>
+          <h2 class="pet-name" id="petName">시냅스몽</h2>
+        </div>
+        <div class="capsule-actions">
+          <button class="ghost-btn" id="btnRename" type="button">이름 변경</button>
+          <button class="ghost-btn accent" id="btnPoke" type="button">✨ 교감하기</button>
+        </div>
+      </div>
+
+      <!-- 2. 우주 유리돔 캐릭터 뷰어 -->
+      <div class="dome-stage" id="portraitFrame" title="클릭하면 시냅스몽과 교감합니다">
+        <img id="petImage" class="dome-img" src="assets/01_greet.jpg" alt="시냅스몽 캐릭터" />
+        <div class="dome-vignette"></div>
+        <div class="dome-top-badges">
+          <span class="condition-pill"><i class="cond-dot"></i><span id="petEmotion">최상 컨디션</span></span>
+          <span class="iq-pill">IQ <strong id="badgeIq">69</strong></span>
+        </div>
+      </div>
+
+      <!-- 3. 8컷 장면 미니 도크 -->
+      <div class="pose-dock" id="poseStrip" role="group" aria-label="시냅스몽 8가지 모습">
+        <button class="pose-btn active" data-pose="01_greet" type="button">인사</button>
+        <button class="pose-btn" data-pose="02_curious" type="button">호기심</button>
+        <button class="pose-btn" data-pose="03_swirl" type="button">흡수</button>
+        <button class="pose-btn" data-pose="04_brainstorm" type="button">고민</button>
+        <button class="pose-btn" data-pose="05_drop" type="button">영감</button>
+        <button class="pose-btn" data-pose="06_star" type="button">별연결</button>
+        <button class="pose-btn" data-pose="07_eureka" type="button">유레카</button>
+        <button class="pose-btn" data-pose="08_journey" type="button">여정</button>
+      </div>
+
+      <!-- 4. 말풍선 -->
+      <div class="speech-bubble" id="petSpeech">
+        안녕 주인님! 외장하드 집에서 반짝이며 깨어났어요.
+      </div>
+
+      <!-- 5. 핵심 생명 상태바 3종 -->
+      <div class="vitals-box">
+        <div class="vital-row">
+          <span class="v-label">지식 포만감</span>
+          <div class="v-bar"><div class="v-fill satiety" id="barSatiety" style="width:80%"></div></div>
+          <strong class="v-num" id="valSatiety">80%</strong>
+        </div>
+        <div class="vital-row">
+          <span class="v-label">기분 · 활력</span>
+          <div class="v-bar"><div class="v-fill mood" id="barMood" style="width:90%"></div></div>
+          <strong class="v-num" id="valMood">90%</strong>
+        </div>
+        <div class="vital-row">
+          <span class="v-label">성장 경험치</span>
+          <div class="v-bar"><div class="v-fill xp" id="barXp" style="width:60%"></div></div>
+          <strong class="v-num" id="valXp">30/50</strong>
+        </div>
+      </div>
+
+      <!-- 6. 요청하신 '작업 환경 상태창' (3대 상태바 바로 아래, 계기판 타일형) -->
+      <section class="env-panel" aria-label="시냅스몽 작업 환경 상태창">
+        <div class="env-header">
+          <span class="env-heading">🖥️ 작업 환경 상태</span>
+          <span class="env-grade optimal" id="envBadge">쾌적 · 77점</span>
+        </div>
+
+        <div class="env-grid">
+          <div class="env-tile">
+            <span class="tile-k">여유 메모리 (RAM)</span>
+            <strong class="tile-v" id="envRamText">3.55 / 3.84 GB</strong>
+            <div class="mini-bar"><div class="mini-fill" id="envRamBar" style="width:90%"></div></div>
           </div>
-          <div class="pet-btns">
-            <button class="btn-subtle" id="btnRename" type="button">이름 변경</button>
-            <button class="btn-subtle" id="btnPoke" type="button">교감하기</button>
+          <div class="env-tile">
+            <span class="tile-k">연산 장치</span>
+            <strong class="tile-v" id="envCpuText">2코어 · 순수 CPU</strong>
+            <span class="tile-sub" id="envOsText">Linux x86_64</span>
+          </div>
+          <div class="env-tile">
+            <span class="tile-k">외장하드 여유</span>
+            <strong class="tile-v" id="envDiskText">-- GB</strong>
+            <span class="tile-sub">독립 서식지 확보</span>
+          </div>
+          <div class="env-tile">
+            <span class="tile-k">주조 가능 등급</span>
+            <strong class="tile-v accent-text" id="envTierText">INT4 2.0B급</strong>
+            <span class="tile-sub">자체 두뇌 설계 한계</span>
           </div>
         </div>
 
-        <!-- 시냅스몽 8컷 캐릭터 포트레이트 -->
-        <div class="portrait-frame" id="portraitFrame" title="클릭하면 시냅스몽과 교감합니다">
-          <img
-            id="petImage"
-            class="pet-image"
-            src="assets/01_greet.jpg"
-            alt="시냅스몽 캐릭터"
-          />
-          <div class="portrait-caption">
-            <span class="emotion-dot"></span>
-            <span id="petEmotion">최상 컨디션 · 별빛 시냅스 활성</span>
-          </div>
-        </div>
-
-        <!-- 8가지 표정·장면 미니 셀렉터 -->
-        <div class="pose-strip" id="poseStrip" aria-label="시냅스몽 장면 선택">
-          <button class="pose-dot active" data-pose="01_greet" title="1. 반가운 인사">인사</button>
-          <button class="pose-dot" data-pose="02_curious" title="2. 호기심 탐구">호기심</button>
-          <button class="pose-dot" data-pose="03_swirl" title="3. 지식 소용돌이 흡수">흡수</button>
-          <button class="pose-dot" data-pose="04_brainstorm" title="4. 깊은 고민">고민</button>
-          <button class="pose-dot" data-pose="05_drop" title="5. 영감 수집">영감</button>
-          <button class="pose-dot" data-pose="06_star" title="6. 별자리 시냅스 연결">별연결</button>
-          <button class="pose-dot" data-pose="07_eureka" title="7. 유레카 깨달음">유레카</button>
-          <button class="pose-dot" data-pose="08_journey" title="8. 은하수 여정">여정</button>
-        </div>
-
-        <div class="speech-box" id="petSpeech">
-          안녕 주인님! 외장하드 집에서 깨어났어요.
-        </div>
-
-        <!-- 기본 생명 상태바 3종 -->
-        <div class="vitals-section">
-          <div class="vital-item">
-            <div class="vital-label">
-              <span>지식 포만감</span>
-              <strong id="valSatiety">80%</strong>
-            </div>
-            <div class="track"><div class="fill satiety" id="barSatiety" style="width:80%"></div></div>
-          </div>
-
-          <div class="vital-item">
-            <div class="vital-label">
-              <span>기분 · 활력</span>
-              <strong id="valMood">90%</strong>
-            </div>
-            <div class="track"><div class="fill mood" id="barMood" style="width:90%"></div></div>
-          </div>
-
-          <div class="vital-item">
-            <div class="vital-label">
-              <span>성장 경험치</span>
-              <strong id="valXp">30 / 50 XP</strong>
-            </div>
-            <div class="track"><div class="fill xp" id="barXp" style="width:60%"></div></div>
-          </div>
-        </div>
-
-        <!-- 요청하신 신규 '환경 상태창' (포만감·기분·경험치 바로 아래) -->
-        <div class="env-card" id="envCard">
-          <div class="env-head">
-            <span class="env-title">작업 환경 상태</span>
-            <span class="env-badge optimal" id="envBadge">쾌적 · 88점</span>
-          </div>
-          <div class="env-metrics">
-            <div class="env-row">
-              <span class="env-key">호흡 메모리 (여유 RAM)</span>
-              <span class="env-val" id="envRamText">측정 중...</span>
-            </div>
-            <div class="track env-track">
-              <div class="fill env-ram-fill" id="envRamBar" style="width:75%"></div>
-            </div>
-            <div class="env-row">
-              <span class="env-key">두뇌 연산 장치</span>
-              <span class="env-val" id="envCpuText">측정 중...</span>
-            </div>
-            <div class="env-row">
-              <span class="env-key">외장하드 여유 공간</span>
-              <span class="env-val" id="envDiskText">측정 중...</span>
-            </div>
-            <div class="env-row">
-              <span class="env-key">주조 가능 한계</span>
-              <span class="env-val highlight" id="envTierText">계산 중...</span>
-            </div>
-          </div>
-          <p class="env-comment" id="envComment">현재 연결된 컴퓨터 환경을 분석하고 있어요.</p>
-        </div>
-
-        <!-- 핵심 요약 수치 -->
-        <div class="summary-strip">
-          <div class="sum-cell">
-            <strong id="kpiIq">69</strong>
-            <span>두뇌 IQ</span>
-          </div>
-          <div class="sum-cell">
-            <strong id="kpiNotes">4</strong>
-            <span>위키 노트</span>
-          </div>
-          <div class="sum-cell">
-            <strong id="kpiEdges">5</strong>
-            <span>시냅스 연결</span>
-          </div>
-          <div class="sum-cell">
-            <strong id="kpiForged">0</strong>
-            <span>주조한 뇌</span>
-          </div>
-        </div>
+        <p class="env-note" id="envComment">
+          연결된 컴퓨터의 메모리와 연산 여유를 실시간 점검하고 있어요.
+        </p>
       </section>
+
+      <!-- 7. 하단 요약 스탯 도크 -->
+      <div class="kpi-dock">
+        <div class="kpi-cell">
+          <strong id="kpiIq">69</strong>
+          <span>두뇌 IQ</span>
+        </div>
+        <div class="kpi-cell">
+          <strong id="kpiNotes">4</strong>
+          <span>위키 노트</span>
+        </div>
+        <div class="kpi-cell">
+          <strong id="kpiEdges">5</strong>
+          <span>시냅스 연결</span>
+        </div>
+        <div class="kpi-cell">
+          <strong id="kpiForged">0</strong>
+          <span>주조한 뇌</span>
+        </div>
+      </div>
     </aside>
 
-    <!-- 우측: 정돈된 메인 워크스페이스 -->
-    <section class="main-area">
-      <nav class="tab-nav">
-        <button class="tab-btn active" data-tab="tab-graph" type="button">시냅스 지식망</button>
-        <button class="tab-btn" data-tab="tab-feed" type="button">지식 먹이기 (위키 정원사)</button>
-        <button class="tab-btn" data-tab="tab-forge" type="button">우리만의 양자화 주조소</button>
-        <button class="tab-btn" data-tab="tab-chat" type="button">시냅스몽과 대화</button>
-      </nav>
+    <!-- 우측: 연구소 메인 콘솔 -->
+    <section class="lab-console">
+      <div class="console-topbar">
+        <nav class="seg-tabs" role="tablist">
+          <button class="seg-tab active" data-tab="tab-graph" type="button">🕸️ 시냅스 지식망</button>
+          <button class="seg-tab" data-tab="tab-feed" type="button">🌱 지식 먹이기</button>
+          <button class="seg-tab" data-tab="tab-forge" type="button">⚒️ 우리만의 양자화 주조소</button>
+          <button class="seg-tab" data-tab="tab-chat" type="button">💬 시냅스몽과 대화</button>
+        </nav>
+        <div class="engine-indicator" id="engineStatusPill">
+          위키 기억망 + 자체 양자화 엔진 가동 중
+        </div>
+      </div>
 
-      <!-- 탭 1: 시냅스 지식망 -->
-      <div class="tab-view active" id="tab-graph">
-        <div class="split-grid">
-          <div class="panel">
-            <div class="panel-head">
+      <!-- [탭 1] 시냅스 지식망 -->
+      <div class="tab-pane active" id="tab-graph">
+        <div class="pane-grid graph-layout">
+          <div class="card">
+            <div class="card-head">
               <div>
-                <h3>실시간 마크다운 시냅스 지도</h3>
-                <p class="panel-sub">노드를 클릭하거나 드래그해 연결된 기억 구조를 탐색하세요.</p>
+                <h3>실시간 마크다운 시냅스 성좌도</h3>
+                <p>노드를 클릭하거나 드래그해 연결된 지식 별자리를 탐색해 보세요.</p>
               </div>
-              <div class="legend-inline">
-                <span><i style="background:#818cf8"></i>모델·양자화</span>
+              <div class="legend-pills">
+                <span><i style="background:#818cf8"></i>양자화·모델</span>
                 <span><i style="background:#34d399"></i>강화학습</span>
                 <span><i style="background:#f472b6"></i>역공학</span>
                 <span><i style="background:#38bdf8"></i>포터블</span>
               </div>
             </div>
-            <canvas id="graphCanvas" width="660" height="430"></canvas>
+            <div class="canvas-wrap">
+              <canvas id="graphCanvas" width="700" height="470"></canvas>
+            </div>
           </div>
 
-          <div class="panel">
-            <div class="panel-head">
+          <div class="card note-reader-card">
+            <div class="card-head">
               <div>
-                <h3 id="viewerTitle">기억 카드 원문</h3>
-                <p class="panel-sub" id="viewerPath">vault/10_Wiki/</p>
+                <span class="path-badge" id="viewerPath">vault/10_Wiki/</span>
+                <h3 id="viewerTitle">기억 카드 뷰어</h3>
               </div>
             </div>
-            <div class="tag-row" id="viewerTags"></div>
-            <pre class="md-viewer" id="viewerBody">왼쪽 시냅스 지도에서 노드를 선택하면 마크다운(.md) 원문이 표시됩니다.</pre>
+            <div class="tag-strip" id="viewerTags"></div>
+            <div class="note-content" id="viewerBody">
+              왼쪽 시냅스 성좌도에서 별(노드)을 클릭하면 마크다운 기억 원문과 연결 고리가 여기에 표시됩니다.
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- 탭 2: 지식 먹이기 -->
-      <div class="tab-view" id="tab-feed">
-        <div class="panel">
-          <div class="panel-head">
-            <div>
-              <h3>자율 위키 정원사 (P-Reinforce)</h3>
-              <p class="panel-sub">
-                메모·아이디어·분석 기록을 그대로 넣으면 제목, 분류, 해시태그, 기존 기억과의 <code>[[양방향 링크]]</code>를 자동으로 생성해 저장합니다.
-              </p>
+      <!-- [탭 2] 지식 먹이기 -->
+      <div class="tab-pane" id="tab-feed">
+        <div class="pane-grid feed-layout">
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <h3>자율 위키 정원사 (지식 먹이기)</h3>
+                <p>메모·코드 분석·아이디어를 자유롭게 넣으면 분류·해시태그·<code>[[양방향 링크]]</code>를 스스로 엮어 저장합니다.</p>
+              </div>
+            </div>
+
+            <div class="chip-row">
+              <span class="chip-hint">예시 불러오기:</span>
+              <button class="preset-chip" data-snack="quant" type="button">자체 4비트 니블 패킹 원리</button>
+              <button class="preset-chip" data-snack="rl" type="button">작은 AI 심판 합의 원리</button>
+              <button class="preset-chip" data-snack="ghidra" type="button">Ghidra 헤드리스 함수 추출</button>
+            </div>
+
+            <div class="composer">
+              <label class="input-label">
+                <span>기억 카드 제목 (선택)</span>
+                <input type="text" id="feedTitle" class="input-field" placeholder="비워두면 첫 문장을 요약해 제목을 자동 생성합니다" />
+              </label>
+              <label class="input-label">
+                <span>기억시킬 내용</span>
+                <textarea id="feedText" class="input-field area" rows="7" placeholder="기억시키고 싶은 내용을 적어주세요..."></textarea>
+              </label>
+              <div class="action-row">
+                <button class="primary-btn" id="btnFeed" type="button">🌱 지식 소화 &amp; 시냅스 연결하기</button>
+                <span class="status-msg" id="feedStatus"></span>
+              </div>
             </div>
           </div>
 
-          <div class="preset-bar">
-            <span class="preset-label">빠른 테스트 메모:</span>
-            <button class="chip-btn" data-snack="quant" type="button">외부 모델 해부 후 자체 4비트 압축 전략</button>
-            <button class="chip-btn" data-snack="rl" type="button">다수가 동의하는 1등 AI 합의 원리</button>
-            <button class="chip-btn" data-snack="ghidra" type="button">Ghidra 헤드리스 함수 흐름 추출 노트</button>
-          </div>
+          <div class="card side-guide-card">
+            <div class="card-head">
+              <div>
+                <h3>소화 결과 &amp; 기억 구조화 리포트</h3>
+                <p>데이터센터 없이도 작은 두뇌가 똑똑해지는 비결은 ‘정돈된 외부 마크다운 기억망’입니다.</p>
+              </div>
+            </div>
 
-          <div class="form-stack">
-            <input type="text" id="feedTitle" class="field" placeholder="노트 제목 (비워두면 첫 문장을 요약해 자동 생성합니다)" />
-            <textarea id="feedText" class="field textarea" rows="6" placeholder="기억시키고 싶은 내용을 자유롭게 입력하세요..."></textarea>
-            <div class="form-footer">
-              <button class="btn-primary" id="btnFeed" type="button">지식 소화 및 시냅스 연결</button>
-              <span class="feedback-text" id="feedStatus"></span>
+            <div id="digestResult" class="digest-box empty">
+              아직 새로 먹인 메모가 없습니다.<br />
+              왼쪽에서 예시 칩을 누르고 <strong>「지식 소화 &amp; 시냅스 연결하기」</strong>를 눌러보세요!
+            </div>
+
+            <div class="principle-list">
+              <div class="p-item">
+                <strong>1. 전체 문서를 매번 읽지 않습니다</strong>
+                <span>질문할 때 필요한 <code>[[시냅스 노드]]</code> 2개만 핀셋처럼 집어 읽어 메모리 소모를 70% 이상 줄입니다.</span>
+              </div>
+              <div class="p-item">
+                <strong>2. 먹인 지식이 곧 우리 두뇌의 재료가 됩니다</strong>
+                <span>새 노트가 쌓일수록 <strong>「우리만의 양자화 주조소」</strong>에서 굽는 <code>.sbrain</code> 신경망의 어휘와 연상 시냅스가 함께 자라납니다.</span>
+              </div>
             </div>
           </div>
-
-          <div id="digestResult" class="result-card hidden"></div>
         </div>
       </div>
 
-      <!-- 탭 3: 우리만의 양자화 두뇌 주조소 (핵심 신규 모듈!) -->
-      <div class="tab-view" id="tab-forge">
-        <div class="forge-grid">
-          <!-- 상단 좌측: 외부 모델 해부대 -->
-          <div class="panel">
-            <div class="panel-head">
+      <!-- [탭 3] 우리만의 양자화 주조소 -->
+      <div class="tab-pane" id="tab-forge">
+        <div class="pane-grid forge-layout">
+          <!-- 좌측: 외부 모델 골격 해부대 -->
+          <div class="card">
+            <div class="card-head">
               <div>
-                <h3>1단계 · 외부 모델 골격 해부대</h3>
-                <p class="panel-sub">
-                  외부 모델을 통째로 빌려 쓰지 않고, 내부 구조만 분해해 <strong>우리 두뇌에 필요한 설계 원리만 추출</strong>합니다.
-                </p>
+                <span class="step-kicker">STEP 1 · BLUEPRINT DISSECTION</span>
+                <h3>외부 모델 골격 해부대</h3>
+                <p>남의 양자화 모델을 통째로 쓰지 않고, 내부 구조만 분해해 <strong>우리 기본 틀에 필요한 알짜 설계만 흡수</strong>합니다.</p>
               </div>
             </div>
 
-            <div class="preset-bar">
-              <button class="chip-btn active" data-bp="custom-synapse-seed" type="button">우리 독자 틀 (Synapse-Core)</button>
-              <button class="chip-btn" data-bp="donor-qwen-0.8b" type="button">Qwen 0.8B 해부</button>
-              <button class="chip-btn" data-bp="donor-gemma4-e2b" type="button">Gemma 4 E2B 해부</button>
+            <div class="chip-row">
+              <button class="preset-chip active" data-bp="custom-synapse-seed" type="button">✦ 우리 독자 틀 (Synapse-Core)</button>
+              <button class="preset-chip" data-bp="donor-qwen-0.8b" type="button">Qwen 0.8B 해부</button>
+              <button class="preset-chip" data-bp="donor-gemma4-e2b" type="button">Gemma 4 E2B 해부</button>
             </div>
 
-            <div class="anatomy-box" id="anatomyBox">
-              해부 데이터를 불러오는 중...
+            <div class="anatomy-panel" id="anatomyBox">
+              설계도를 불러오는 중...
             </div>
           </div>
 
-          <!-- 상단 우측: 자체 양자화 주조기 -->
-          <div class="panel">
-            <div class="panel-head">
+          <!-- 우측: 자체 .sbrain 양자화 두뇌 주조기 -->
+          <div class="card">
+            <div class="card-head">
               <div>
-                <h3>2단계 · 우리만의 양자화 두뇌 직접 주조 (`SynapseQuant`)</h3>
-                <p class="panel-sub">
-                  현재 내 위키(`vault/`)에 쌓인 지식 어휘와 시냅스 공출현 행렬로 신경망 가중치를 빚고,
-                  <strong>32-블록 대칭 스케일링 + 니블 패킹</strong>으로 직접 압축해 <code>.sbrain</code> 파일을 생성합니다.
-                </p>
+                <span class="step-kicker">STEP 2 · SYNAPSEQUANT FORGE</span>
+                <h3>우리만의 양자화 두뇌 직접 주조 (<code>.sbrain</code>)</h3>
+                <p>내 위키 어휘와 시냅스 행렬로 신경망 가중치를 빚고, <strong>32-블록 스케일링 + 니블 패킹</strong>으로 직접 압축합니다.</p>
               </div>
             </div>
 
-            <div class="forge-controls">
-              <label class="control-group">
-                <span>양자화 눈금 정밀도</span>
-                <select id="forgeBits" class="field">
-                  <option value="4" selected>INT4 니블 패킹 (4비트 · 1바이트에 가중치 2개 압축, 추천)</option>
-                  <option value="8">INT8 블록 스케일링 (8비트 · 초고정밀 보존)</option>
-                </select>
-              </label>
+            <div class="forge-options">
+              <span class="opt-title">양자화 압축 방식 선택</span>
+              <div class="quant-cards" id="quantBitsGroup">
+                <button class="q-card active" data-bits="4" type="button">
+                  <div class="q-card-top">
+                    <strong>INT4 니블 패킹</strong>
+                    <span class="rec-tag">추천 · -84% 압축</span>
+                  </div>
+                  <p>1바이트에 4비트 가중치 2개를 짝지어 수납하는 초경량 외장하드 표준</p>
+                </button>
+                <button class="q-card" data-bits="8" type="button">
+                  <div class="q-card-top">
+                    <strong>INT8 블록 스케일링</strong>
+                    <span class="rec-tag subtle">-72% 압축</span>
+                  </div>
+                  <p>8비트 대칭 눈금으로 원본 신경망 방향성을 99.9% 이상 보존</p>
+                </button>
+              </div>
 
-              <label class="control-group">
-                <span>내부 신경망 은닉 차원 (Hidden Dim)</span>
-                <select id="forgeDim" class="field">
-                  <option value="48">48차원 (초경량 씨앗 두뇌)</option>
-                  <option value="64" selected>64차원 (표준 균형 두뇌)</option>
-                  <option value="96">96차원 (고밀도 연상 두뇌)</option>
-                </select>
-              </label>
+              <span class="opt-title">신경망 은닉 차원 (두뇌 용량)</span>
+              <div class="dim-pills" id="quantDimGroup">
+                <button class="dim-pill" data-dim="48" type="button">48차원 · 씨앗형</button>
+                <button class="dim-pill active" data-dim="64" type="button">64차원 · 균형형</button>
+                <button class="dim-pill" data-dim="96" type="button">96차원 · 고밀도형</button>
+              </div>
 
-              <button class="btn-primary full-w" id="btnForge" type="button">
-                우리만의 양자화 두뇌 (.sbrain) 직접 주조하기
+              <button class="primary-btn full" id="btnForge" type="button">
+                ⚡ 우리만의 양자화 두뇌 (.sbrain) 직접 주조하기
               </button>
             </div>
 
-            <div id="forgeResult" class="result-card hidden"></div>
+            <div id="forgeResult" class="forge-report hidden"></div>
 
-            <div class="forged-list-wrap">
-              <h4 class="mini-head">외장하드 `models/` 에 주조된 우리 두뇌 목록</h4>
-              <div id="forgedList" class="forged-list">아직 주조된 `.sbrain` 파일이 없습니다. 위 버튼을 눌러 첫 독자 두뇌를 구워보세요!</div>
+            <div class="vault-brains">
+              <div class="vb-head">외장하드 <code>models/</code> 에 주조된 우리 두뇌 목록</div>
+              <div id="forgedList" class="vb-list"></div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 탭 4: 대화창 -->
-      <div class="tab-view" id="tab-chat">
-        <div class="panel chat-panel">
-          <div class="panel-head">
+      <!-- [탭 4] 시냅스몽과 대화 -->
+      <div class="tab-pane" id="tab-chat">
+        <div class="card chat-card">
+          <div class="card-head">
             <div>
               <h3>시냅스몽과 대화하기</h3>
-              <p class="panel-sub">위키 전체를 무식하게 다 읽지 않고, 질문과 연결된 핵심 시냅스 카드만 골라 답합니다.</p>
+              <p>질문과 연결된 마크다운 시냅스 카드만 골라 읽고 답합니다.</p>
+            </div>
+            <div class="chip-row no-margin">
+              <button class="preset-chip" data-q="외장하드에 사는 시냅스몽은 어떻게 다른 컴퓨터에서도 그대로 깨어나?" type="button">외장하드 서식 원리</button>
+              <button class="preset-chip" data-q="외부 모델을 그대로 안 쓰고 우리만의 양자화 두뇌를 어떻게 만들어?" type="button">자체 양자화 전략</button>
+              <button class="preset-chip" data-q="Ghidra 헤드리스 분석이랑 어떻게 연결될 예정이야?" type="button">Ghidra 역공학 결합</button>
             </div>
           </div>
 
-          <div class="preset-bar">
-            <button class="chip-btn" data-q="외장하드에 사는 시냅스몽은 어떻게 다른 컴퓨터에서도 그대로 깨어나?" type="button">외장하드 서식 원리</button>
-            <button class="chip-btn" data-q="외부 모델을 그대로 안 쓰고 우리만의 양자화 두뇌를 어떻게 만들어?" type="button">자체 양자화 두뇌 전략</button>
-            <button class="chip-btn" data-q="Ghidra 헤드리스 분석이랑 어떻게 연결될 예정이야?" type="button">Ghidra 역공학 결합</button>
-          </div>
-
-          <div class="chat-stream" id="chatLog">
-            <div class="bubble bot">
-              안녕하세요 주인님! 제 마크다운 위키 기억망에 담긴 지식들을 바탕으로 무엇이든 답해 드릴게요.
+          <div class="chat-feed" id="chatLog">
+            <div class="msg-row bot">
+              <img src="assets/01_greet.jpg" alt="시냅스몽" class="msg-avatar" />
+              <div class="msg-bubble">
+                안녕하세요 주인님! 제 마크다운 위키 기억망과 직접 구운 <code>.sbrain</code> 두뇌로 무엇이든 함께 탐구해 볼게요. 위 예시 질문을 누르거나 직접 물어봐 주세요!
+              </div>
             </div>
           </div>
 
-          <div class="chat-bar">
-            <input type="text" id="chatInput" class="field" placeholder="질문을 입력하고 Enter를 누르세요..." />
-            <button class="btn-primary" id="btnChat" type="button">질문하기</button>
+          <div class="chat-input-bar">
+            <input type="text" id="chatInput" class="input-field" placeholder="시냅스몽에게 궁금한 점을 입력하고 Enter를 누르세요..." />
+            <button class="primary-btn" id="btnChat" type="button">질문 보내기</button>
           </div>
         </div>
       </div>
     </section>
   </main>
 
-  <script src="app.js"></script>
+  <script src="ui-v3.js?v=3.0"></script>
 </body>
 </html>

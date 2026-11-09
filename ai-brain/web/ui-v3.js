@@ -331,11 +331,12 @@ function renderDebateFeed() {
 
   const bubblesHtml = d.dialogue
     .map((turn) => {
+      const isUser = turn.constellation_id === "user_architect";
       const replyTxt = turn.reply_to
         ? `<span style="color:#fcd34d;font-weight:600">↳ ${escapeHtml(turn.reply_to)} 의견에 응답</span>`
         : `<span style="color:#94a3b8">${escapeHtml(turn.constellation_name)}</span>`;
       return `
-        <div class="debate-bubble" style="border-left-color:${turn.color || "#818cf8"}">
+        <div class="debate-bubble ${isUser ? "user-own" : ""}" style="border-left-color:${turn.color || "#818cf8"}">
           <div class="debate-bubble-head">
             <div>
               <strong style="color:#ffffff">${turn.emoji} ${escapeHtml(turn.speaker)}</strong>
@@ -1364,6 +1365,66 @@ function setupInteractions() {
         • 5인 꼬마 뉴런 심판단 실전 점수: <strong>${d.before_score}점 → ${d.after_score}점</strong> (${d.gain_pts >= 0 ? "+" : ""}${d.gain_pts}점 변화!)<br/>
         • 천재들의 의견 교환록이 마크다운 위키 기억망에도 새 카드로 영구 보존되었습니다!
       `;
+    }
+  });
+
+  // Preset Chips for User's Own Thought on Constellation Opinions
+  document.querySelectorAll("#thoughtPresetChips .preset-chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      document.querySelectorAll("#thoughtPresetChips .preset-chip").forEach((c) => c.classList.remove("active"));
+      chip.classList.add("active");
+      document.getElementById("userThoughtInput").value = chip.dataset.thought || "";
+      document.getElementById("userThoughtInput").focus();
+    });
+  });
+
+  async function submitUserThoughtForFeedback() {
+    const inputEl = document.getElementById("userThoughtInput");
+    const userThought = inputEl.value.trim();
+    const fb = document.getElementById("distillFeedback");
+    if (!userThought) {
+      fb.classList.remove("hidden");
+      fb.textContent = "성좌 천재들에게 들려줄 나의 생각이나 질문을 먼저 한 줄 적어주세요!";
+      inputEl.focus();
+      return;
+    }
+
+    const topic = document.getElementById("debateTopicInput").value.trim();
+    fb.classList.remove("hidden");
+    fb.textContent = "성좌의 천재 스승님들이 주인님의 생각을 읽고 강점과 정밀 보완점을 토론 중이에요...";
+    setPetPose("06_star");
+
+    const res = await apiPost("api/pantheon/feedback", {
+      constellation_ids: pantheonState.selectedConstIds,
+      user_thought: userThought,
+      topic,
+    });
+    if (res.feedback) {
+      const f = res.feedback;
+      pantheonState.lastDebate = f.updated_debate;
+      inputEl.value = "";
+      pulsePortrait();
+      renderStatus(res.status);
+      loadRlScenario(selectedScenarioId);
+
+      const feedEl = document.getElementById("debateFeedBox");
+      if (feedEl) {
+        feedEl.scrollTop = feedEl.scrollHeight;
+      }
+
+      fb.innerHTML = `
+        👑 <strong>주인님 생각 피드백 &amp; 공동 진화 완료!</strong> [${escapeHtml(f.analysis.badge)}]<br/>
+        • 성좌가 주인님의 강점을 반영해 공동 모듈 <code>${escapeHtml(f.sbrain_file)}</code> (${f.sbrain_kb} KB)을 새로 주조했습니다! (총 모듈 ${f.total_modular_capsules}개 ∞)<br/>
+        • 바로 위 담론창 맨 아래에서 <strong>천재들의 3단 입체 피드백(강점 공명 · 정밀 보완 · 다음 질문)</strong>을 확인해 보세요!
+      `;
+    }
+  }
+
+  document.getElementById("btnAskFeedback").addEventListener("click", submitUserThoughtForFeedback);
+  document.getElementById("userThoughtInput").addEventListener("keydown", (evt) => {
+    if (evt.key === "Enter" && !evt.shiftKey) {
+      evt.preventDefault();
+      submitUserThoughtForFeedback();
     }
   });
 }

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>시냅스몽 · 나만의 양자화 AI 두뇌 연구소</title>
-  <link rel="stylesheet" href="ui-v3.css?v=4.2" />
+  <link rel="stylesheet" href="ui-v3.css?v=4.3" />
   <!--__INITIAL_STATE__-->
 </head>
 <body>
@@ -246,6 +246,24 @@
             </div>
 
             <div id="debateFeedBox" class="debate-feed-box"></div>
+
+            <!-- 👑 주인님 생각 제안 & 성좌 입체 피드백 창 -->
+            <div class="user-thought-box" id="userThoughtBox">
+              <div class="vb-head">👑 성좌들의 의견에 나의 생각 물어보고 피드백 받기</div>
+              <p class="thought-sub">
+                천재들의 토론을 보고 떠오른 <strong>내 생각·반론·궁금한 점</strong>을 적어보세요! 각 성좌 천재들이 <strong>✨ 빛나는 강점</strong>과 <strong>🔍 날카로운 보완점</strong>을 피드백하고 공동 합의 공식에 반영합니다.
+              </p>
+              <div class="chip-row" id="thoughtPresetChips" style="margin-bottom:7px">
+                <button type="button" class="preset-chip" data-thought="자주 쓰는 핵심 성좌는 미리 캐시에 올려두면 외장하드 스왑 속도가 훨씬 빨라지지 않을까?">💡 자주 쓰는 성좌 캐시 제안</button>
+                <button type="button" class="preset-chip" data-thought="만약 두 영역 성좌의 의견이 끝까지 정반대로 충돌하면 어떤 기준으로 결정하는 게 맞을까?">⚖️ 성좌 의견 충돌 시 결정법</button>
+                <button type="button" class="preset-chip" data-thought="처음부터 너무 안전만 따지면 오히려 판단 속도가 느려지는 단점은 없을까?">⚡ 안전 vs 속도 반론 질문</button>
+              </div>
+              <textarea id="userThoughtInput" class="input-field thought-textarea" rows="2" placeholder="예: 내 생각엔 자주 쓰는 성좌 모듈은 미리 캐시에 올려두면 훨씬 빠를 것 같은데 어떻게 생각해?"></textarea>
+              <button class="secondary-btn full thought-cta-btn" id="btnAskFeedback" type="button" style="margin-top:7px">
+                💬 나의 생각 건네고 성좌 천재들에게 입체 피드백 받기
+              </button>
+            </div>
+
             <div id="distillFeedback" class="clinic-feedback hidden" style="margin-top:8px;margin-bottom:0"></div>
           </div>
         </div>
@@ -559,6 +577,6 @@
     </section>
   </main>
 
-  <script src="ui-v3.js?v=4.2"></script>
+  <script src="ui-v3.js?v=4.3"></script>
 </body>
 </html>

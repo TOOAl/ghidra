@@ -795,6 +795,229 @@ class GeniusPantheon:
         self._save()
         return debate_record
 
+    def _analyze_user_thought(
+        self, thought: str, recalled_notes: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        clean = thought.strip()
+        counter_kw = ("반면", "오히려", "하지만", "반대로", "아니라", "보다", "단점", "느리", "느려", "위험", "충돌", "다르면", "틀리")
+        opt_kw = ("캐시", "미리", "압축", "속도", "나눠", "쪼개", "단계", "점수", "우선순위", "자동", "백업", "모듈", "저장", "연결", "가볍")
+        q_kw = ("어떻게", "왜", "만약", "누가", "언제", "차이", "가능할", "어떨까", "맞을까", "할까")
+
+        if any(k in clean for k in counter_kw):
+            stance = "counter"
+            badge = "⚡ 예리한 역발상 · 트레이드오프 지적"
+            praise_core = "단순히 성좌의 결론을 그대로 받아들이지 않고, 현실에서 부딪힐 수 있는 반대 급부(속도·충돌·비용의 균형)를 정확히 짚어내셨습니다!"
+        elif any(k in clean for k in opt_kw):
+            stance = "optimize"
+            badge = "🛠️ 실전 시스템 설계 · 최적화 제안"
+            praise_core = "추상적인 원리를 실제 외장하드와 컴퓨터 위에서 더 빠르고 영리하게 굴러가게 만드는 구체적 메커니즘을 제안하셨어요!"
+        elif "?" in clean or any(k in clean for k in q_kw):
+            stance = "question"
+            badge = "🔭 본질을 꿰뚫는 소크라테스식 질문"
+            praise_core = "천재들도 자칫 당연하게 넘길 뻔한 '결정 기준과 경계 조건'을 정면으로 물어보셨습니다. 좋은 질문이 최고의 알고리즘을 만듭니다!"
+        else:
+            stance = "hypothesis"
+            badge = "💡 주인님의 독창적 통찰 · 가설 제시"
+            praise_core = "여러 성좌의 논의를 주인님만의 직관적 언어로 재해석해 새로운 방향타를 제시해 주셨습니다!"
+
+        # Extract meaningful tokens for concrete quoting
+        tokens = [
+            w for w in re.findall(r"[가-힣A-Za-z0-9]{2,}", clean)
+            if w not in {"생각엔", "생각에는", "나는", "내가", "만약", "어떨까", "같아", "있을까", "성좌들의", "의견에", "어떻게"}
+        ]
+        focus_terms = tokens[:3] if tokens else ["핵심 아이디어"]
+        wiki_titles = [n["title"] for n in (recalled_notes or [])[:2]]
+
+        return {
+            "stance": stance,
+            "badge": badge,
+            "praise_core": praise_core,
+            "focus_terms": focus_terms,
+            "wiki_titles": wiki_titles,
+        }
+
+    def feedback_on_user_thought(
+        self,
+        constellation_ids: List[str],
+        user_thought: str,
+        topic: str,
+        recalled_notes: List[Dict[str, Any]],
+        rl_gym: Any,
+    ) -> Dict[str, Any]:
+        t0 = time.perf_counter()
+        consts: List[Dict[str, Any]] = self.data["constellations"]
+        by_id = {c["id"]: c for c in consts}
+        valid_ids = [cid for cid in constellation_ids if cid in by_id]
+        if not valid_ids:
+            valid_ids = self.data.get("active_constellation_ids") or [consts[0]["id"]]
+        selected_consts = [by_id[cid] for cid in valid_ids if cid in by_id]
+
+        # If no prior debate exists yet, convene a quick baseline debate on topic first!
+        if not self.data.get("last_debate"):
+            self.convene_debate(valid_ids, topic or user_thought, rl_gym)
+
+        last_deb = self.data["last_debate"]
+        clean_thought = user_thought.strip()[:220]
+        analysis = self._analyze_user_thought(clean_thought, recalled_notes)
+        kw_str = " · ".join(analysis["focus_terms"])
+
+        # Pick 3 distinct voices across the selected constellations (Praise / Constructive Critique / Co-evolution Synthesis)
+        pool: List[Tuple[Dict[str, Any], Dict[str, Any]]] = [
+            (c, g) for c in selected_consts for g in c["geniuses"]
+        ]
+        c1, g_praise = pool[0]
+        c2, g_critique = pool[len(pool) // 2] if len(pool) > 1 else pool[0]
+        c3, g_synth = pool[-1]
+
+        wiki_bridge_sentence = (
+            f" 게다가 이 발상은 우리 위키 기억망의 『{analysis['wiki_titles'][0]}』 노트와도 멋지게 시냅스가 연결됩니다!"
+            if analysis["wiki_titles"]
+            else ""
+        )
+
+        # Domain-specific constructive blind-spot coaching (never hollow flattery!)
+        critique_by_const = {
+            "const_re": (
+                f"다만 역공학 현장의 함정을 하나 보완해 봅시다! 『{kw_str}』 아이디어를 실행할 때, "
+                f"겉모양만 정상처럼 위장한 예외 입력이 들어오면 흐름이 꼬일 수 있으니 '입출력 상태 체크섬 확인'을 입구에 한 줄 추가하면 빈틈이 완전히 사라집니다."
+            ),
+            "const_truth": (
+                f"과학자의 눈으로 보완점을 하나 더하자면, 『{kw_str}』 접근이 빨라질수록 '확인되지 않은 추측'이 슬쩍 섞일 위험을 경계해야 합니다. "
+                f"확신도가 75% 미만일 땐 멈춰서 위키 제1원리와 대조하는 안전장치만 묶어주면 완벽합니다!"
+            ),
+            "const_scale": (
+                f"여기에 메모리 공학 디테일을 한 스푼 더하면 천하무적이 됩니다! 『{kw_str}』 방식을 쓸 때 "
+                f"자주 안 쓰는 모듈이 작업창(RAM 핫슬롯)에 계속 남아 있지 않도록 '열기-판단-즉시 비우기(LRU 스왑)' 규칙을 짝지어 주면 구형 PC에서도 날아다닙니다."
+            ),
+            "const_strategy": (
+                f"게임이론으로 한 수 더 내다보면 어떨까요? 평소엔 주인님의 『{kw_str}』 해법이 압도적으로 유리하지만, "
+                f"의견이 팽팽히 맞설 때를 대비해 '단순 다수결'이 아니라 '위험을 먼저 걸러내는 다수 심판 합의(Good Judges)'를 최종 결승선으로 두면 오판 확률이 0에 수렴합니다!"
+            ),
+            "const_shield": (
+                f"아폴로 방어 공학 관점에서 안전핀 하나만 채워 봅시다! 주인님의 『{kw_str}』 전략이 예상치 못한 과부하를 만났을 때 "
+                f"전체를 멈추는 대신 0.01초 만에 기본 안전 모드로 전환하는 비상 회피로(Fallback)를 붙여두면 어떤 위기에도 안 무너집니다."
+            ),
+        }
+        critique_msg = critique_by_const.get(
+            c2["id"],
+            f"여기에 우리 [{c2['name']}]의 안전 기준을 더해, 『{kw_str}』 실행 전후로 근거 일치율을 짧게 점검하는 관문을 두면 단점 없는 완성형 설계가 됩니다!",
+        )
+
+        new_turns = [
+            {
+                "phase": analysis["badge"],
+                "constellation_id": "user_architect",
+                "constellation_name": "주인님 · 원탁 의장",
+                "color": "#38bdf8",
+                "speaker": "👑 주인님의 생각",
+                "emoji": "🧑‍🚀",
+                "lens": "원탁 의장 · 직접 제안",
+                "reply_to": "성좌 원탁 합의안",
+                "message": f"“{clean_thought}”",
+            },
+            {
+                "phase": "✨ 강점 공명 피드백",
+                "constellation_id": c1["id"],
+                "constellation_name": c1["name"],
+                "color": c1["color"],
+                "speaker": g_praise["name"],
+                "emoji": g_praise["emoji"],
+                "lens": g_praise["lens"],
+                "reply_to": "👑 주인님의 생각",
+                "message": (
+                    f"무릎을 탁 치게 만드는 생각입니다! {analysis['praise_core']} "
+                    f"특히 『{kw_str}』 포인트를 짚어주신 덕분에 우리 [{c1['name']}]의 논의가 탁상공론을 넘어 실전 무기가 되었어요.{wiki_bridge_sentence}"
+                ),
+            },
+            {
+                "phase": "🔍 천재의 정밀 보완",
+                "constellation_id": c2["id"],
+                "constellation_name": c2["name"],
+                "color": c2["color"],
+                "speaker": g_critique["name"],
+                "emoji": g_critique["emoji"],
+                "lens": g_critique["lens"],
+                "reply_to": "👑 주인님의 생각",
+                "message": critique_msg,
+            },
+            {
+                "phase": "🚀 공동 진화 · 다음 질문",
+                "constellation_id": c3["id"],
+                "constellation_name": c3["name"],
+                "color": "#fde68a",
+                "speaker": g_synth["name"],
+                "emoji": g_synth["emoji"],
+                "lens": g_synth["lens"],
+                "reply_to": f"주인님 × {g_critique['name']}",
+                "message": (
+                    f"좋습니다! 주인님의 『{kw_str}』 아이디어에 {g_critique['name']}의 안전핀을 결합해 성좌 합의를 2단계로 업그레이드합시다! "
+                    f"한 걸음 더 여쭤볼게요 — 만약 실전에서 '속도'와 '100% 확실한 검증' 중 단 하나만 택해야 하는 긴박한 순간이 오면, 주인님은 어느 쪽에 가중치를 더 두고 싶으신가요?"
+                ),
+            },
+        ]
+
+        last_deb["dialogue"].extend(new_turns)
+        upgraded_consensus = (
+            f"{last_deb['consensus']} "
+            f"➕ [👑 주인님 공동 설계 반영]: 주인님이 제안한 『{clean_thought}』 원칙을 채택하고, "
+            f"{g_critique['name']}의 경계 조건 방어막을 결합해 실전 속도·정확도·확장성을 동시에 달성한다."
+        )
+        last_deb["consensus"] = upgraded_consensus
+
+        # Forge co-authored modular .sbrain capsule & nudge 5 Baby Neurons!
+        co_hash = hashlib.md5(clean_thought.encode("utf-8")).hexdigest()[:6]
+        capsule_path = self.models_dir / f"coauthored_thought_{co_hash}_int4.sbrain"
+        sample_mat = self._default_bias_from_text(clean_thought)
+        cap_info = _quantize_int4_capsule(
+            sample_mat,
+            capsule_path,
+            meta={
+                "coauthor": "주인님 × " + " × ".join(c["name"] for c in selected_consts),
+                "user_thought": clean_thought,
+            },
+        )
+        capsules: List[str] = self.data.setdefault("modular_capsules", [])
+        if cap_info["file"] not in capsules:
+            capsules.append(cap_info["file"])
+
+        # Reinforce Baby Neurons with validation-gated coaching
+        distill_rng = random.Random(999 + len(capsules))
+        for idx, ag in enumerate(rl_gym.agents):
+            if idx == 1:
+                continue
+            for s_idx in range(len(ARCHETYPES)):
+                _, opt_a, _, trap_a = ARCHETYPES[s_idx]
+                st_vec = rl_gym._sample_state(distill_rng, s_idx, train_mode=True, shortcut_bias=0.0, obs_noise=0.04)
+                ag.update(st_vec, opt_a, 1.0, lr_scale=0.35)
+                ag.update(st_vec, trap_a, -0.92, lr_scale=0.35)
+        rl_gym._export_quantized_policy()
+        rl_gym._save_state()
+
+        last_deb["total_modular_capsules"] = len(capsules)
+        self.data["last_debate"] = last_deb
+        self._save()
+
+        elapsed_ms = round((time.perf_counter() - t0) * 1000.0, 1)
+        wiki_title = f"주인님 × 성좌 피드백 담론 ({clean_thought[:22]})"
+        wiki_body = (
+            f"주인님의 제안·생각: 『{clean_thought}』 ({analysis['badge']})\n"
+            f"참여 성좌: {', '.join(c['name'] for c in selected_consts)}\n\n"
+            + "\n".join(f"- [{t['phase']}] {t['speaker']}: {t['message']}" for t in new_turns[1:])
+            + f"\n\n업그레이드된 공동 합의 공식: {upgraded_consensus}"
+        )
+
+        return {
+            "analysis": analysis,
+            "new_turns": new_turns,
+            "updated_debate": last_deb,
+            "sbrain_file": cap_info["file"],
+            "sbrain_kb": cap_info["size_kb"],
+            "total_modular_capsules": len(capsules),
+            "elapsed_ms": elapsed_ms,
+            "wiki_note_title": wiki_title,
+            "wiki_note_body": wiki_body,
+        }
+
     # Backward-compatible alias
     def distill_into_neurons(self, ids: List[str], rl_gym: Any, topic: str = "") -> Dict[str, Any]:
         return self.convene_debate(ids, topic, rl_gym)

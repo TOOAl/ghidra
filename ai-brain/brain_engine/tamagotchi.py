@@ -244,6 +244,19 @@ class TamagotchiSoul:
         self._log_event(f"영역 성좌 천재 담론 전수: {label} (심판단 {after_score}점)")
         self._save()
 
+    def on_user_thought_feedback(self, badge: str, short_thought: str) -> None:
+        self.data["xp"] = int(self.data.get("xp", 0)) + 30
+        self.data["mood"] = min(100, int(self.data.get("mood", 88)) + 10)
+        self.data["satiety"] = min(100, int(self.data.get("satiety", 72)) + 10)
+        self.data["rl_iq_bonus"] = int(self.data.get("rl_iq_bonus", 0)) + 4
+        self.data["pose"] = "07_eureka"
+        self.data["last_speech"] = (
+            f"유레카! 주인님의 생각([{badge}])에 천재 성좌 스승님들이 감탄하며 입체 피드백을 보냈어요! "
+            f"우리 공동 합의 공식도 한 단계 더 진화했어요! (+30 XP)"
+        )
+        self._log_event(f"주인님 생각 × 성좌 피드백 공명: {short_thought[:20]}…")
+        self._save()
+
     def on_forge_brain(self, bits: int, saved_pct: float, cos_sim: float) -> None:
         self.data["xp"] = int(self.data.get("xp", 0)) + 30
         self.data["mood"] = min(100, int(self.data.get("mood", 80)) + 12)

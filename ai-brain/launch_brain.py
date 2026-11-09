@@ -265,6 +265,38 @@ def make_handler(state: BrainState):
                 self._send_json({"added": added, "status": state.full_status()})
                 return
 
+            if route == "/api/pantheon/feedback":
+                user_thought = str(body.get("user_thought") or "").strip()
+                if not user_thought:
+                    self._send_json({"error": "주인님의 생각을 한 줄 이상 적어주세요!"}, status=400)
+                    return
+                cids = body.get("constellation_ids") or []
+                if not isinstance(cids, list):
+                    cids = []
+                topic = str(body.get("topic") or "").strip()
+                recall_bundle = state.gardener.recall_memories(user_thought, limit=2)
+                fb = state.pantheon.feedback_on_user_thought(
+                    constellation_ids=[str(x) for x in cids],
+                    user_thought=user_thought,
+                    topic=topic,
+                    recalled_notes=recall_bundle.get("recalled", []),
+                    rl_gym=state.rl_gym,
+                )
+                digested = state.gardener.digest_raw_memory(
+                    fb["wiki_note_body"], custom_title=fb["wiki_note_title"]
+                )
+                state.soul.on_user_thought_feedback(
+                    fb["analysis"]["badge"], user_thought
+                )
+                self._send_json(
+                    {
+                        "feedback": fb,
+                        "digested_note": digested,
+                        "status": state.full_status(),
+                    }
+                )
+                return
+
             if route == "/api/rl/train":
                 episodes = int(body.get("episodes") or 600)
                 snap = state.rl_gym.train_episodes(episodes=episodes)

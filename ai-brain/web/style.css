@@ -1934,4 +1934,45 @@ code {
   border-color: #a5b4fc;
 }
 
+.user-thought-box {
+  margin-top: 10px;
+  padding: 12px 13px;
+  background: linear-gradient(145deg, rgba(14, 165, 233, 0.09), rgba(99, 102, 241, 0.1));
+  border: 1px solid rgba(56, 189, 248, 0.42);
+  border-radius: 12px;
+}
+
+.thought-sub {
+  margin: 4px 0 8px;
+  font-size: 11.5px;
+  line-height: 1.48;
+  color: #cbd5e1;
+}
+
+.thought-textarea {
+  resize: vertical;
+  min-height: 52px;
+  font-family: inherit;
+  line-height: 1.45;
+}
+
+.thought-cta-btn {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.28), rgba(99, 102, 241, 0.32));
+  border-color: rgba(56, 189, 248, 0.65);
+  color: #ffffff;
+}
+
+.thought-cta-btn:hover {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.42), rgba(99, 102, 241, 0.46));
+  border-color: #7dd3fc;
+}
+
+.debate-bubble.user-own {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.18), rgba(30, 41, 59, 0.85));
+  border-left: 3.5px solid #38bdf8;
+  border-top: 1px solid rgba(56, 189, 248, 0.3);
+  border-right: 1px solid rgba(56, 189, 248, 0.2);
+  border-bottom: 1px solid rgba(56, 189, 248, 0.2);
+}
+
 

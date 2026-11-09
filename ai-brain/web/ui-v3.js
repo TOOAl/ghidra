@@ -1995,6 +1995,105 @@ function setupEvoForgeInteractions() {
   document.getElementById("btnEvoAutoRepair").addEventListener("click", () => doRepair("auto"));
   document.getElementById("btnEvoTestCustom").addEventListener("click", () => doRepair("manual"));
 
+
+  /* ---- 📎🧩🔍 Workbench Trio: upload window, port-apply button, trace chat ---- */
+  function traceBubble(who, text) {
+    const log = document.getElementById("traceChatLog");
+    if (!log) return;
+    const name = who === "master" ? "👑 주인님" : "🔍 돋보기 기관";
+    const div = document.createElement("div");
+    div.className = `chat-bubble ${who === "master" ? "master" : "brain"}`;
+    div.innerHTML = `<strong>${name}</strong> ${escapeHeartHtml(text)}`;
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  const benchUpBtn = document.getElementById("btnBenchUpload");
+  const benchFile = document.getElementById("benchFileInput");
+  if (benchUpBtn && benchFile) {
+    benchUpBtn.addEventListener("click", () => benchFile.click());
+    benchFile.addEventListener("change", (evt) => {
+      const file = evt.target.files && evt.target.files[0];
+      if (!file) return;
+      const nameEl = document.getElementById("benchUploadName");
+      if (nameEl) nameEl.textContent = `📎 ${file.name}`;
+      if (/\.(py|txt|md)$/i.test(file.name)) {
+        file.text().then((txt) => {
+          document.getElementById("evoCodeEditor").value = txt;
+          traceBubble("brain", `📎 코드 파일 "${file.name}" 을(를) 3단계 편집창에 착륙시켰어요! 바로 4단계 돋보기를 가동할게요!`);
+          doAudit();
+        });
+      } else {
+        traceBubble("brain", `📎 바이너리 "${file.name}" 첨부! 1단계 X-Ray 해부 → 원리 설계도 번역 → 이식 초안까지 한번에 달릴게요!`);
+        document.querySelectorAll("#evoSpecimenChips .preset-chip").forEach((c) => c.classList.remove("active"));
+        loadSpecimen("custom_upload", file);
+      }
+    });
+  }
+
+  const portBtn = document.getElementById("btnBenchPort");
+  if (portBtn) {
+    portBtn.addEventListener("click", async () => {
+      const code = document.getElementById("evoCodeEditor").value;
+      portBtn.disabled = true;
+      const old = portBtn.textContent;
+      portBtn.textContent = "🧪 유리방 검증 중...";
+      try {
+        const res = await apiPost("api/evo/install", { specimen_id: activeEvoSpecimenId, code });
+        if (res.error) {
+          traceBubble("brain", `🚫 이식 보류: ${res.error} — 4단계 돋보기와 5단계 수리를 먼저 거쳐주세요!`);
+          showEvoToast({ kind: "stumble", beat: "🚫", diary: `이식 보류: ${res.error}` });
+        } else if (res.installed) {
+          traceBubble("brain", `🧩 이식 적용 완료! "${res.installed.title}" 이(가) ${res.installed.py_file} + ${res.installed.sbrain_file} + 위키 기억 2장으로 우리 뇌에 영구 합체됐어요! (${res.installed.tests_passed} 통과)`);
+          showEvoToast({ kind: "evolve", beat: "🧩", diary: `우리 뇌 이식 적용 완료! ${res.installed.entry_fn} 카트리지 장착 (${res.installed.tests_passed})` });
+          if (res.status) renderStatus(res.status);
+          setPetPose("07_eureka");
+          setEvoStepper(6, 6);
+        }
+      } catch (err) {
+        traceBubble("brain", `🚫 이식 중 오류: ${err}`);
+      }
+      portBtn.disabled = false;
+      portBtn.textContent = old;
+    });
+  }
+
+  async function sendTraceChat() {
+    const input = document.getElementById("traceChatInput");
+    const btn = document.getElementById("btnTraceChat");
+    if (!input || !btn) return;
+    const msg = input.value.trim();
+    if (!msg) return;
+    traceBubble("master", msg);
+    input.value = "";
+    btn.disabled = true;
+    try {
+      const res = await apiPost("api/evo/trace-chat", {
+        message: msg,
+        specimen_id: activeEvoSpecimenId,
+        code: document.getElementById("evoCodeEditor").value,
+      });
+      traceBubble("brain", res.reply || "...");
+      setPetPose("02_curious");
+    } catch (err) {
+      traceBubble("brain", `🚫 역추적 중 오류: ${err}`);
+    }
+    btn.disabled = false;
+    input.focus();
+  }
+  const traceBtn = document.getElementById("btnTraceChat");
+  const traceInput = document.getElementById("traceChatInput");
+  if (traceBtn) traceBtn.addEventListener("click", sendTraceChat);
+  if (traceInput) {
+    traceInput.addEventListener("keydown", (evt) => {
+      if (evt.key === "Enter") {
+        evt.preventDefault();
+        sendTraceChat();
+      }
+    });
+  }
+  traceBubble("brain", "안녕하세요! 저는 기관③ 원인 역추적 돋보기예요. 현재 편집창 코드에 대해 '왜 깨졌어?' 라고 한번 물어봐 주세요! 🔍");
+
   document.getElementById("btnEvoRollback").addEventListener("click", async () => {
     const snapId = document.getElementById("evoSnapshotSelect").value;
     const res = await apiPost("api/evo/rollback", { specimen_id: activeEvoSpecimenId, snap_id: snapId });
@@ -2429,7 +2528,7 @@ function setupHeartbeat() {
   setInterval(pollHeartbeat, 5000);
 }
 
-const CURRENT_UI_VERSION = "6.3";
+const CURRENT_UI_VERSION = "6.4";
 
 async function init() {
   setupGraphSimulation();

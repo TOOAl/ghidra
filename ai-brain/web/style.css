@@ -3140,3 +3140,79 @@ code {
 .journal-entry.kind-research { border-left-color: #38bdf8; background: rgba(8, 47, 73, 0.35); }
 .journal-entry.kind-research .je-beat { background: linear-gradient(135deg, #bae6fd, #38bdf8); }
 .gc-break-btn { border-color: rgba(251, 191, 36, 0.6); color: #fde68a; }
+
+/* ---------------------------------------------------------------------------
+   Workbench Trio — upload window 📎 + port button 🧩 + trace chat 🔍
+--------------------------------------------------------------------------- */
+.workbench-trio {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.trio-upload {
+  border: 1px dashed rgba(56, 189, 248, 0.45);
+  border-radius: 12px;
+  padding: 9px 12px;
+  background: rgba(8, 47, 73, 0.25);
+}
+
+.trio-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  margin: 6px 0 4px;
+}
+
+.upload-filename {
+  font-size: 11.6px;
+  font-weight: 700;
+  color: #bae6fd;
+  background: rgba(12, 74, 110, 0.5);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+
+.trio-hint {
+  font-size: 10.8px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.port-btn {
+  background: linear-gradient(135deg, #f59e0b, #ec4899 60%, #8b5cf6);
+  border: none;
+  color: #fff;
+  font-weight: 800;
+  padding: 10px 12px;
+  border-radius: 12px;
+  box-shadow: 0 6px 22px rgba(236, 72, 153, 0.35);
+}
+
+.port-btn:hover { filter: brightness(1.08); }
+
+.trace-chat {
+  border: 1px solid rgba(34, 211, 238, 0.4);
+  border-radius: 13px;
+  background: rgba(8, 51, 68, 0.3);
+  padding: 10px 12px 12px;
+}
+
+.trace-chat-log {
+  max-height: 216px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding-right: 3px;
+  margin-bottom: 9px;
+}
+
+.trace-chat-log .chat-bubble.brain {
+  background: linear-gradient(135deg, rgba(14, 116, 144, 0.6), rgba(15, 23, 42, 0.92));
+  border-color: rgba(34, 211, 238, 0.45);
+  color: #cffafe;
+}

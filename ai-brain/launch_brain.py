@@ -79,7 +79,7 @@ class BrainState:
             rl_trained=rl_trained,
         )
         return {
-            "ui_version": "6.3",
+            "ui_version": "6.4",
             "soul": self.soul.snapshot(graph["stats"], env_grade=env_grade),
             "hallucination": hallucination,
             "host": self.host_info,
@@ -522,6 +522,57 @@ def make_handler(state: BrainState):
                 elif session.get("success"):
                     state.soul.on_ability_level_up(session["title"], session["cap_after"])
                 self._send_json({"session": session, "abilities": state.abilities.snapshot(), "status": state.full_status()})
+                return
+
+            if route == "/api/evo/trace-chat":
+                spec_id = str(body.get("specimen_id") or "xor_rot_vault").strip()
+                code = str(body.get("code") or "")
+                message = str(body.get("message") or "").strip()
+                spec = state.evo_forge._resolve_spec(spec_id)
+                cur = code or spec["initial_buggy_code"]
+                diag = state.evo_forge.audit_code(spec_id, cur)["diagnosis"]
+                findings = diag.get("findings", [])
+                toxins = [f for f in findings if f.get("severity") == "toxin"]
+                sandbox = diag.get("sandbox")
+                bp = spec.get("blueprint", {})
+                if not message:
+                    reply = "히잇! 저는 🔍 원인 역추적 돋보기 기관이에요! \'왜 깨졌어?\', \'몇 번째 줄?\', \'복어독?\', \'어떻게 고쳐?\', \'원리 공식?\', \'유리방 결과?\' 라고 물어봐 주세요!"
+                elif any(k in message for k in ("왜", "원인", "깨졌", "이유", "틀렸")):
+                    if findings:
+                        lines = "\n".join(f"· {f.get('line')}번째 줄 — {f.get('badge')}: {f.get('root_cause')}" for f in findings[:3])
+                        reply = f"🔍 역추적 완료! 돋보기로 파고든 깨진 원인들은 이래요:\n{lines}"
+                    else:
+                        reply = "🔍 돋보기로 역추적했는데 균열이 없어요! 이 코드는 지금 깨끗한 상태랍니다."
+                elif any(k in message for k in ("어디", "몇 번째", "줄번", "위치")):
+                    reply = ("🔍 범인 줄 목록: " + ", ".join(f"{f.get('line')}줄" for f in findings)) if findings else "🔍 범인 줄 없음! 모든 줄이 결백해요."
+                elif any(k in message for k in ("복어", "독", "위험", "보안")):
+                    if toxins:
+                        reply = f"🐡 복어 독 {len(toxins)}건 격리 중: " + " / ".join(f["root_cause"] for f in toxins) + " — AST 게이트가 실행을 이미 차단했어요!"
+                    else:
+                        reply = "🐡 복어 독 0건! 지금 코드는 깨끗한 밥상이에요."
+                elif any(k in message for k in ("어떻게 고", "고쳐", "수리", "해결", "방법")):
+                    hints = [f.get("fix_hint") for f in findings if f.get("fix_hint")]
+                    reply = ("🩹 처방전: " + " / ".join(hints[:3])) if hints else "🩹 처방전 필요 없음! 지금 [🧩 우리 뇌에 지금 이식 적용] 을 눌러도 완벽해요."
+                    reply += " [🩹 5단계: 자동 수리 & 유리방 시험] 을 누르면 제가 직접 고쳐 유리방 6/6 을 확인해요!"
+                elif any(k in message for k in ("원리", "공식", "설계도", "원본", "블루프린트")):
+                    reply = (
+                        f"🧬 핵심 공식: {bp.get('core_formula')} | 입력: {bp.get('inputs')} | 출력: {bp.get('outputs')} | "
+                        "불변식: " + " / ".join(bp.get("invariants", [])) + f" | 성좌 감수: {bp.get('mentor_comment')}"
+                    )
+                elif any(k in message for k in ("테스트", "유리방", "쌍둥이", "통과")):
+                    if sandbox:
+                        fails = [r["name"] for r in sandbox.get("results", []) if not r["passed"]]
+                        reply = f"🧪 유리방 쌍둥이 대조: {sandbox['passed_count']}/{sandbox['total_count']} 통과 ({sandbox['pass_rate_pct']}%)."
+                        reply += f" 떨어진 테스트: {', '.join(fails)}" if fails else " 쌍둥이 전부 손잡았어요!"
+                    else:
+                        reply = "🧪 유리방은 복어 독 때문에 현재 봉인 중 — 독 제거 후 열려요!"
+                else:
+                    reply = (
+                        f"🔍 현재 진단 요약: 결함 {len(findings)}건 (복어독 {len(toxins)}) / 유리방 "
+                        + (f"{sandbox['pass_rate_pct']}%" if sandbox else "봉인")
+                        + ". '왜 / 어디 / 복어독 / 어떻게 고쳐 / 원리 / 테스트' 를 더 물어봐 주세요!"
+                    )
+                self._send_json({"reply": reply, "findings": len(findings), "toxins": len(toxins), "pass_rate": (sandbox or {}).get("pass_rate_pct")})
                 return
 
             if route == "/api/evo/heartbeat/chat":

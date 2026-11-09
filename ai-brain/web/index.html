@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>시냅스몽 · 나만의 양자화 AI 두뇌 연구소</title>
-  <link rel="stylesheet" href="ui-v3.css?v=6.3" />
+  <link rel="stylesheet" href="ui-v3.css?v=6.4" />
   <!--__INITIAL_STATE__-->
 </head>
 <body>
@@ -487,6 +487,28 @@
                 <button class="ghost-btn accent" id="btnEvoTestCustom" type="button">🧪 내 직접 수정 코드 검증</button>
               </div>
 
+              <!-- 📎 첨부 업로드창 + 🧩 우리 뇌 이식 적용 + 🔍 원인 역추적 대화창 (주인님 워크벤치 3종) -->
+              <div class="workbench-trio">
+                <div class="trio-upload">
+                  <div class="vb-head">📎 첨부파일 업로드창 — 내 코드(.py/.txt)나 바이너리(.elf/.exe/.bin)를 첨부하세요!</div>
+                  <div class="trio-upload-row">
+                    <button class="ghost-btn" id="btnBenchUpload" type="button">📎 파일 첨부</button>
+                    <span class="upload-filename" id="benchUploadName">첨부된 파일 없음</span>
+                    <input type="file" id="benchFileInput" class="hidden" accept=".py,.txt,.md,.elf,.exe,.bin" />
+                  </div>
+                  <div class="trio-hint">코드 파일은 3단계 편집창에 그대로 착륙! 바이너리는 1단계 X-Ray 해부 후 이식 초안으로 번역돼요. (업로드 즉시 4단계 돋보기 자동 가동!)</div>
+                </div>
+                <button class="primary-btn full port-btn" id="btnBenchPort" type="button">🧩 우리 뇌에 지금 이식 적용 — 편집창 코드 유리방 검증 + 영구 이식 (.py + .sbrain + 위키)</button>
+                <div class="trace-chat">
+                  <div class="heart-chat-head">🔍 원인 역추적 대화창 — 돋보기 기관(기관③)에게 무엇이든 물어보세요! (예: "왜 깨졌어?", "복어독 있어?", "어떻게 고쳐?", "원리 공식 알려줘")</div>
+                  <div class="trace-chat-log" id="traceChatLog"></div>
+                  <div class="heart-chat-bar">
+                    <input type="text" id="traceChatInput" class="input-field" placeholder="원인 역추적 질문을 적고 Enter..." />
+                    <button class="secondary-btn" id="btnTraceChat" type="button">🔍 역추적</button>
+                  </div>
+                </div>
+              </div>
+
               <!-- 4단계: 기관 ③ 원인 역추적 돋보기 + 기관 ⑤a 복어 독 제거기 -->
               <div class="evo-panel-box" id="evoAuditBox" style="margin-top:9px">
                 <strong>[🔍 4단계: 잘못된 곳 · 복어독 찾기]</strong>를 누르면 정확한 줄 번호와 깨진 원인을 콕 집어냅니다.
@@ -870,6 +892,6 @@
     </div>
   </div>
 
-  <script src="ui-v3.js?v=6.3"></script>
+  <script src="ui-v3.js?v=6.4"></script>
 </body>
 </html>

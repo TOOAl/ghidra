@@ -24,7 +24,6 @@ const SNACK_SAMPLES = {
 };
 
 let graphState = { nodes: [], edges: [], selectedId: null, dragNode: null };
-let manualPoseOverride = null;
 let selectedBits = 4;
 let selectedDim = 64;
 
@@ -64,14 +63,11 @@ function setPetPose(poseKey) {
   if (img && !img.getAttribute("src").endsWith(`${valid}.jpg`)) {
     img.setAttribute("src", `assets/${valid}.jpg`);
   }
-  document.querySelectorAll(".pose-btn").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.pose === valid);
-  });
 }
 
 function renderStatus(data) {
   if (!data || !data.soul) return;
-  const { soul, host, forged_brains, graph } = data;
+  const { soul, hallucination, host, forged_brains, graph } = data;
 
   document.getElementById("petStageBadge").textContent =
     `Lv.${soul.level} ${soul.stage_emoji} ${soul.stage_title}`;
@@ -80,9 +76,7 @@ function renderStatus(data) {
   document.getElementById("badgeIq").textContent = soul.iq;
   document.getElementById("petSpeech").textContent = soul.speech;
 
-  if (!manualPoseOverride) {
-    setPetPose(soul.pose || "01_greet");
-  }
+  setPetPose(soul.pose || "01_greet");
 
   document.getElementById("barSatiety").style.width = `${soul.satiety}%`;
   document.getElementById("valSatiety").textContent = `${soul.satiety}%`;
@@ -92,6 +86,23 @@ function renderStatus(data) {
   const xpPct = soul.next_xp > 0 ? Math.min(100, Math.round((soul.xp / soul.next_xp) * 100)) : 100;
   document.getElementById("barXp").style.width = `${xpPct}%`;
   document.getElementById("valXp").textContent = `${soul.xp}/${soul.next_xp}`;
+
+  // Brain Hallucination Risk & Grounding Gauge
+  if (hallucination) {
+    const hGrade = hallucination.grade || "safe";
+    const hBadge = document.getElementById("hallucBadge");
+    const hBar = document.getElementById("barHalluc");
+    hBadge.className = `halluc-badge ${hGrade}`;
+    hBadge.textContent = hallucination.label || `안심 · ${hallucination.risk_pct}%`;
+    hBar.className = `v-fill halluc-${hGrade}`;
+    hBar.style.width = `${hallucination.risk_pct}%`;
+
+    const qText = hallucination.quant_fidelity_pct > 0
+      ? `양자화 보존 ${hallucination.quant_fidelity_pct}%`
+      : "주조 전 기본 상태";
+    document.getElementById("hallucMeta").textContent =
+      `시냅스 검증 ${hallucination.link_verified_pct}% · ${qText} · 억지추측 차단 ON`;
+  }
 
   // Environment Telemetry Cockpit
   const env = (host && host.environment) || {};
@@ -384,18 +395,8 @@ function setupInteractions() {
     });
   });
 
-  // 8-Cut Pose Switcher
-  document.querySelectorAll(".pose-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      manualPoseOverride = btn.dataset.pose;
-      setPetPose(manualPoseOverride);
-      pulsePortrait();
-    });
-  });
-
-  // Poke / Interact
+  // Poke / Interact (pose updates automatically from soul state)
   const doPoke = async () => {
-    manualPoseOverride = null;
     pulsePortrait();
     const res = await apiPost("api/poke");
     if (res.status) renderStatus(res.status);
@@ -408,7 +409,6 @@ function setupInteractions() {
     const current = document.getElementById("petName").textContent;
     const next = window.prompt("시냅스몽의 새 이름을 입력해 주세요:", current);
     if (next && next.trim()) {
-      manualPoseOverride = null;
       pulsePortrait();
       const res = await apiPost("api/rename", { name: next.trim() });
       if (res.status) renderStatus(res.status);
@@ -434,7 +434,6 @@ function setupInteractions() {
       statusEl.textContent = "먼저 기억시킬 내용을 입력해 주세요.";
       return;
     }
-    manualPoseOverride = null;
     setPetPose("03_swirl");
     statusEl.textContent = "소용돌이 시냅스로 소화 중...";
     const res = await apiPost("api/feed", { title, text });
@@ -491,7 +490,6 @@ function setupInteractions() {
   // Forge Custom Quantized Brain (.sbrain)
   document.getElementById("btnForge").addEventListener("click", async () => {
     const box = document.getElementById("forgeResult");
-    manualPoseOverride = null;
     setPetPose("03_swirl");
     box.classList.remove("hidden");
     box.innerHTML = "내 위키 어휘로 신경망 가중치를 빚고 블록 양자화 눈금으로 깎는 중...";
@@ -511,7 +509,7 @@ function setupInteractions() {
     }
   });
 
-  // Chat
+  // Chat (with Real-Time Hallucination & Grounding Audit)
   const sendQuestion = async (qText) => {
     const input = document.getElementById("chatInput");
     const question = (qText || input.value).trim();
@@ -533,22 +531,34 @@ function setupInteractions() {
     log.appendChild(bRow);
     log.scrollTop = log.scrollHeight;
 
-    manualPoseOverride = null;
     setPetPose("02_curious");
     const res = await apiPost("api/chat", { question });
     pulsePortrait();
 
     const bubble = bRow.querySelector(".msg-bubble");
     const avatar = bRow.querySelector(".msg-avatar");
-    avatar.src = "assets/06_star.jpg";
+    const audit = res.hallucination_audit || {};
+    const aGrade = audit.grade || "safe";
 
-    const recalledHtml = (res.recalled || []).length
-      ? `<div class="recall-strip">
-           <span>📌 인출한 기억 (토큰 ${res.saved_tokens_pct}% 절약):</span>
-           ${res.recalled.map((r) => `<code>[[${escapeHtml(r.title)}]]</code>`).join(" ")}
-         </div>`
+    avatar.src = audit.shield_triggered
+      ? "assets/04_brainstorm.jpg"
+      : aGrade === "caution"
+      ? "assets/02_curious.jpg"
+      : "assets/07_eureka.jpg";
+
+    const auditHtml = audit.badge
+      ? `<span class="audit-pill ${aGrade}">${escapeHtml(audit.badge)}</span>`
       : "";
-    bubble.innerHTML = `${escapeHtml(res.answer || "응답을 불러오지 못했습니다.")}${recalledHtml}`;
+    const recallCardsHtml = (res.recalled || []).length
+      ? `<span>📌 인출 기억 (토큰 ${res.saved_tokens_pct}% 절약):</span> ` +
+        res.recalled.map((r) => `<code>[[${escapeHtml(r.title)}]]</code>`).join(" ")
+      : "";
+    const reasonHtml = audit.reason
+      ? `<span class="audit-reason">${escapeHtml(audit.reason)}</span>`
+      : "";
+
+    const footerHtml = `<div class="recall-strip">${auditHtml} ${recallCardsHtml} ${reasonHtml}</div>`;
+    bubble.innerHTML = `${escapeHtml(res.answer || "응답을 불러오지 못했습니다.")}${footerHtml}`;
     log.scrollTop = log.scrollHeight;
     if (res.status) renderStatus(res.status);
   };

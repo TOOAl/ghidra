@@ -312,46 +312,10 @@ html, body {
   font-variant-numeric: tabular-nums;
 }
 
-/* 8-cut Pose Dock */
-.pose-dock {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 3px;
-  margin-top: 7px;
-  padding: 3px;
-  background: var(--bg-well);
-  border: 1px solid var(--border);
-  border-radius: 9px;
-}
-
-.pose-btn {
-  appearance: none;
-  background: transparent;
-  color: var(--text-muted);
-  border: none;
-  border-radius: 6px;
-  padding: 4px 1px;
-  font-size: 10.5px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.14s ease;
-}
-
-.pose-btn:hover {
-  color: var(--text-main);
-}
-
-.pose-btn.active {
-  background: rgba(124, 111, 246, 0.28);
-  color: #ffffff;
-  font-weight: 700;
-  box-shadow: 0 1px 6px rgba(124, 111, 246, 0.3);
-}
-
 /* Speech Bubble */
 .speech-bubble {
-  margin: 9px 0 11px;
-  padding: 8px 11px;
+  margin: 10px 0 11px;
+  padding: 9px 11px;
   background: var(--bg-elev);
   border: 1px solid var(--border);
   border-left: 3px solid var(--violet);
@@ -398,15 +362,76 @@ html, body {
   transition: width 0.35s ease;
 }
 
-.v-fill.satiety { background: linear-gradient(90deg, #059669, #34d399); }
-.v-fill.mood    { background: linear-gradient(90deg, #d97706, #fbbf24); }
-.v-fill.xp      { background: linear-gradient(90deg, #6d5efc, #c084fc); }
+.v-fill.satiety     { background: linear-gradient(90deg, #059669, #34d399); }
+.v-fill.mood        { background: linear-gradient(90deg, #d97706, #fbbf24); }
+.v-fill.xp          { background: linear-gradient(90deg, #6d5efc, #c084fc); }
+.v-fill.halluc-safe    { background: linear-gradient(90deg, #10b981, #38bdf8); }
+.v-fill.halluc-caution { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.v-fill.halluc-high    { background: linear-gradient(90deg, #e11d48, #fb7185); }
 
 .v-num {
   text-align: right;
   font-size: 11.5px;
   font-weight: 700;
   color: #f8fafc;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hallucination Telemetry inside Vitals Box */
+.halluc-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 3px 0 2px;
+}
+
+.halluc-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+
+.halluc-title {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.halluc-title small {
+  font-weight: 400;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.halluc-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+
+.halluc-badge.safe {
+  background: rgba(16, 185, 129, 0.16);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.halluc-badge.caution {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fcd34d;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.halluc-badge.high {
+  background: rgba(244, 63, 94, 0.18);
+  color: #fda4af;
+  border: 1px solid rgba(244, 63, 94, 0.45);
+}
+
+.halluc-meta {
+  font-size: 10.5px;
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 
@@ -806,6 +831,16 @@ html, body {
   color: #ffffff;
 }
 
+.preset-chip.test-warn {
+  border-color: rgba(245, 185, 66, 0.38);
+  color: #fde68a;
+}
+
+.preset-chip.test-warn:hover {
+  background: rgba(245, 185, 66, 0.16);
+  border-color: rgba(245, 185, 66, 0.65);
+}
+
 .composer {
   display: flex;
   flex-direction: column;
@@ -1181,12 +1216,49 @@ html, body {
 .recall-strip {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 8px;
-  padding-top: 7px;
+  align-items: center;
+  gap: 6px;
+  margin-top: 9px;
+  padding-top: 8px;
   border-top: 1px dashed var(--border);
   font-size: 11px;
   color: var(--text-muted);
+}
+
+.audit-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.audit-pill.safe {
+  background: rgba(16, 185, 129, 0.16);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.38);
+}
+
+.audit-pill.caution {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fcd34d;
+  border: 1px solid rgba(245, 158, 11, 0.38);
+}
+
+.audit-pill.high {
+  background: rgba(244, 63, 94, 0.18);
+  color: #fda4af;
+  border: 1px solid rgba(244, 63, 94, 0.45);
+}
+
+.audit-reason {
+  display: block;
+  width: 100%;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
 }
 
 .chat-input-bar {

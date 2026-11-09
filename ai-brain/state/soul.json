@@ -1,12 +1,12 @@
 {
   "name": "시냅스몽",
   "born_at": "2026-11-09T08:37:11Z",
-  "xp": 60,
+  "xp": 76,
   "satiety": 80,
   "mood": 100,
-  "pose": "07_eureka",
+  "pose": "01_greet",
   "last_fed_ts": 1794213431.4215264,
-  "last_interaction_ts": 1794213431.4215264,
+  "last_interaction_ts": 1794214293.8550096,
   "memories_eaten": 4,
   "questions_answered": 0,
   "brains_forged": 1,
@@ -17,7 +17,7 @@
   "hosts_visited": [
     "e2b.local (Linux-x86_64-2c)"
   ],
-  "last_speech": "짜잔! 내 위키 지식으로 직접 4비트 독자 두뇌(.sbrain)를 구워냈어요! 용량 84.4% 절감, 정밀도 99.77% 보존 성공! (+30 XP)",
+  "last_speech": "안녕 주인님! 이제 제 기분과 표정은 스스로 바뀌고, 환각 방어막으로 아는 것과 모르는 것을 정확히 구분해요!",
   "recent_events": [
     {
       "time": "2026-11-09T08:37:20Z",
@@ -31,5 +31,6 @@
       "time": "2026-11-09T08:37:11Z",
       "text": "외장하드 포터블 서식지(ai-brain)에서 첫 탄생"
     }
-  ]
+  ],
+  "recent_hallucination_checks": []
 }

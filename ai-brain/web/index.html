@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>시냅스몽 · 나만의 양자화 AI 두뇌 연구소</title>
-  <link rel="stylesheet" href="ui-v3.css?v=3.0" />
+  <link rel="stylesheet" href="ui-v3.css?v=3.1" />
   <!--__INITIAL_STATE__-->
 </head>
 <body>
@@ -56,24 +56,12 @@
         </div>
       </div>
 
-      <!-- 3. 8컷 장면 미니 도크 -->
-      <div class="pose-dock" id="poseStrip" role="group" aria-label="시냅스몽 8가지 모습">
-        <button class="pose-btn active" data-pose="01_greet" type="button">인사</button>
-        <button class="pose-btn" data-pose="02_curious" type="button">호기심</button>
-        <button class="pose-btn" data-pose="03_swirl" type="button">흡수</button>
-        <button class="pose-btn" data-pose="04_brainstorm" type="button">고민</button>
-        <button class="pose-btn" data-pose="05_drop" type="button">영감</button>
-        <button class="pose-btn" data-pose="06_star" type="button">별연결</button>
-        <button class="pose-btn" data-pose="07_eureka" type="button">유레카</button>
-        <button class="pose-btn" data-pose="08_journey" type="button">여정</button>
-      </div>
-
-      <!-- 4. 말풍선 -->
+      <!-- 3. 말풍선 (상황·감정에 따라 8가지 모습이 자동으로 바뀝니다) -->
       <div class="speech-bubble" id="petSpeech">
         안녕 주인님! 외장하드 집에서 반짝이며 깨어났어요.
       </div>
 
-      <!-- 5. 핵심 생명 상태바 3종 -->
+      <!-- 4. 핵심 생명 상태바 3종 + 두뇌 환각 위험도 계측기 -->
       <div class="vitals-box">
         <div class="vital-row">
           <span class="v-label">지식 포만감</span>
@@ -89,6 +77,19 @@
           <span class="v-label">성장 경험치</span>
           <div class="v-bar"><div class="v-fill xp" id="barXp" style="width:60%"></div></div>
           <strong class="v-num" id="valXp">30/50</strong>
+        </div>
+
+        <!-- 두뇌 환각 위험도 & 근거 신뢰도 게이지 -->
+        <div class="halluc-divider"></div>
+        <div class="halluc-head">
+          <span class="halluc-title">🛡️ 두뇌 환각 위험도 <small>(낮을수록 정확)</small></span>
+          <span class="halluc-badge safe" id="hallucBadge">안심 · 11%</span>
+        </div>
+        <div class="v-bar">
+          <div class="v-fill halluc-safe" id="barHalluc" style="width:11%"></div>
+        </div>
+        <div class="halluc-meta" id="hallucMeta">
+          시냅스 검증 100% · 양자화 보존 99.8% · 억지추측 차단 ON
         </div>
       </div>
 
@@ -346,6 +347,7 @@
               <button class="preset-chip" data-q="외장하드에 사는 시냅스몽은 어떻게 다른 컴퓨터에서도 그대로 깨어나?" type="button">외장하드 서식 원리</button>
               <button class="preset-chip" data-q="외부 모델을 그대로 안 쓰고 우리만의 양자화 두뇌를 어떻게 만들어?" type="button">자체 양자화 전략</button>
               <button class="preset-chip" data-q="Ghidra 헤드리스 분석이랑 어떻게 연결될 예정이야?" type="button">Ghidra 역공학 결합</button>
+              <button class="preset-chip test-warn" data-q="2099년 화성 올림픽 우승국은 어디야?" type="button">🧪 환각 방어 테스트</button>
             </div>
           </div>
 
@@ -367,6 +369,6 @@
     </section>
   </main>
 
-  <script src="ui-v3.js?v=3.0"></script>
+  <script src="ui-v3.js?v=3.1"></script>
 </body>
 </html>

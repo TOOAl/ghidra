@@ -428,33 +428,43 @@ class WikiGardener:
             return {"recalled": [], "total_notes": 0, "saved_tokens_pct": 0}
 
         q_lower = query.lower()
-        q_terms = extract_keywords(query, top_k=10)
+        # Strip generic question endings in Korean so real topic words stand out
+        cleaned_q = re.sub(
+            r"(무엇인가요|무엇이야|뭐야|어떻게|어디야|누구야|알려줘|설명해줘|궁금해|있어|할까|인가요|예정이야|원리가|전략이)",
+            " ",
+            q_lower,
+        )
+        q_terms = extract_keywords(cleaned_q, top_k=8) or extract_keywords(query, top_k=8)
         scored: List[Tuple[float, Dict[str, Any]]] = []
+        matched_term_set: Set[str] = set()
+
         for n in notes:
             hay = f"{n['title']} {' '.join(n['tags'])} {n['category']} {n['summary']} {n['body']}".lower()
             score = 0.0
             for term in q_terms:
                 if term in n["title"].lower():
                     score += 5.0
+                    matched_term_set.add(term)
                 if any(term in tg.lower() for tg in n["tags"]):
                     score += 4.0
+                    matched_term_set.add(term)
                 occurrences = hay.count(term)
                 if occurrences > 0:
                     score += 1.5 * (1.0 + math.log(occurrences))
-            if score == 0.0 and any(ch in hay for ch in q_lower.split() if len(ch) >= 2):
-                score += 1.0
+                    matched_term_set.add(term)
             scored.append((score, n))
 
         scored.sort(key=lambda x: x[0], reverse=True)
+        top_score = round(scored[0][0], 2) if scored else 0.0
         max_cards = min(limit, max(1, len(notes) - 2)) if len(notes) >= 4 else limit
-        primary = [n for sc, n in scored if sc > 0][:max_cards]
-        if not primary:
-            primary = [n for _, n in scored[:1]]
+
+        # Never fabricate unrelated recall when score == 0 (prevents hallucination!)
+        primary = [n for sc, n in scored if sc >= 1.5][:max_cards]
 
         # 1-hop graph expansion along [[Wiki Links]] when vault grows larger
         recalled_slugs = {n["slug"] for n in primary}
         recalled = list(primary)
-        if len(notes) >= 6:
+        if primary and len(notes) >= 6:
             title_map = {n["title"]: n for n in notes}
             for p in primary:
                 if len(recalled) >= max_cards + 1:
@@ -468,9 +478,15 @@ class WikiGardener:
 
         total_chars = sum(len(n["body"]) for n in notes) or 1
         used_chars = sum(len(n["body"]) for n in recalled)
-        saved_pct = max(0, min(95, round((1.0 - used_chars / total_chars) * 100)))
+        saved_pct = max(0, min(95, round((1.0 - used_chars / total_chars) * 100))) if recalled else 100
+        missing_terms = [t for t in q_terms if t not in matched_term_set]
+
         return {
             "recalled": recalled,
             "total_notes": len(notes),
             "saved_tokens_pct": saved_pct,
+            "top_score": top_score,
+            "query_terms": q_terms,
+            "matched_terms": sorted(matched_term_set),
+            "missing_terms": missing_terms,
         }

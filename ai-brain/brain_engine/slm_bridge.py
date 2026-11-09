@@ -148,30 +148,28 @@ class PortableSLMBridge:
             except Exception:
                 pass
 
-        # Built-in Synapse Graph Memory Synthesizer (works 100% offline even before GGUF download!)
+        # Built-in Synapse Graph Memory Synthesizer (100% grounded, zero fabrication!)
         if not recalled:
             answer = (
-                "아직 제 위키 기억 주머니에 이 질문과 연결된 메모가 없어요! "
-                "왼쪽 **'밥 주기 (지식·메모 먹이기)'** 칸에 주인님의 생각이나 노트를 던져주시면 즉시 시냅스로 기억할게요."
+                "🛑 **[환각 방어막 작동 — 억지 추측 차단]**\n"
+                "방금 물어보신 내용은 아직 제 마크다운 위키 기억망(`vault/`)에 적혀 있지 않아요!\n\n"
+                "거대 AI처럼 그럴듯한 거짓말(환각)을 지어내는 대신 솔직하게 **'아직 모르는 내용'** 이라고 말씀드립니다. "
+                "상단 **「🌱 지식 먹이기」** 탭에 관련 내용을 한 줄만 넣어주시면 즉시 시냅스로 기억해 정확히 답할게요!"
             )
         else:
             lines = [
-                f"🧠 **내 머릿속 위키 그물망에서 관련 기억 카드 {len(recalled)}개**를 찾아 정리했어요 "
-                f"*(전체 지식 대비 약 {recall_bundle.get('saved_tokens_pct', 0)}% 읽기 비용 절약!)*:\n"
+                f"🧠 **위키 기억망에서 검증된 근거 카드 {len(recalled)}개**를 찾아 정리했어요 "
+                f"*(전체 문서 대비 {recall_bundle.get('saved_tokens_pct', 0)}% 읽기 절약)*:\n"
             ]
             for n in recalled:
-                lines.append(f"- **[[{n['title']}]]** *({n['category']})*: {n['summary']}")
+                lines.append(f"• **[[{n['title']}]]** *({n['category']})*: {n['summary']}")
             connected = []
             for n in recalled:
                 for lk in n["links"]:
                     if lk not in connected and all(r["title"] != lk for r in recalled):
                         connected.append(lk)
             if connected:
-                lines.append(f"\n🔗 **함께 이어지는 시냅스 고리**: " + ", ".join(f"`[[{c}]]`" for c in connected[:4]))
-            lines.append(
-                "\n💡 *참고: 지금 샌드박스에서는 무설치 '시냅스 기억 합성 모드'로 답하고 있어요. "
-                "외장하드에 4비트/8비트 GGUF 모델(Gemma 4 E2B 또는 Qwen 0.8B)을 넣으면 같은 기억을 읽고 자유로운 문장 추론까지 수행합니다!*"
-            )
+                lines.append(f"\n🔗 **연결된 시냅스 고리**: " + ", ".join(f"`[[{c}]]`" for c in connected[:4]))
             answer = "\n".join(lines)
 
         return {"answer": answer, "engine": engine}

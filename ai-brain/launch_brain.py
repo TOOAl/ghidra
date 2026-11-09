@@ -20,6 +20,10 @@ from urllib.parse import parse_qs, urlparse
 BRAIN_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(BRAIN_ROOT))
 
+from brain_engine.hallucination import (  # noqa: E402
+    audit_chat_grounding,
+    evaluate_brain_hallucination,
+)
 from brain_engine.host_probe import probe_host  # noqa: E402
 from brain_engine.quant_forge import CustomBrainForge, dissect_architecture  # noqa: E402
 from brain_engine.slm_bridge import PortableSLMBridge  # noqa: E402
@@ -40,13 +44,18 @@ class BrainState:
 
     def full_status(self) -> Dict[str, Any]:
         self.host_info = probe_host(self.root)
+        notes = self.gardener.list_notes()
         graph = self.gardener.get_graph()
+        forged = self.forge.list_forged_brains()
         env_grade = self.host_info.get("environment", {}).get("grade", "optimal")
+        recent_checks = self.soul.data.get("recent_hallucination_checks", [])
+        hallucination = evaluate_brain_hallucination(notes, forged, recent_checks)
         return {
             "soul": self.soul.snapshot(graph["stats"], env_grade=env_grade),
+            "hallucination": hallucination,
             "host": self.host_info,
             "engine": self.slm.detect_active_engine(),
-            "forged_brains": self.forge.list_forged_brains(),
+            "forged_brains": forged,
             "graph": graph,
             "roadmap": {
                 "stage_a": {"status": "active", "title": "A단계: 마크다운 위키 & 자체 양자화 주조"},
@@ -165,12 +174,14 @@ def make_handler(state: BrainState):
                     self._send_json({"error": "질문을 입력해 주세요!"}, status=400)
                     return
                 recall_bundle = state.gardener.recall_memories(question, limit=2)
+                audit = audit_chat_grounding(question, recall_bundle)
                 result = state.slm.answer_with_memories(question, recall_bundle)
-                state.soul.on_chat(len(recall_bundle["recalled"]))
+                state.soul.on_chat(len(recall_bundle["recalled"]), risk_pct=audit["risk_pct"])
                 self._send_json(
                     {
                         "answer": result["answer"],
                         "engine": result["engine"],
+                        "hallucination_audit": audit,
                         "recalled": [
                             {"slug": n["slug"], "title": n["title"], "category": n["category"]}
                             for n in recall_bundle["recalled"]

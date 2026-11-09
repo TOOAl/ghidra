@@ -140,15 +140,32 @@ class TamagotchiSoul:
         self._log_event(f"지식 섭취: [{title}] (연결 +{links_count}, XP +{gained_xp})")
         self._save()
 
-    def on_chat(self, recalled_count: int) -> None:
+    def on_chat(self, recalled_count: int, risk_pct: int = 10) -> None:
         self.data["xp"] = int(self.data.get("xp", 0)) + 8
-        self.data["mood"] = min(100, int(self.data.get("mood", 75)) + 5)
         self.data["last_interaction_ts"] = time.time()
         self.data["questions_answered"] = int(self.data.get("questions_answered", 0)) + 1
-        self.data["pose"] = "07_eureka"
-        self.data["last_speech"] = (
-            f"유레카! 내 위키 그물망에서 핵심 기억 카드 {recalled_count}개를 찾아 답을 완성했어요! (+8 XP)"
-        )
+
+        checks: List[int] = self.data.setdefault("recent_hallucination_checks", [])
+        checks.append(int(risk_pct))
+        del checks[:-8]
+
+        if recalled_count == 0 or risk_pct >= 60:
+            self.data["pose"] = "04_brainstorm"
+            self.data["last_speech"] = (
+                "흠냐... 위키 기억에 없는 내용이라 지어내지 않고 솔직하게 환각 방어막을 켰어요! 관련 지식을 먹여주실래요?"
+            )
+        elif risk_pct >= 25:
+            self.data["mood"] = min(100, int(self.data.get("mood", 75)) + 3)
+            self.data["pose"] = "02_curious"
+            self.data["last_speech"] = (
+                f"확인된 기억 {recalled_count}개 범위 안에서 조심스럽게 답했어요! 부족한 부분은 더 공부할게요."
+            )
+        else:
+            self.data["mood"] = min(100, int(self.data.get("mood", 75)) + 5)
+            self.data["pose"] = "07_eureka"
+            self.data["last_speech"] = (
+                f"유레카! 위키 기억 카드 {recalled_count}개 근거를 100% 검증해 환각 없이 답했어요! (+8 XP)"
+            )
         self._save()
 
     def on_forge_brain(self, bits: int, saved_pct: float, cos_sim: float) -> None:

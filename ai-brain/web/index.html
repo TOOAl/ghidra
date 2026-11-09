@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>시냅스몽 · 나만의 양자화 AI 두뇌 연구소</title>
-  <link rel="stylesheet" href="ui-v3.css?v=3.3" />
+  <link rel="stylesheet" href="ui-v3.css?v=3.4" />
   <!--__INITIAL_STATE__-->
 </head>
 <body>
@@ -79,27 +79,26 @@
           <strong class="v-num" id="valXp">30/50</strong>
         </div>
 
-        <!-- 두뇌 환각 위험도 & 맞춤 저감 처방 바로가기 -->
+        <!-- 두뇌 환각 위험도 & 맞춤 저감 처방 -->
         <div class="halluc-divider"></div>
         <div class="halluc-head">
           <span class="halluc-title">🛡️ 두뇌 환각 위험도</span>
-          <div class="halluc-right">
-            <span class="halluc-badge safe" id="hallucBadge">안심 · 10%</span>
-            <button class="halluc-clinic-btn" id="btnOpenClinic" type="button" title="환각 원인을 분석하고 줄이는 처방창을 엽니다">
-              🩺 처방창
-            </button>
-            <button class="halluc-test-btn" id="btnQuickHallucTest" type="button" title="없는 지식을 물어봐서 억지 추측을 막는지 실험합니다">
-              🧪 테스트
-            </button>
-          </div>
+          <span class="halluc-badge safe" id="hallucBadge">안심 · 10%</span>
         </div>
         <div class="v-bar">
           <div class="v-fill halluc-safe" id="barHalluc" style="width:10%"></div>
         </div>
-        <button class="halluc-tip-row" id="btnTopTipOpenClinic" type="button">
-          <span id="hallucTopTip">💡 처방 제안: 고정밀 INT8 재주조 및 취약 분야 보강 가능</span>
-          <span class="tip-arrow">처방 보기 ›</span>
-        </button>
+        <p class="halluc-tip-text" id="hallucTopTip">
+          💡 맞춤 처방: 고정밀 INT8 재주조 및 취약 분야 보강 가능
+        </p>
+        <div class="halluc-btn-grid">
+          <button class="halluc-action-btn clinic" id="btnOpenClinic" type="button">
+            🩺 환각 처방창 열기
+          </button>
+          <button class="halluc-action-btn test" id="btnQuickHallucTest" type="button">
+            🧪 방어 테스트 실행
+          </button>
+        </div>
       </div>
 
       <!-- 6. 요청하신 '작업 환경 상태창' (3대 상태바 바로 아래, 계기판 타일형) -->

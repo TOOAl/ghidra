@@ -513,9 +513,8 @@ function setupInteractions() {
     btn.addEventListener("click", () => switchTab(btn.dataset.tab));
   });
 
-  // Open Clinic shortcuts from Left Bio-Capsule
+  // Open Clinic shortcut from Left Bio-Capsule
   document.getElementById("btnOpenClinic").addEventListener("click", () => switchTab("tab-clinic"));
-  document.getElementById("btnTopTipOpenClinic").addEventListener("click", () => switchTab("tab-clinic"));
 
   // Poke / Interact (pose updates automatically from soul state)
   const doPoke = async () => {

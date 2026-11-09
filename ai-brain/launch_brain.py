@@ -49,7 +49,10 @@ class BrainState:
         forged = self.forge.list_forged_brains()
         env_grade = self.host_info.get("environment", {}).get("grade", "optimal")
         recent_checks = self.soul.data.get("recent_hallucination_checks", [])
-        hallucination = evaluate_brain_hallucination(notes, forged, recent_checks)
+        recent_missing = self.soul.data.get("recent_missing_topics", [])
+        hallucination = evaluate_brain_hallucination(
+            notes, forged, recent_checks, recent_missing_topics=recent_missing
+        )
         return {
             "soul": self.soul.snapshot(graph["stats"], env_grade=env_grade),
             "hallucination": hallucination,
@@ -176,7 +179,11 @@ def make_handler(state: BrainState):
                 recall_bundle = state.gardener.recall_memories(question, limit=2)
                 audit = audit_chat_grounding(question, recall_bundle)
                 result = state.slm.answer_with_memories(question, recall_bundle)
-                state.soul.on_chat(len(recall_bundle["recalled"]), risk_pct=audit["risk_pct"])
+                state.soul.on_chat(
+                    len(recall_bundle["recalled"]),
+                    risk_pct=audit["risk_pct"],
+                    missing_terms=audit.get("missing_terms", []),
+                )
                 self._send_json(
                     {
                         "answer": result["answer"],
@@ -203,6 +210,28 @@ def make_handler(state: BrainState):
                     cos_sim=record["cosine_similarity_pct"],
                 )
                 self._send_json({"forged": record, "status": state.full_status()})
+                return
+
+            if route == "/api/remedy":
+                action = str(body.get("action") or "").strip()
+                if action == "relink_synapses":
+                    res = state.gardener.weave_missing_synapses()
+                    added = res["added_pairs"]
+                    msg = (
+                        f"시냅스 그물망을 점검해 새로운 교차검증 고리 {added}쌍을 엮었어요!"
+                        if added > 0
+                        else "모든 노트의 시냅스 교차검증 그물망을 재정비 완료했어요!"
+                    )
+                    state.soul.on_remedy(msg)
+                    self._send_json({"remedy": res, "message": msg, "status": state.full_status()})
+                    return
+                if action == "reset_checks":
+                    state.soul.data["recent_hallucination_checks"] = []
+                    state.soul.data["recent_missing_topics"] = []
+                    state.soul.on_remedy("최근 환각 경보 기록을 초기화하고 방어막 영점을 재조정했어요!")
+                    self._send_json({"message": "초기화 완료", "status": state.full_status()})
+                    return
+                self._send_json({"error": "Unknown remedy action"}, status=400)
                 return
 
             if route == "/api/poke":

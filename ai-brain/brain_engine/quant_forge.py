@@ -299,6 +299,7 @@ class CustomBrainForge:
             "filename": out_name,
             "bits": bits,
             "hidden_dim": hidden_dim,
+            "notes_count": len(notes),
             "vocab_size": vocab_size,
             "total_params": total_params,
             "fp32_kb": round(fp32_bytes / 1024, 1),

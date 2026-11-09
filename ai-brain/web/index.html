@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>시냅스몽 · 나만의 양자화 AI 두뇌 연구소</title>
-  <link rel="stylesheet" href="ui-v3.css?v=3.2" />
+  <link rel="stylesheet" href="ui-v3.css?v=3.3" />
   <!--__INITIAL_STATE__-->
 </head>
 <body>
@@ -79,23 +79,27 @@
           <strong class="v-num" id="valXp">30/50</strong>
         </div>
 
-        <!-- 두뇌 환각 위험도 & 근거 신뢰도 게이지 + 즉시 테스트 버튼 -->
+        <!-- 두뇌 환각 위험도 & 맞춤 저감 처방 바로가기 -->
         <div class="halluc-divider"></div>
         <div class="halluc-head">
-          <span class="halluc-title">🛡️ 두뇌 환각 위험도 <small>(낮을수록 정확)</small></span>
+          <span class="halluc-title">🛡️ 두뇌 환각 위험도</span>
           <div class="halluc-right">
             <span class="halluc-badge safe" id="hallucBadge">안심 · 10%</span>
+            <button class="halluc-clinic-btn" id="btnOpenClinic" type="button" title="환각 원인을 분석하고 줄이는 처방창을 엽니다">
+              🩺 처방창
+            </button>
             <button class="halluc-test-btn" id="btnQuickHallucTest" type="button" title="없는 지식을 물어봐서 억지 추측을 막는지 실험합니다">
-              🧪 방어 테스트
+              🧪 테스트
             </button>
           </div>
         </div>
         <div class="v-bar">
           <div class="v-fill halluc-safe" id="barHalluc" style="width:10%"></div>
         </div>
-        <div class="halluc-meta" id="hallucMeta">
-          시냅스 검증 100% · 양자화 보존 99.8% · 억지추측 차단 ON
-        </div>
+        <button class="halluc-tip-row" id="btnTopTipOpenClinic" type="button">
+          <span id="hallucTopTip">💡 처방 제안: 고정밀 INT8 재주조 및 취약 분야 보강 가능</span>
+          <span class="tip-arrow">처방 보기 ›</span>
+        </button>
       </div>
 
       <!-- 6. 요청하신 '작업 환경 상태창' (3대 상태바 바로 아래, 계기판 타일형) -->
@@ -160,8 +164,9 @@
         <nav class="seg-tabs" role="tablist">
           <button class="seg-tab active" data-tab="tab-graph" type="button">🕸️ 시냅스 지식망</button>
           <button class="seg-tab" data-tab="tab-feed" type="button">🌱 지식 먹이기</button>
-          <button class="seg-tab" data-tab="tab-forge" type="button">⚒️ 우리만의 양자화 주조소</button>
-          <button class="seg-tab" data-tab="tab-chat" type="button">💬 시냅스몽과 대화</button>
+          <button class="seg-tab" data-tab="tab-forge" type="button">⚒️ 양자화 주조소</button>
+          <button class="seg-tab" data-tab="tab-clinic" type="button">🩺 환각 처방실</button>
+          <button class="seg-tab" data-tab="tab-chat" type="button">💬 시냅스몽 대화</button>
         </nav>
         <div class="engine-indicator" id="engineStatusPill">
           위키 기억망 + 자체 양자화 엔진 가동 중
@@ -340,6 +345,51 @@
         </div>
       </div>
 
+      <!-- [탭 3.5] 환각 원인 진단 & 저감 처방실 -->
+      <div class="tab-pane" id="tab-clinic">
+        <div class="pane-grid clinic-layout">
+          <!-- 좌측: 4대 환각 원인 정밀 진단표 -->
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <span class="step-kicker">DIAGNOSTIC SCANNER</span>
+                <h3>4대 환각 원인 정밀 진단표</h3>
+                <p>작은 AI 두뇌가 거짓말(환각)을 하는 4가지 원인을 실시간 점검합니다.</p>
+              </div>
+            </div>
+
+            <div class="clinic-summary-banner" id="clinicBanner">
+              <div>
+                <span class="cs-label">현재 두뇌 신뢰도 · 환각 억제 상태</span>
+                <strong class="cs-val" id="clinicHeadline">환각 위험 10% · 근거 신뢰도 90%</strong>
+                <p class="cs-sub" id="clinicNote">기억 카드들이 시냅스로 검증되어 있고, 모르는 질문은 차단합니다.</p>
+              </div>
+              <div class="cs-actions">
+                <button class="ghost-btn" id="btnClinicStress" type="button">🧪 함정 질문 실험</button>
+                <button class="ghost-btn" id="btnClinicReset" type="button">🔄 경보 영점 조정</button>
+              </div>
+            </div>
+
+            <div class="diag-list" id="clinicBreakdown"></div>
+          </div>
+
+          <!-- 우측: 맞춤형 환각 저감 처방전 -->
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <span class="step-kicker">ACTIONABLE PRESCRIPTIONS</span>
+                <h3>맞춤형 환각 저감 처방전 (원클릭 실행)</h3>
+                <p>현재 두뇌 상태에서 환각 위험을 가장 효과적으로 낮추는 맞춤 해법입니다.</p>
+              </div>
+            </div>
+
+            <div id="clinicFeedback" class="clinic-feedback hidden"></div>
+
+            <div class="rx-list" id="clinicPrescriptions"></div>
+          </div>
+        </div>
+      </div>
+
       <!-- [탭 4] 시냅스몽과 대화 -->
       <div class="tab-pane" id="tab-chat">
         <div class="card chat-card">
@@ -374,6 +424,6 @@
     </section>
   </main>
 
-  <script src="ui-v3.js?v=3.2"></script>
+  <script src="ui-v3.js?v=3.3"></script>
 </body>
 </html>

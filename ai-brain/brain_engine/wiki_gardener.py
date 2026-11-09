@@ -490,3 +490,41 @@ class WikiGardener:
             "matched_terms": sorted(matched_term_set),
             "missing_terms": missing_terms,
         }
+
+    def weave_missing_synapses(self) -> Dict[str, Any]:
+        """Scan all Wiki notes and weave missing bidirectional [[links]] between related concepts."""
+        notes = self.list_notes()
+        kw_map: Dict[str, Set[str]] = {}
+        for n in notes:
+            kws = set(
+                w.lower()
+                for w in (
+                    n["tags"]
+                    + extract_keywords(n["title"] + " " + n["summary"] + " " + n["body"], top_k=16)
+                )
+            )
+            kw_map[n["slug"]] = kws
+
+        added_pairs = 0
+        for i in range(len(notes)):
+            for j in range(i + 1, len(notes)):
+                a, b = notes[i], notes[j]
+                already_ab = b["title"] in a["links"]
+                already_ba = a["title"] in b["links"]
+                if already_ab and already_ba:
+                    continue
+                overlap = len(kw_map[a["slug"]] & kw_map[b["slug"]])
+                same_cat = 1 if a["category"] == b["category"] else 0
+                if overlap + same_cat >= 1:
+                    for src, dst in ((a, b), (b, a)):
+                        p = self.vault_dir / src["rel_path"]
+                        if p.exists():
+                            txt = p.read_text(encoding="utf-8", errors="ignore")
+                            marker = f"[[{dst['title']}]]"
+                            if marker not in txt:
+                                txt = txt.rstrip() + f"\n- {marker}\n"
+                                p.write_text(txt, encoding="utf-8")
+                    added_pairs += 1
+
+        self.rebuild_index()
+        return {"added_pairs": added_pairs, "total_notes": len(notes)}

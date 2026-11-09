@@ -1,14 +1,14 @@
 {
   "name": "시냅스몽",
   "born_at": "2026-11-09T08:37:11Z",
-  "xp": 76,
-  "satiety": 80,
+  "xp": 84,
+  "satiety": 72,
   "mood": 100,
-  "pose": "01_greet",
+  "pose": "04_brainstorm",
   "last_fed_ts": 1794213431.4215264,
-  "last_interaction_ts": 1794214293.8550096,
+  "last_interaction_ts": 1794215423.576385,
   "memories_eaten": 4,
-  "questions_answered": 0,
+  "questions_answered": 1,
   "brains_forged": 1,
   "rl_episodes": 0,
   "binaries_analyzed": 0,
@@ -17,7 +17,7 @@
   "hosts_visited": [
     "e2b.local (Linux-x86_64-2c)"
   ],
-  "last_speech": "안녕 주인님! 이제 제 기분과 표정은 스스로 바뀌고, 환각 방어막으로 아는 것과 모르는 것을 정확히 구분해요!",
+  "last_speech": "흠냐... 위키 기억에 없는 내용이라 지어내지 않고 솔직하게 환각 방어막을 켰어요! 관련 지식을 먹여주실래요?",
   "recent_events": [
     {
       "time": "2026-11-09T08:37:20Z",
@@ -32,5 +32,7 @@
       "text": "외장하드 포터블 서식지(ai-brain)에서 첫 탄생"
     }
   ],
-  "recent_hallucination_checks": []
+  "recent_hallucination_checks": [
+    84
+  ]
 }

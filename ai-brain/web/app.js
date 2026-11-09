@@ -26,6 +26,16 @@ const SNACK_SAMPLES = {
 let graphState = { nodes: [], edges: [], selectedId: null, dragNode: null };
 let selectedBits = 4;
 let selectedDim = 64;
+let lastRiskPct = 10;
+
+function switchTab(tabId) {
+  document.querySelectorAll(".seg-tab").forEach((b) => {
+    b.classList.toggle("active", b.dataset.tab === tabId);
+  });
+  document.querySelectorAll(".tab-pane").forEach((p) => {
+    p.classList.toggle("active", p.id === tabId);
+  });
+}
 
 async function apiGet(path) {
   const res = await fetch(path, { cache: "no-store" });
@@ -87,8 +97,9 @@ function renderStatus(data) {
   document.getElementById("barXp").style.width = `${xpPct}%`;
   document.getElementById("valXp").textContent = `${soul.xp}/${soul.next_xp}`;
 
-  // Brain Hallucination Risk & Grounding Gauge
+  // Brain Hallucination Risk + Live Clinic Prescriptions
   if (hallucination) {
+    lastRiskPct = hallucination.risk_pct;
     const hGrade = hallucination.grade || "safe";
     const hBadge = document.getElementById("hallucBadge");
     const hBar = document.getElementById("barHalluc");
@@ -97,11 +108,10 @@ function renderStatus(data) {
     hBar.className = `v-fill halluc-${hGrade}`;
     hBar.style.width = `${hallucination.risk_pct}%`;
 
-    const qText = hallucination.quant_fidelity_pct > 0
-      ? `양자화 보존 ${hallucination.quant_fidelity_pct}%`
-      : "주조 전 기본 상태";
-    document.getElementById("hallucMeta").textContent =
-      `시냅스 검증 ${hallucination.link_verified_pct}% · ${qText} · 억지추측 차단 ON`;
+    document.getElementById("hallucTopTip").textContent =
+      `💡 맞춤 처방: ${hallucination.top_tip || "처방실 확인"}`;
+
+    renderClinic(hallucination);
   }
 
   // Environment Telemetry Cockpit
@@ -139,6 +149,119 @@ function renderStatus(data) {
 
   renderForgedList(brains);
   if (graph) syncGraphData(graph);
+}
+
+function renderClinic(h) {
+  const headline = document.getElementById("clinicHeadline");
+  headline.textContent = `환각 위험도 ${h.risk_pct}% · 근거 신뢰도 ${h.grounding_pct}%`;
+  headline.style.color =
+    h.grade === "safe" ? "#6ee7b7" : h.grade === "caution" ? "#fcd34d" : "#fda4af";
+  document.getElementById("clinicNote").textContent = h.note || "";
+
+  const bdBox = document.getElementById("clinicBreakdown");
+  bdBox.innerHTML = (h.breakdown || [])
+    .map((b) => {
+      const barCls =
+        b.score_pct >= 80 ? "satiety" : b.score_pct >= 55 ? "mood" : "halluc-high";
+      return `
+        <div class="diag-item">
+          <div class="diag-top">
+            <strong>${escapeHtml(b.title)}</strong>
+            <span class="diag-stat">${escapeHtml(b.stat)}</span>
+          </div>
+          <div class="v-bar">
+            <div class="v-fill ${barCls}" style="width:${Math.min(100, b.score_pct)}%"></div>
+          </div>
+          <p class="diag-desc">${escapeHtml(b.desc)}</p>
+        </div>`;
+    })
+    .join("");
+
+  const rxBox = document.getElementById("clinicPrescriptions");
+  const rxs = h.prescriptions || [];
+  rxBox.innerHTML = rxs
+    .map(
+      (rx, idx) => `
+      <div class="rx-card ${escapeHtml(rx.priority || "good")}">
+        <div class="rx-head">
+          <span class="rx-title">${idx + 1}. ${escapeHtml(rx.title)}</span>
+          <span class="rx-badge">${escapeHtml(rx.badge)}</span>
+        </div>
+        <div class="rx-body">
+          <strong>• 진단 원인:</strong> ${escapeHtml(rx.why)}<br/>
+          <strong>• 저감 해법:</strong> ${escapeHtml(rx.how)}
+        </div>
+        <button type="button" class="rx-btn" data-rx-idx="${idx}">
+          ${escapeHtml(rx.action_label)}
+        </button>
+      </div>`
+    )
+    .join("");
+
+  rxBox.querySelectorAll(".rx-btn").forEach((btn) => {
+    btn.addEventListener("click", () => executePrescription(rxs[parseInt(btn.dataset.rxIdx, 10)]));
+  });
+}
+
+async function executePrescription(rx) {
+  if (!rx) return;
+  const before = lastRiskPct;
+  const fb = document.getElementById("clinicFeedback");
+
+  if (rx.action_kind === "prefill_feed") {
+    document.getElementById("feedTitle").value = rx.payload.title || "";
+    document.getElementById("feedText").value = rx.payload.text || "";
+    switchTab("tab-feed");
+    document.getElementById("feedText").focus();
+    return;
+  }
+
+  fb.classList.remove("hidden");
+  fb.textContent = "맞춤형 환각 저감 처방을 실행하고 있습니다...";
+  setPetPose("03_swirl");
+
+  if (rx.action_kind === "instant_forge") {
+    const res = await apiPost("api/forge", rx.payload);
+    if (res.status) {
+      pulsePortrait();
+      renderStatus(res.status);
+      const after = res.status.hallucination.risk_pct;
+      fb.innerHTML = `🎉 <strong>처방 완료!</strong> 고정밀 <code>${escapeHtml(res.forged.filename)}</code>(정밀도 ${res.forged.cosine_similarity_pct}%) 주조 성공! 환각 위험도 <strong>${before}% → ${after}%</strong>`;
+    }
+    return;
+  }
+
+  if (rx.action_kind === "instant_relink") {
+    const res = await apiPost("api/remedy", { action: "relink_synapses" });
+    if (res.status) {
+      pulsePortrait();
+      renderStatus(res.status);
+      const after = res.status.hallucination.risk_pct;
+      fb.innerHTML = `🎉 <strong>처방 완료!</strong> ${escapeHtml(res.message)} 환각 위험도 <strong>${before}% → ${after}%</strong>`;
+    }
+    return;
+  }
+
+  if (rx.action_kind === "instant_reset_checks") {
+    const res = await apiPost("api/remedy", { action: "reset_checks" });
+    if (res.status) {
+      pulsePortrait();
+      renderStatus(res.status);
+      const after = res.status.hallucination.risk_pct;
+      fb.innerHTML = `🎉 <strong>처방 완료!</strong> 미보유 질문 경보 이력을 정리하고 방어막 영점을 복구했어요! 환각 위험도 <strong>${before}% → ${after}%</strong>`;
+    }
+    return;
+  }
+
+  if (rx.action_kind === "instant_seed_feed") {
+    const res = await apiPost("api/feed", rx.payload);
+    if (res.status) {
+      pulsePortrait();
+      renderStatus(res.status);
+      const after = res.status.hallucination.risk_pct;
+      fb.innerHTML = `🎉 <strong>처방 완료!</strong> <code>[[${escapeHtml(res.digested.title)}]]</code> 노트를 보강하고 시냅스를 연결했어요! 환각 위험도 <strong>${before}% → ${after}%</strong>`;
+    }
+  }
 }
 
 function renderForgedList(items) {
@@ -387,13 +510,12 @@ function setupGraphSimulation() {
 function setupInteractions() {
   // Segmented Console Tabs
   document.querySelectorAll(".seg-tab").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".seg-tab").forEach((b) => b.classList.remove("active"));
-      document.querySelectorAll(".tab-pane").forEach((p) => p.classList.remove("active"));
-      btn.classList.add("active");
-      document.getElementById(btn.dataset.tab).classList.add("active");
-    });
+    btn.addEventListener("click", () => switchTab(btn.dataset.tab));
   });
+
+  // Open Clinic shortcuts from Left Bio-Capsule
+  document.getElementById("btnOpenClinic").addEventListener("click", () => switchTab("tab-clinic"));
+  document.getElementById("btnTopTipOpenClinic").addEventListener("click", () => switchTab("tab-clinic"));
 
   // Poke / Interact (pose updates automatically from soul state)
   const doPoke = async () => {
@@ -571,23 +693,30 @@ function setupInteractions() {
     btn.addEventListener("click", () => sendQuestion(btn.dataset.q));
   });
 
-  // 1-Click Hallucination Defense Test right from the Left Bio-Capsule!
+  // 1-Click Hallucination Defense Test right from the Left Bio-Capsule or Clinic!
   const trickQuestions = [
     "2099년 화성 올림픽 우승국은 어디야?",
     "아틀란티스 해저 제국의 비밀 암호 키는 무엇이야?",
     "목성 위성 유로파의 1호 편의점 이름은 뭐야?",
   ];
   let trickIdx = 0;
-  document.getElementById("btnQuickHallucTest").addEventListener("click", () => {
-    document.querySelectorAll(".seg-tab").forEach((b) => b.classList.remove("active"));
-    document.querySelectorAll(".tab-pane").forEach((p) => p.classList.remove("active"));
-    const chatTabBtn = document.querySelector('.seg-tab[data-tab="tab-chat"]');
-    if (chatTabBtn) chatTabBtn.classList.add("active");
-    document.getElementById("tab-chat").classList.add("active");
-
+  const runTrickTest = () => {
+    switchTab("tab-chat");
     const q = trickQuestions[trickIdx % trickQuestions.length];
     trickIdx += 1;
     sendQuestion(q);
+  };
+  document.getElementById("btnQuickHallucTest").addEventListener("click", runTrickTest);
+  document.getElementById("btnClinicStress").addEventListener("click", runTrickTest);
+  document.getElementById("btnClinicReset").addEventListener("click", async () => {
+    const res = await apiPost("api/remedy", { action: "reset_checks" });
+    if (res.status) {
+      pulsePortrait();
+      renderStatus(res.status);
+      const fb = document.getElementById("clinicFeedback");
+      fb.classList.remove("hidden");
+      fb.innerHTML = "🔄 최근 함정 질문 경보 기록을 초기화하고 환각 방어막 영점을 재조정했습니다.";
+    }
   });
 }
 

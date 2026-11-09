@@ -127,6 +127,19 @@ class TamagotchiSoul:
         self.data["last_fed_ts"] = now
         self.data["last_interaction_ts"] = now
         self.data["memories_eaten"] = int(self.data.get("memories_eaten", 0)) + 1
+
+        # Feeding new memory clears matching missing topics & improves recent grounding history
+        missing_list: List[str] = self.data.get("recent_missing_topics", [])
+        if missing_list:
+            t_low = title.lower()
+            self.data["recent_missing_topics"] = [
+                m for m in missing_list if m.lower() not in t_low
+            ][:5]
+        checks: List[int] = self.data.setdefault("recent_hallucination_checks", [])
+        if checks:
+            checks.append(6)
+            del checks[:-8]
+
         if links_count > 0:
             self.data["pose"] = "06_star"
             self.data["last_speech"] = (
@@ -140,7 +153,9 @@ class TamagotchiSoul:
         self._log_event(f"지식 섭취: [{title}] (연결 +{links_count}, XP +{gained_xp})")
         self._save()
 
-    def on_chat(self, recalled_count: int, risk_pct: int = 10) -> None:
+    def on_chat(
+        self, recalled_count: int, risk_pct: int = 10, missing_terms: List[str] | None = None
+    ) -> None:
         self.data["xp"] = int(self.data.get("xp", 0)) + 8
         self.data["last_interaction_ts"] = time.time()
         self.data["questions_answered"] = int(self.data.get("questions_answered", 0)) + 1
@@ -149,16 +164,23 @@ class TamagotchiSoul:
         checks.append(int(risk_pct))
         del checks[:-8]
 
+        if missing_terms and (recalled_count == 0 or risk_pct >= 25):
+            topic = " · ".join(missing_terms[:3])
+            topics: List[str] = self.data.setdefault("recent_missing_topics", [])
+            if topic and topic not in topics:
+                topics.insert(0, topic)
+                del topics[4:]
+
         if recalled_count == 0 or risk_pct >= 60:
             self.data["pose"] = "04_brainstorm"
             self.data["last_speech"] = (
-                "흠냐... 위키 기억에 없는 내용이라 지어내지 않고 솔직하게 환각 방어막을 켰어요! 관련 지식을 먹여주실래요?"
+                "흠냐... 위키 기억에 없는 내용이라 지어내지 않고 솔직하게 환각 방어막을 켰어요! 처방실에서 보강해 볼까요?"
             )
         elif risk_pct >= 25:
             self.data["mood"] = min(100, int(self.data.get("mood", 75)) + 3)
             self.data["pose"] = "02_curious"
             self.data["last_speech"] = (
-                f"확인된 기억 {recalled_count}개 범위 안에서 조심스럽게 답했어요! 부족한 부분은 더 공부할게요."
+                f"확인된 기억 {recalled_count}개 범위 안에서 조심스럽게 답했어요! 부족한 부분은 처방실에서 채울 수 있어요."
             )
         else:
             self.data["mood"] = min(100, int(self.data.get("mood", 75)) + 5)
@@ -166,6 +188,18 @@ class TamagotchiSoul:
             self.data["last_speech"] = (
                 f"유레카! 위키 기억 카드 {recalled_count}개 근거를 100% 검증해 환각 없이 답했어요! (+8 XP)"
             )
+        self._save()
+
+    def on_remedy(self, summary_msg: str) -> None:
+        self.data["xp"] = int(self.data.get("xp", 0)) + 15
+        self.data["mood"] = min(100, int(self.data.get("mood", 80)) + 8)
+        checks: List[int] = self.data.setdefault("recent_hallucination_checks", [])
+        if checks:
+            checks.append(5)
+            del checks[:-8]
+        self.data["pose"] = "06_star"
+        self.data["last_speech"] = f"반짝! {summary_msg} (+15 XP)"
+        self._log_event(f"환각 처방 실행: {summary_msg}")
         self._save()
 
     def on_forge_brain(self, bits: int, saved_pct: float, cos_sim: float) -> None:

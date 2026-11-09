@@ -21,6 +21,7 @@ BRAIN_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(BRAIN_ROOT))
 
 from brain_engine.genius_pantheon import GeniusPantheon  # noqa: E402
+from brain_engine.genius_scout import analyze_candidate_genius  # noqa: E402
 from brain_engine.hallucination import (  # noqa: E402
     audit_chat_grounding,
     evaluate_brain_hallucination,
@@ -253,16 +254,74 @@ def make_handler(state: BrainState):
                 )
                 return
 
+            if route == "/api/pantheon/scout":
+                query = str(body.get("query") or "").strip()
+                if not query:
+                    self._send_json({"error": "검색할 인물 이름을 입력해 주세요!"}, status=400)
+                    return
+                custom_hint = str(body.get("custom_hint") or "").strip()
+                dossier = analyze_candidate_genius(
+                    query_name=query,
+                    constellations=state.pantheon.data["constellations"],
+                    wiki_notes=state.gardener.list_notes(),
+                    custom_hint=custom_hint,
+                )
+                self._send_json({"dossier": dossier})
+                return
+
             if route == "/api/pantheon/add":
+                g_name = str(body.get("genius_name") or "").strip()
+                strengths = str(body.get("strengths") or "").strip()
+                limitations = str(body.get("limitations") or "").strip()
+                proof = str(body.get("proof_of_genius") or "").strip()
+                achievements = body.get("achievements") or []
                 added = state.pantheon.add_genius_or_constellation(
                     target_constellation_id=str(body.get("target_constellation_id") or ""),
                     new_constellation_name=str(body.get("new_constellation_name") or ""),
-                    genius_name=str(body.get("genius_name") or ""),
+                    genius_name=g_name,
                     lens=str(body.get("lens") or ""),
                     credo=str(body.get("credo") or ""),
                     emoji=str(body.get("emoji") or "🌟"),
+                    strengths=strengths,
+                    limitations=limitations,
                 )
+                if g_name and (strengths or proof):
+                    ach_txt = "\n".join(f"- {a}" for a in achievements[:4]) if isinstance(achievements, list) else ""
+                    dossier_md = (
+                        f"영입 천재: {g_name} ({added['added_genius']['lens']})\n"
+                        f"배치 성좌: {added['constellation']['name']}\n\n"
+                        f"[주요 업적 추적]\n{ach_txt}\n\n"
+                        f"[천재성 입증]\n{proof}\n\n"
+                        f"[천재성 강점]: {strengths}\n"
+                        f"[명확한 한계점]: {limitations}\n"
+                        f"[원탁 핵심 철학]: {added['added_genius']['credo']}"
+                    )
+                    state.gardener.digest_raw_memory(
+                        dossier_md, custom_title=f"천재 영입 심사록 — {g_name}"
+                    )
+                    state.soul.on_feed_memory(f"천재 영입: {g_name}", 2)
                 self._send_json({"added": added, "status": state.full_status()})
+                return
+
+            if route == "/api/pantheon/move":
+                gid = str(body.get("genius_id") or "").strip()
+                to_cid = str(body.get("to_constellation_id") or "").strip()
+                new_cname = str(body.get("new_constellation_name") or "").strip()
+                try:
+                    moved = state.pantheon.move_genius(gid, to_cid, new_cname)
+                except ValueError as exc:
+                    self._send_json({"error": str(exc)}, status=400)
+                    return
+                state.soul._log_event(
+                    f"천재 성좌 이동: {moved['moved_genius']['name']} ({moved['from_constellation']['name']} → {moved['to_constellation']['name']})"
+                )
+                state.soul.data["pose"] = "06_star"
+                state.soul.data["last_speech"] = (
+                    f"자리 이동 완료! [{moved['moved_genius']['name']}] 스승님이 "
+                    f"[{moved['from_constellation']['name']}]에서 [{moved['to_constellation']['name']}] 성좌로 합류하셨어요!"
+                )
+                state.soul._save()
+                self._send_json({"moved": moved, "status": state.full_status()})
                 return
 
             if route == "/api/pantheon/feedback":

@@ -447,6 +447,8 @@ class GeniusPantheon:
         lens: str,
         credo: str,
         emoji: str = "🌟",
+        strengths: str = "",
+        limitations: str = "",
     ) -> Dict[str, Any]:
         consts: List[Dict[str, Any]] = self.data["constellations"]
         g_clean = genius_name.strip() or "무명 현자"
@@ -454,13 +456,26 @@ class GeniusPantheon:
         credo_clean = credo.strip() or "근본 원리를 꿰뚫어 서로 다른 성좌의 지혜를 하나로 잇습니다."
         emoji_clean = (emoji.strip() or "🌟")[:2]
 
-        gid = "g_" + hashlib.md5(f"{g_clean}_{time.time()}".encode("utf-8")).hexdigest()[:8]
+        # If a genius with the exact same name already exists, remove from old constellation (clean transfer!)
+        existing_id: str | None = None
+        for c in consts:
+            for idx, g in enumerate(c.get("geniuses", [])):
+                if g["name"].strip().lower() == g_clean.lower():
+                    existing_id = g["id"]
+                    c["geniuses"].pop(idx)
+                    break
+            if existing_id:
+                break
+
+        gid = existing_id or ("g_" + hashlib.md5(f"{g_clean}_{time.time()}".encode("utf-8")).hexdigest()[:8])
         new_genius = {
             "id": gid,
             "name": g_clean,
             "emoji": emoji_clean,
             "lens": lens_clean,
             "credo": credo_clean,
+            "strengths": strengths.strip(),
+            "limitations": limitations.strip(),
             "rebuttal_style": f"{lens_clean} 관점에서 빈틈을 보완",
             "bias": self._default_bias_from_text(f"{g_clean}:{lens_clean}:{credo_clean}"),
         }
@@ -485,7 +500,6 @@ class GeniusPantheon:
                 "geniuses": [new_genius],
             }
             consts.append(target_const)
-            # Automatically weave bridges to two core constellations!
             if len(consts) >= 2:
                 prev_id = consts[0]["id"]
                 self.data["bridges"].append(
@@ -509,6 +523,70 @@ class GeniusPantheon:
             "added_genius": new_genius,
             "total_constellations": len(consts),
             "total_geniuses": sum(len(c["geniuses"]) for c in consts),
+        }
+
+    def move_genius(
+        self,
+        genius_id: str,
+        to_constellation_id: str,
+        new_constellation_name: str = "",
+    ) -> Dict[str, Any]:
+        consts: List[Dict[str, Any]] = self.data["constellations"]
+        found_genius: Dict[str, Any] | None = None
+        from_const: Dict[str, Any] | None = None
+
+        for c in consts:
+            for idx, g in enumerate(c.get("geniuses", [])):
+                if g["id"] == genius_id:
+                    found_genius = c["geniuses"].pop(idx)
+                    from_const = c
+                    break
+            if found_genius:
+                break
+
+        if not found_genius or not from_const:
+            raise ValueError("이동할 천재를 찾지 못했습니다.")
+
+        to_const = None
+        if to_constellation_id and to_constellation_id != "__new__":
+            to_const = next((c for c in consts if c["id"] == to_constellation_id), None)
+
+        if to_const is None:
+            cname = new_constellation_name.strip() or f"{found_genius.get('lens', '융합')} 성좌"
+            if not cname.endswith("성좌"):
+                cname = f"{cname} 성좌"
+            cid = "const_" + hashlib.md5(f"{cname}_{len(consts)}_{time.time()}".encode("utf-8")).hexdigest()[:6]
+            color = PALETTE_CYCLE[len(consts) % len(PALETTE_CYCLE)]
+            to_const = {
+                "id": cid,
+                "name": cname,
+                "en_name": "Custom Infinite Constellation",
+                "icon": found_genius.get("emoji", "🌌"),
+                "color": color,
+                "domain_mission": f"주인님이 '{found_genius['name']}' 배치를 위해 창설한 '{cname}' 영역 성좌입니다.",
+                "geniuses": [found_genius],
+            }
+            consts.append(to_const)
+            if len(consts) >= 2:
+                self.data["bridges"].append(
+                    {
+                        "a": cid,
+                        "b": consts[0]["id"],
+                        "label": f"{cname} × {consts[0]['name']} 융합 공명",
+                        "desc": "새로 확장된 성좌와 기존 성좌 사이의 무한 시너지 다리",
+                    }
+                )
+        else:
+            to_const["geniuses"].append(found_genius)
+
+        if to_const["id"] not in self.data["active_constellation_ids"]:
+            self.data["active_constellation_ids"].append(to_const["id"])
+
+        self._save()
+        return {
+            "moved_genius": found_genius,
+            "from_constellation": {"id": from_const["id"], "name": from_const["name"]},
+            "to_constellation": {"id": to_const["id"], "name": to_const["name"]},
         }
 
     def _extract_topic_focus(self, topic: str) -> str:
@@ -554,6 +632,11 @@ class GeniusPantheon:
                     if idx == 1
                     else f"{gs[0]['name']}과 {prev_g['name']} 두 분의 의견을 합치면 해법이 선명해집니다. "
                 )
+                limit_note = (
+                    f"(또한 {prev_g['name']}의 '{prev_g['limitations'][:28]}…' 한계도 제가 이 지점에서 보완하겠습니다!) "
+                    if prev_g.get("limitations") and idx == 1
+                    else ""
+                )
                 dialogue.append(
                     {
                         "phase": role_tag,
@@ -564,14 +647,15 @@ class GeniusPantheon:
                         "emoji": cur_g["emoji"],
                         "lens": cur_g["lens"],
                         "reply_to": prev_g["name"],
-                        "message": f"{connector}{cur_g['credo']}",
+                        "message": f"{connector}{limit_note}{cur_g['credo']}",
                     }
                 )
 
         # Phase 2: Cross-Constellation Synthesis when >= 2 Domain Constellations convene!
-        if len(selected_consts) >= 2:
-            c_first = selected_consts[0]
-            c_last = selected_consts[-1]
+        non_empty = [c for c in selected_consts if c.get("geniuses")]
+        if len(non_empty) >= 2:
+            c_first = non_empty[0]
+            c_last = non_empty[-1]
             rep_a = c_first["geniuses"][0]
             rep_b = c_last["geniuses"][-1]
             bridge_txt = (

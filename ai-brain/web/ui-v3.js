@@ -235,27 +235,69 @@ function renderGeniusPanel() {
   const focused = cs.find((c) => c.id === pantheonState.focusedConstId) || cs[0];
   const selSet = new Set(pantheonState.selectedConstIds);
 
+  const otherConstOptions = cs
+    .filter((c) => c.id !== focused.id)
+    .map((c) => `<option value="${c.id}">↪ ${c.icon} ${escapeHtml(c.name)}으로 이동</option>`)
+    .join("");
+
   const membersHtml = (focused.geniuses || [])
     .map(
       (g) => `
       <div class="genius-member-row">
-        <div>
-          <strong style="color:#ffffff">${g.emoji} ${escapeHtml(g.name)}</strong>
-          <span style="color:#94a3b8;font-size:11px;margin-left:6px">· ${escapeHtml(g.lens)}</span>
+        <div class="member-top-bar">
+          <div>
+            <strong style="color:#ffffff">${g.emoji} ${escapeHtml(g.name)}</strong>
+            <span style="color:#94a3b8;font-size:11px;margin-left:6px">· ${escapeHtml(g.lens)}</span>
+          </div>
+          <select class="move-const-select" data-move-gid="${g.id}" data-gname="${escapeHtml(g.name)}" data-glens="${escapeHtml(g.lens)}" aria-label="다른 성좌로 이동">
+            <option value="">⇄ 다른 성좌로 보내기</option>
+            ${otherConstOptions}
+            <option value="__new__">🌌 + 새 성좌 창설해 보내기</option>
+          </select>
         </div>
         <div style="color:#cbd5e1;margin-top:2px">“${escapeHtml(g.credo)}”</div>
+        ${
+          g.strengths || g.limitations
+            ? `<div style="margin-top:4px;font-size:10.8px;color:#94a3b8">
+                ${g.strengths ? `<span style="color:#6ee7b7">✨ 강점:</span> ${escapeHtml(g.strengths)}<br/>` : ""}
+                ${g.limitations ? `<span style="color:#fda4af">⚠️ 한계:</span> ${escapeHtml(g.limitations)}` : ""}
+              </div>`
+            : ""
+        }
       </div>`
     )
     .join("");
 
-  document.getElementById("geniusDetailBox").innerHTML = `
+  const detailEl = document.getElementById("geniusDetailBox");
+  detailEl.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
       <strong style="font-size:14.5px;color:#ffffff">${focused.icon} ${escapeHtml(focused.name)}</strong>
       <span class="tag-pill" style="border-color:${focused.color};color:#ffffff">소속 천재 ${focused.geniuses.length}인 집결</span>
     </div>
     <div style="margin-top:5px;color:#fde68a;font-size:11.5px">${escapeHtml(focused.domain_mission)}</div>
-    <div class="genius-roster-grid">${membersHtml}</div>
+    <div class="genius-roster-grid">${membersHtml || `<div style="color:#94a3b8;padding:6px">현재 비어 있는 성좌입니다. 왼쪽 심사원에서 천재를 배치하거나 다른 성좌에서 이동시켜 보세요!</div>`}</div>
   `;
+
+  detailEl.querySelectorAll("[data-move-gid]").forEach((sel) => {
+    sel.addEventListener("change", async (evt) => {
+      const toId = evt.target.value;
+      if (!toId) return;
+      const gid = sel.dataset.moveGid;
+      const gLens = sel.dataset.glens || "융합";
+      const newCName = toId === "__new__" ? `${gLens.split("·")[0].trim()} 성좌` : "";
+      setPetPose("06_star");
+      const res = await apiPost("api/pantheon/move", {
+        genius_id: gid,
+        to_constellation_id: toId,
+        new_constellation_name: newCName,
+      });
+      if (res.moved && res.status) {
+        pantheonState.focusedConstId = res.moved.to_constellation.id;
+        pulsePortrait();
+        renderStatus(res.status);
+      }
+    });
+  });
 
   const chipsEl = document.getElementById("activeMentorChips");
   chipsEl.innerHTML = cs
@@ -1304,7 +1346,116 @@ function setupInteractions() {
     });
   });
 
-  // Unlimited Constellation / Genius Recruitment
+  // Genius Scout, Achievement Tracker & Optimal Constellation Placement!
+  async function runScoutAnalysis(overrideName) {
+    const qInput = document.getElementById("scoutQueryInput");
+    const query = (overrideName || qInput.value || "").trim();
+    if (!query) {
+      qInput.focus();
+      return;
+    }
+    qInput.value = query;
+    const hint = document.getElementById("scoutHintInput").value.trim();
+    const box = document.getElementById("scoutDossierBox");
+    box.classList.remove("hidden");
+    box.innerHTML = `🔭 <strong>${escapeHtml(query)}</strong> 인물의 역사적 업적 추적, 천재성 입증, 한계점 및 최적 영역 성좌를 분석 중입니다...`;
+    setPetPose("02_curious");
+
+    const res = await apiPost("api/pantheon/scout", { query, custom_hint: hint });
+    if (!res.dossier) return;
+    const d = res.dossier;
+    pantheonState.lastScoutDossier = d;
+
+    const achHtml = (d.achievements || [])
+      .map((a) => `<li>${escapeHtml(a)}</li>`)
+      .join("");
+
+    const fitBarsHtml = (d.constellation_rankings || [])
+      .slice(0, 5)
+      .map(
+        (r, i) => `
+        <div class="fit-bar-row">
+          <span style="color:${i === 0 ? "#fde68a" : "#cbd5e1"};font-weight:${i === 0 ? "700" : "500"}">
+            ${i === 0 ? "👑 " : ""}${r.icon} ${escapeHtml(r.name)}
+          </span>
+          <div class="fit-bar-track">
+            <div class="fit-bar-fill" style="width:${r.fit_pct}%;background:${i === 0 ? "#f5b942" : r.color}"></div>
+          </div>
+          <strong style="text-align:right;color:${i === 0 ? "#fde68a" : "#94a3b8"}">${r.fit_pct}%</strong>
+        </div>`
+      )
+      .join("");
+
+    const alreadyBanner = d.already_in
+      ? `<div style="margin-top:6px;padding:6px 9px;background:rgba(56,189,248,0.14);border:1px solid rgba(56,189,248,0.4);border-radius:7px;color:#bae6fd">
+          ℹ️ 현재 <strong>[${escapeHtml(d.already_in.constellation_name)}]</strong>에 배치되어 있는 천재입니다! 아래 선택창에서 다른 성좌를 고르고 버튼을 누르면 즉시 해당 성좌로 이동합니다.
+         </div>`
+      : "";
+
+    box.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+        <div>
+          <strong style="font-size:14px;color:#ffffff">${d.emoji} ${escapeHtml(d.name)}</strong>
+          <span style="font-size:11px;color:#94a3b8;margin-left:5px">${escapeHtml(d.en_name)} · ${escapeHtml(d.era_field)}</span>
+        </div>
+        <span class="tag-pill" style="border-color:#f5b942;color:#fde68a">${escapeHtml(d.source_badge)}</span>
+      </div>
+      ${alreadyBanner}
+      <div style="margin-top:6px;color:#e2e8f0">${escapeHtml(d.summary)}</div>
+
+      <div class="dossier-sec-title">📜 핵심 업적 추적 (Tracked Achievements)</div>
+      <ul class="dossier-ach-list">${achHtml}</ul>
+
+      <div class="dossier-sec-title">🏅 천재성 입증 (Proof of Genius)</div>
+      <div style="color:#fef3c7">${escapeHtml(d.proof_of_genius)}</div>
+
+      <div class="dossier-grid-two">
+        <div class="dossier-strength-card">
+          <strong style="color:#6ee7b7">✨ 천재성 핵심 강점</strong>
+          <div style="margin-top:3px;color:#e2e8f0">${escapeHtml(d.genius_strengths)}</div>
+        </div>
+        <div class="dossier-limit-card">
+          <strong style="color:#fda4af">⚠️ 명확한 한계 · 보완점</strong>
+          <div style="margin-top:3px;color:#e2e8f0">${escapeHtml(d.limitations)}</div>
+        </div>
+      </div>
+
+      <div class="dossier-sec-title">📊 영역별 성좌 배치 적합도 측정</div>
+      <div class="fit-bars-wrap">${fitBarsHtml}</div>
+    `;
+
+    // Auto-select recommended optimal constellation & populate editable placement fields!
+    const best = d.recommended_constellation;
+    const selEl = document.getElementById("addTargetConst");
+    if (best && selEl && [...selEl.options].some((o) => o.value === best.id)) {
+      selEl.value = best.id;
+      document.getElementById("addNewConstName").classList.add("hidden");
+    }
+    document.getElementById("placementLabel").innerHTML =
+      `🎯 AI 최적 배치 추천: <strong style="color:#fde68a">${best.icon} ${escapeHtml(best.name)} (${best.fit_pct}%)</strong> — 다른 성좌로 보내고 싶다면 아래에서 자유롭게 변경하세요!`;
+
+    document.getElementById("addGeniusEmoji").value = d.emoji || "🌟";
+    document.getElementById("addGeniusName").value = d.name || query;
+    document.getElementById("addGeniusLens").value = d.lens || "";
+    document.getElementById("addGeniusCredo").value = d.credo || "";
+  }
+
+  document.getElementById("btnScoutGenius").addEventListener("click", () => runScoutAnalysis());
+  document.getElementById("scoutQueryInput").addEventListener("keydown", (evt) => {
+    if (evt.key === "Enter") {
+      evt.preventDefault();
+      runScoutAnalysis();
+    }
+  });
+  document.querySelectorAll("#scoutPresetChips .preset-chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      document.querySelectorAll("#scoutPresetChips .preset-chip").forEach((c) => c.classList.remove("active"));
+      chip.classList.add("active");
+      runScoutAnalysis(chip.dataset.scout);
+    });
+  });
+
+  // Unlimited Constellation / Genius Placement & Transfer
   document.getElementById("addTargetConst").addEventListener("change", (evt) => {
     const isNew = evt.target.value === "__new__";
     document.getElementById("addNewConstName").classList.toggle("hidden", !isNew);
@@ -1314,10 +1465,19 @@ function setupInteractions() {
     const targetId = document.getElementById("addTargetConst").value;
     const newConstName = document.getElementById("addNewConstName").value.trim();
     const emoji = document.getElementById("addGeniusEmoji").value.trim() || "🌟";
-    const name = document.getElementById("addGeniusName").value.trim();
+    const name = document.getElementById("addGeniusName").value.trim() || document.getElementById("scoutQueryInput").value.trim();
     const lens = document.getElementById("addGeniusLens").value.trim();
     const credo = document.getElementById("addGeniusCredo").value.trim();
-    if (!name) return;
+    const sfb = document.getElementById("scoutFeedback");
+    if (!name) {
+      sfb.classList.remove("hidden");
+      sfb.textContent = "먼저 위 검색창에서 영입할 천재 이름을 검색하거나 입력해 주세요!";
+      return;
+    }
+
+    const d = pantheonState.lastScoutDossier && pantheonState.lastScoutDossier.name === name
+      ? pantheonState.lastScoutDossier
+      : null;
 
     setPetPose("06_star");
     const res = await apiPost("api/pantheon/add", {
@@ -1327,17 +1487,24 @@ function setupInteractions() {
       lens,
       credo,
       emoji,
+      strengths: d ? d.genius_strengths : "",
+      limitations: d ? d.limitations : "",
+      proof_of_genius: d ? d.proof_of_genius : "",
+      achievements: d ? d.achievements : [],
     });
     if (res.added && res.status) {
-      pantheonState.focusedConstId = res.added.constellation.id;
-      if (!pantheonState.selectedConstIds.includes(res.added.constellation.id)) {
-        pantheonState.selectedConstIds.push(res.added.constellation.id);
+      const placedConst = res.added.constellation;
+      pantheonState.focusedConstId = placedConst.id;
+      if (!pantheonState.selectedConstIds.includes(placedConst.id)) {
+        pantheonState.selectedConstIds.push(placedConst.id);
       }
-      document.getElementById("addGeniusName").value = "";
-      document.getElementById("addGeniusLens").value = "";
-      document.getElementById("addGeniusCredo").value = "";
       pulsePortrait();
       renderStatus(res.status);
+      sfb.classList.remove("hidden");
+      sfb.innerHTML = `
+        ✦ <strong>${escapeHtml(name)}</strong> 천재가 <strong>[${placedConst.icon} ${escapeHtml(placedConst.name)}]</strong>에 공식 배치되었습니다! (위키 심사록 자동 저장 완료)<br/>
+        • 언제든 오른쪽 성좌 명단의 <strong>[⇄ 다른 성좌로 보내기]</strong> 메뉴로 다른 성좌로 자유롭게 이동시킬 수 있습니다!
+      `;
     }
   });
 

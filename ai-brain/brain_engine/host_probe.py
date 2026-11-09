@@ -1,7 +1,7 @@
 """
 Host PC hardware & external-drive habitat sensor.
-Uses ONLY Python 3 standard library so it works on Windows, macOS, and Linux
-the instant an external drive is plugged in.
+Computes real-time workspace comfort ('환경 상태') for Synapsemong using
+ONLY Python 3 standard library.
 """
 
 from __future__ import annotations
@@ -16,50 +16,36 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 
-SLM_CATALOG: List[Dict[str, Any]] = [
+DONOR_BLUEPRINTS: List[Dict[str, Any]] = [
     {
-        "id": "qwen-0.5b-q4",
-        "name": "Qwen 0.5B Instruct (Q4_K_M · 4비트)",
-        "params_b": 0.5,
-        "bits": 4,
-        "fp16_mb": 1000,
-        "file_mb": 395,
-        "ram_needed_gb": 0.9,
-        "role": "초저사양 구형 노트북 · 초고속 분류기(정원사)",
-        "speed_hint": "구형 CPU에서도 초당 25~45 토큰",
-    },
-    {
-        "id": "qwen-0.8b-q8",
-        "name": "Qwen3.5 / C1급 0.8B (Q8_0 · 8비트)",
-        "params_b": 0.8,
-        "bits": 8,
+        "id": "donor-qwen-0.8b",
+        "name": "Qwen3.5-0.8B 해부 틀",
+        "params": "0.8B (24층 · GQA)",
         "fp16_mb": 1620,
-        "file_mb": 812,
-        "ram_needed_gb": 1.5,
-        "role": "판단·의사결정 특화 두뇌 (정확도 99.5% 보존)",
-        "speed_hint": "일반 노트북 CPU에서 초당 18~35 토큰",
+        "our_int8_mb": 812,
+        "our_int4_mb": 460,
+        "ram_needed_gb": 1.1,
+        "takeaway": "그룹 쿼리 어텐션(GQA) 비율이 뛰어나 우리 독자 판단 두뇌의 기본 골격으로 최적",
     },
     {
-        "id": "gemma4-e2b-q4",
-        "name": "Gemma 4 E2B (Q4_K_M · 4비트)",
-        "params_b": 2.0,
-        "bits": 4,
+        "id": "donor-gemma4-e2b",
+        "name": "Gemma 4 E2B 해부 틀",
+        "params": "2.0B (효율형 임베딩)",
         "fp16_mb": 4200,
-        "file_mb": 1480,
-        "ram_needed_gb": 2.4,
-        "role": "제2의 두뇌 주력 대화·요약 (가성비 최고 추천)",
-        "speed_hint": "일반 노트북 RAM 8GB에서 쾌적 구동",
+        "our_int8_mb": 2150,
+        "our_int4_mb": 1240,
+        "ram_needed_gb": 2.1,
+        "takeaway": "다국어·한국어 사전 구조와 로컬 어텐션 창 설계를 참고하기 좋은 중형 골격",
     },
     {
-        "id": "gemma4-e4b-q4",
-        "name": "Gemma 4 E4B (Q4_K_M · 4비트)",
-        "params_b": 4.0,
-        "bits": 4,
-        "fp16_mb": 8200,
-        "file_mb": 2750,
-        "ram_needed_gb": 4.0,
-        "role": "역공학(Ghidra) 코드 해석 · 심층 추론 두뇌",
-        "speed_hint": "RAM 16GB 이상 또는 GPU/맥북에서 강력 추천",
+        "id": "custom-synapse-seed",
+        "name": "Synapse-Core 독자 초경량 틀",
+        "params": "Custom (내 위키 맞춤형)",
+        "fp16_mb": 640,
+        "our_int8_mb": 325,
+        "our_int4_mb": 185,
+        "ram_needed_gb": 0.5,
+        "takeaway": "불필요한 잡학 상식을 덜어내고 내 위키·강화학습·역공학 시냅스만 남긴 순수 우리 두뇌",
     },
 ]
 
@@ -75,7 +61,7 @@ def _detect_memory_gb() -> Dict[str, float]:
                     key = parts[0].strip()
                     val_parts = parts[1].strip().split()
                     if val_parts and val_parts[0].isdigit():
-                        info[key] = int(val_parts[0])  # kB
+                        info[key] = int(val_parts[0])
             total_kb = info.get("MemTotal", 0)
             avail_kb = info.get("MemAvailable", info.get("MemFree", 0))
             if total_kb > 0:
@@ -151,7 +137,7 @@ def _detect_accelerator() -> Dict[str, str]:
     system = platform.system()
     machine = platform.machine().lower()
     if system == "Darwin" and ("arm" in machine or "aarch64" in machine):
-        return {"type": "Apple Metal (Unified Memory)", "mode": "metal"}
+        return {"type": "Apple Metal 통합메모리", "mode": "metal"}
     if shutil.which("nvidia-smi"):
         try:
             gpu_name = (
@@ -165,15 +151,63 @@ def _detect_accelerator() -> Dict[str, str]:
                 .strip()
             )
             if gpu_name:
-                return {"type": f"NVIDIA GPU ({gpu_name})", "mode": "cuda"}
+                return {"type": f"NVIDIA {gpu_name}", "mode": "cuda"}
         except Exception:
             pass
-    return {"type": "CPU 전용 모드 (데이터센터 GPU 불필요!)", "mode": "cpu"}
+    return {"type": "순수 CPU 모드 (무GPU 동작)", "mode": "cpu"}
+
+
+def _evaluate_environment(
+    total_ram: float, avail_ram: float, cores: int, drive_free_gb: float, accel_mode: str
+) -> Dict[str, Any]:
+    ram_score = min(45, int(avail_ram * 12))
+    core_score = min(25, cores * 5)
+    disk_score = min(20, int(drive_free_gb * 1.5))
+    accel_bonus = 10 if accel_mode in ("cuda", "metal") else 5
+    score = max(15, min(100, ram_score + core_score + disk_score + accel_bonus))
+
+    ram_free_pct = round((avail_ram / max(0.1, total_ram)) * 100)
+
+    if avail_ram >= 2.5 and drive_free_gb >= 2.0:
+        grade = "optimal"
+        label = "쾌적 · 연구 최적"
+        note = (
+            f"호흡할 여유 메모리({avail_ram}GB)가 넉넉해요! "
+            f"우리만의 4비트·8비트 양자화 두뇌를 빚고 공부하기에 아주 쾌적합니다."
+        )
+        max_custom_tier = "INT4 2.0B급 / INT8 1.2B급 두뇌까지 직접 주조·실행 가능"
+    elif avail_ram >= 1.2:
+        grade = "balanced"
+        label = "보통 · 경량 적합"
+        note = (
+            f"여유 메모리({avail_ram}GB)가 적당해요. "
+            f"초경량 4비트(INT4) 압축 모드로 작업하면 버벅임 없이 돌아갑니다."
+        )
+        max_custom_tier = "INT4 0.8B급 이하 초경량 두뇌 권장"
+    else:
+        grade = "tight"
+        label = "협소 · 초절전 필요"
+        note = (
+            f"현재 컴퓨터 여유 메모리({avail_ram}GB)가 좁아요! "
+            f"무거운 프로그램을 닫거나 200MB급 초압축 INT4 시냅스 모드를 사용하세요."
+        )
+        max_custom_tier = "초압축 INT4 마이크로 두뇌 전용"
+
+    return {
+        "score": score,
+        "grade": grade,
+        "label": label,
+        "ram_free_pct": ram_free_pct,
+        "note": note,
+        "max_custom_tier": max_custom_tier,
+    }
 
 
 def probe_host(brain_root: Path) -> Dict[str, Any]:
     mem = _detect_memory_gb()
     avail = mem["available_gb"]
+    total = mem["total_gb"]
+    cores = os.cpu_count() or 1
     accel = _detect_accelerator()
     try:
         usage = shutil.disk_usage(brain_root)
@@ -182,39 +216,28 @@ def probe_host(brain_root: Path) -> Dict[str, Any]:
     except Exception:
         drive_total_gb, drive_free_gb = 0.0, 0.0
 
-    # Evaluate each quantized SLM against live free RAM
-    recommendations: List[Dict[str, Any]] = []
-    best_model = SLM_CATALOG[0]
-    for item in SLM_CATALOG:
-        need = item["ram_needed_gb"]
-        saved_pct = round((1.0 - item["file_mb"] / item["fp16_mb"]) * 100)
-        if avail >= need * 1.25:
-            fit = "optimal"
-            fit_label = "쾌적 실행"
-            best_model = item
-        elif avail >= need * 0.9:
-            fit = "tight"
-            fit_label = "실행 가능 (여유 적음)"
-        else:
-            fit = "heavy"
-            fit_label = "현재 여유 RAM 부족"
-        recommendations.append(
-            {
-                **item,
-                "saved_pct": saved_pct,
-                "fit": fit,
-                "fit_label": fit_label,
-            }
-        )
+    env_status = _evaluate_environment(total, avail, cores, drive_free_gb, accel["mode"])
 
-    host_fingerprint = f"{platform.system()}-{platform.machine()}-{os.cpu_count() or 1}c"
+    blueprints: List[Dict[str, Any]] = []
+    for bp in DONOR_BLUEPRINTS:
+        need = bp["ram_needed_gb"]
+        saved_pct = round((1.0 - bp["our_int4_mb"] / bp["fp16_mb"]) * 100)
+        if avail >= need * 1.2:
+            fit, fit_label = "optimal", "쾌적 구동"
+        elif avail >= need * 0.85:
+            fit, fit_label = "tight", "절약 구동"
+        else:
+            fit, fit_label = "heavy", "메모리 부족"
+        blueprints.append({**bp, "saved_pct": saved_pct, "fit": fit, "fit_label": fit_label})
+
+    host_fingerprint = f"{platform.system()}-{platform.machine()}-{cores}c"
     return {
         "hostname": socket.gethostname(),
         "os": f"{platform.system()} {platform.release()}",
         "arch": platform.machine(),
         "cpu_name": _detect_cpu_name(),
-        "cpu_cores": os.cpu_count() or 1,
-        "ram_total_gb": mem["total_gb"],
+        "cpu_cores": cores,
+        "ram_total_gb": total,
         "ram_available_gb": avail,
         "accelerator": accel["type"],
         "accel_mode": accel["mode"],
@@ -222,6 +245,6 @@ def probe_host(brain_root: Path) -> Dict[str, Any]:
         "drive_total_gb": drive_total_gb,
         "drive_free_gb": drive_free_gb,
         "host_fingerprint": host_fingerprint,
-        "best_slm": best_model,
-        "slm_matrix": recommendations,
+        "environment": env_status,
+        "blueprints": blueprints,
     }

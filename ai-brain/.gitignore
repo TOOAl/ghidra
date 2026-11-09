@@ -1,5 +1,7 @@
 # External-drive heavy weights & portable binaries (kept on USB/SSD, not pushed to GitHub)
 models/*.gguf
+models/*.sbrain
+models/forged_brains.json
 models/*.bin
 models/*.safetensors
 runtime/

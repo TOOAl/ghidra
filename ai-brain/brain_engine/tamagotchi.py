@@ -1,7 +1,14 @@
 """
 Living Tamagotchi Brain state & evolution engine.
-Lives inside `state/soul.json` on the external drive so your AI brain keeps its
-memories, personality, XP, and travel log across every PC it plugs into.
+Maps Synapsemong's internal state and recent actions to the 8 cosmic poses:
+  01_greet      - 첫 인사 / 반가운 환영
+  02_curious    - 호기심 가득 대기 상태
+  03_swirl      - 새 지식을 소용돌이로 흡수·분류 중
+  04_brainstorm - 배고프거나 환경이 좁아 깊이 고민 중
+  05_drop       - 소중한 영감 한 방울 수집
+  06_star       - 시냅스 별 연결 완성!
+  07_eureka     - 유레카! 질문 답변 / 양자화 두뇌 주조 성공!
+  08_journey    - 진화 순항 · 최고 컨디션
 """
 
 from __future__ import annotations
@@ -14,10 +21,10 @@ from typing import Any, Dict, List
 
 
 STAGES: List[Dict[str, Any]] = [
-    {"level": 1, "min_xp": 0, "key": "egg", "title": "알에서 깨어난 꼬마 뉴런", "emoji": "🐣"},
-    {"level": 2, "min_xp": 50, "key": "sprout", "title": "호기심 많은 아기 시냅스", "emoji": "🌱"},
-    {"level": 3, "min_xp": 140, "key": "scholar", "title": "노트 정리하는 학자 두뇌", "emoji": "🦉"},
-    {"level": 4, "min_xp": 300, "key": "analyst", "title": "스스로 판단하는 연구원 두뇌", "emoji": "🧠"},
+    {"level": 1, "min_xp": 0, "key": "egg", "title": "알에서 깨어난 꼬마 뉴런", "emoji": "✦"},
+    {"level": 2, "min_xp": 50, "key": "sprout", "title": "호기심 많은 아기 시냅스", "emoji": "✧"},
+    {"level": 3, "min_xp": 140, "key": "scholar", "title": "노트 정리하는 학자 두뇌", "emoji": "★"},
+    {"level": 4, "min_xp": 300, "key": "analyst", "title": "스스로 판단하는 연구원 두뇌", "emoji": "✪"},
     {"level": 5, "min_xp": 600, "key": "master", "title": "전설의 포터블 마스터 두뇌", "emoji": "👑"},
 ]
 
@@ -35,7 +42,10 @@ class TamagotchiSoul:
     def _load_or_create(self) -> Dict[str, Any]:
         if self.soul_path.exists():
             try:
-                return json.loads(self.soul_path.read_text(encoding="utf-8"))
+                loaded = json.loads(self.soul_path.read_text(encoding="utf-8"))
+                loaded.setdefault("pose", "01_greet")
+                loaded.setdefault("brains_forged", 0)
+                return loaded
             except Exception:
                 pass
         now_ts = time.time()
@@ -43,20 +53,22 @@ class TamagotchiSoul:
             "name": "시냅스몽",
             "born_at": _utc_iso(),
             "xp": 30,
-            "satiety": 78,
-            "mood": 88,
+            "satiety": 80,
+            "mood": 90,
+            "pose": "01_greet",
             "last_fed_ts": now_ts,
             "last_interaction_ts": now_ts,
             "memories_eaten": 4,
             "questions_answered": 0,
+            "brains_forged": 0,
             "rl_episodes": 0,
             "binaries_analyzed": 0,
             "rl_iq_bonus": 0,
             "re_skill": 0,
             "hosts_visited": [],
-            "last_speech": "안녕 주인님! 외장하드 집에서 방금 눈을 떴어요. 오늘 배운 지식이나 메모를 먹여 주세요!",
+            "last_speech": "안녕 주인님! 외장하드 집에서 깨어났어요. 지식을 먹이고 우리만의 양자화 두뇌를 함께 빚어봐요!",
             "recent_events": [
-                {"time": _utc_iso(), "text": "외장하드 포터블 서식지(ai-brain)에서 첫 탄생!"}
+                {"time": _utc_iso(), "text": "외장하드 포터블 서식지(ai-brain)에서 첫 탄생"}
             ],
         }
         self._save(initial)
@@ -81,11 +93,12 @@ class TamagotchiSoul:
         visited: List[str] = self.data.setdefault("hosts_visited", [])
         if fp not in visited:
             visited.append(fp)
-            best = host_info.get("best_slm", {}).get("name", "초경량 모델")
-            self._log_event(f"새로운 숙주 컴퓨터 감지: {fp} → 추천 두뇌: {best}")
+            env_label = host_info.get("environment", {}).get("label", "양호")
+            self._log_event(f"숙주 PC 연결: {fp} · 환경 [{env_label}]")
+            self.data["pose"] = "01_greet"
             self.data["last_speech"] = (
-                f"우와! 새로운 컴퓨터({host_info.get('cpu_cores')}코어, 여유 RAM "
-                f"{host_info.get('ram_available_gb')}GB)에 연결됐어요! '{best}' 눈금이 딱 맞겠어요!"
+                f"새 컴퓨터({host_info.get('cpu_cores')}코어, 여유 RAM "
+                f"{host_info.get('ram_available_gb')}GB)에 자리를 잡았어요! 작업 환경은 '{env_label}' 상태예요."
             )
             self._save()
 
@@ -99,8 +112,9 @@ class TamagotchiSoul:
         if clean:
             self.data["name"] = clean
             self.data["mood"] = min(100, int(self.data.get("mood", 80)) + 8)
-            self.data["last_speech"] = f"헤헤, 이제 제 이름은 '{clean}'이에요! 평생 주인님 지식을 지켜드릴게요!"
-            self._log_event(f"이름이 '{clean}'(으)로 변경됨")
+            self.data["pose"] = "08_journey"
+            self.data["last_speech"] = f"좋아요! 이제 제 이름은 '{clean}'이에요. 우리만의 두뇌를 멋지게 키워봐요!"
+            self._log_event(f"이름 변경: {clean}")
             self._save()
         return self.data
 
@@ -114,12 +128,14 @@ class TamagotchiSoul:
         self.data["last_interaction_ts"] = now
         self.data["memories_eaten"] = int(self.data.get("memories_eaten", 0)) + 1
         if links_count > 0:
+            self.data["pose"] = "06_star"
             self.data["last_speech"] = (
-                f"냠냠! '{title}' 지식을 맛있게 소화해서 기존 기억 {links_count}개와 시냅스를 연결했어요! (+{gained_xp} XP)"
+                f"반짝! '{title}' 지식을 소화해 기존 기억 {links_count}개와 별자리 시냅스로 연결했어요! (+{gained_xp} XP)"
             )
         else:
+            self.data["pose"] = "05_drop"
             self.data["last_speech"] = (
-                f"꿀꺽! 새로운 씨앗 기억 '{title}'을(를) 마크다운 위키에 심었어요! (+{gained_xp} XP)"
+                f"소중한 첫 영감 방울 '{title}'을(를) 마크다운 위키에 간직했어요! (+{gained_xp} XP)"
             )
         self._log_event(f"지식 섭취: [{title}] (연결 +{links_count}, XP +{gained_xp})")
         self._save()
@@ -129,9 +145,23 @@ class TamagotchiSoul:
         self.data["mood"] = min(100, int(self.data.get("mood", 75)) + 5)
         self.data["last_interaction_ts"] = time.time()
         self.data["questions_answered"] = int(self.data.get("questions_answered", 0)) + 1
+        self.data["pose"] = "07_eureka"
         self.data["last_speech"] = (
-            f"내 머릿속 시냅스에서 관련 기억 카드 {recalled_count}개를 꺼내 대답했어요! (+8 XP)"
+            f"유레카! 내 위키 그물망에서 핵심 기억 카드 {recalled_count}개를 찾아 답을 완성했어요! (+8 XP)"
         )
+        self._save()
+
+    def on_forge_brain(self, bits: int, saved_pct: float, cos_sim: float) -> None:
+        self.data["xp"] = int(self.data.get("xp", 0)) + 30
+        self.data["mood"] = min(100, int(self.data.get("mood", 80)) + 12)
+        self.data["rl_iq_bonus"] = int(self.data.get("rl_iq_bonus", 0)) + 4
+        self.data["brains_forged"] = int(self.data.get("brains_forged", 0)) + 1
+        self.data["pose"] = "07_eureka"
+        self.data["last_speech"] = (
+            f"짜잔! 내 위키 지식으로 직접 {bits}비트 독자 두뇌(.sbrain)를 구워냈어요! "
+            f"용량 {saved_pct}% 절감, 정밀도 {cos_sim}% 보존 성공! (+30 XP)"
+        )
+        self._log_event(f"자체 INT{bits} 두뇌 주조 성공 (정밀도 {cos_sim}%, 압축 -{saved_pct}%)")
         self._save()
 
     def poke(self) -> Dict[str, Any]:
@@ -140,14 +170,18 @@ class TamagotchiSoul:
         self.data["last_interaction_ts"] = time.time()
         satiety = int(self.data.get("satiety", 70))
         if satiety < 45:
-            self.data["last_speech"] = "꼬르륵... 배가 조금 고파요! 오늘 떠오른 생각이나 메모 한 줄만 먹여 주세요!"
+            self.data["pose"] = "04_brainstorm"
+            self.data["last_speech"] = "꼬르륵... 새로운 메모나 아이디어 한 줄만 먹여 주세요!"
         else:
-            self.data["last_speech"] = "기분 최고예요! 외장하드만 챙기면 어느 컴퓨터에서든 제가 바로 깨어날 수 있어요!"
-        self._log_event("주인님이 쓰다듬어 줌 (기분 +7, XP +3)")
+            poses = ["02_curious", "08_journey", "01_greet"]
+            cur = self.data.get("pose", "01_greet")
+            self.data["pose"] = poses[(poses.index(cur) + 1) % len(poses)] if cur in poses else "02_curious"
+            self.data["last_speech"] = "헤헤, 우주 별빛 시냅스가 반짝여요! 오늘은 어떤 지식을 빚어볼까요?"
+        self._log_event("주인님과 교감 (기분 +7, XP +3)")
         self._save()
         return self.data
 
-    def snapshot(self, graph_stats: Dict[str, int]) -> Dict[str, Any]:
+    def snapshot(self, graph_stats: Dict[str, int], env_grade: str = "optimal") -> Dict[str, Any]:
         self._apply_time_decay()
         xp = int(self.data.get("xp", 0))
         current_stage = STAGES[0]
@@ -163,15 +197,17 @@ class TamagotchiSoul:
         satiety = int(self.data.get("satiety", 75))
         mood = int(self.data.get("mood", 85))
 
-        if satiety < 35:
+        pose = self.data.get("pose", "01_greet")
+        if satiety < 35 or env_grade == "tight":
             emotion = "hungry"
-            emotion_label = "꼬르륵 배고픔 (지식 필요!)"
-        elif mood >= 80:
+            emotion_label = "집중 고민 · 에너지 보충 필요"
+            pose = "04_brainstorm"
+        elif mood >= 82:
             emotion = "happy"
-            emotion_label = "신남 · 시냅스 반짝이는 중"
+            emotion_label = "최상 컨디션 · 별빛 시냅스 활성"
         else:
             emotion = "calm"
-            emotion_label = "차분히 사색 중"
+            emotion_label = "차분히 탐구 중"
 
         return {
             "name": self.data.get("name", "시냅스몽"),
@@ -184,6 +220,7 @@ class TamagotchiSoul:
             "next_xp": next_stage["min_xp"] if next_stage else xp,
             "satiety": satiety,
             "mood": mood,
+            "pose": pose,
             "emotion": emotion,
             "emotion_label": emotion_label,
             "iq": iq,
@@ -192,6 +229,7 @@ class TamagotchiSoul:
             "edges_count": edges_cnt,
             "memories_eaten": self.data.get("memories_eaten", 0),
             "questions_answered": self.data.get("questions_answered", 0),
+            "brains_forged": self.data.get("brains_forged", 0),
             "rl_episodes": self.data.get("rl_episodes", 0),
             "binaries_analyzed": self.data.get("binaries_analyzed", 0),
             "re_skill": self.data.get("re_skill", 0),

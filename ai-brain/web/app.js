@@ -1,7 +1,7 @@
-/* Portable Tamagotchi AI Brain Frontend (100% relative API URLs) */
+/* Clean Cosmic UI + 8-Pose Synapsemong + Custom Quantization Forge (Relative URLs Only) */
 
 const CATEGORY_COLORS = {
-  "AI모델·양자화": "#a78bfa",
+  "AI모델·양자화": "#818cf8",
   "강화학습·판단": "#34d399",
   "역공학·보안": "#f472b6",
   "포터블·인프라": "#38bdf8",
@@ -10,20 +10,21 @@ const CATEGORY_COLORS = {
 
 const SNACK_SAMPLES = {
   quant: {
-    title: "노트북 RAM에서 4비트 GGUF 모델 빠르게 돌리는 비결",
-    text: "초소형 언어모델(SLM)을 16비트 그대로 쓰면 무겁지만 Q4_K_M 4비트 양자화를 적용하면 용량이 1/4로 줄어든다. 외장하드에서 처음 모델을 읽어들일 때 OS 파일 캐시에 올라가므로 두 번째 질문부터는 내장 SSD처럼 초고속으로 응답한다.",
+    title: "외부 모델을 해부해 우리만의 4비트 두뇌(.sbrain)로 재주조하는 원리",
+    text: "거대 모델을 그대로 내려받아 쓰지 않고, 외부 오픈모델의 GQA 어텐션과 SwiGLU 골격 비율만 참고한 뒤 내 마크다운 위키 어휘와 역공학 지식으로 신경망 가중치를 구성한다. 이후 32개 블록 단위 대칭 스케일링과 니블 패킹(1바이트에 4비트 가중치 2개 저장)을 적용하면 용량이 약 84% 줄어들어 외장하드 어디서든 빠르게 작동한다.",
   },
   rl: {
-    title: "작은 AI 여러 개를 연결할 때 다수결보다 좋은 방법",
-    text: "단순 다수결 투표를 하면 평범한 평균 점수가 나오지만, 다수가 동의하는 범위 안에서 1등 전문가 에이전트에게 선택권을 맡기면(Poor Voters, Good Judges) 답만 외운 가짜 1등을 걸러내고 진짜 실력을 발휘할 수 있다. B단계 강화학습 두뇌에 이 규칙을 넣자!",
+    title: "작은 AI 여러 개를 연결할 때 다수결보다 뛰어난 합의 방식",
+    text: "단순 다수결 투표는 평범한 평균에 머물지만, 다수가 동의하는 후보 안에서 1등 전문가 두뇌의 선택을 따르게 하면(Poor Voters, Good Judges) 암기만 한 오버피팅 모델을 걸러내고 훨씬 높은 판단 정확도를 얻는다.",
   },
   ghidra: {
-    title: "Ghidra analyzeHeadless로 의심스러운 바이너리 문자열 추적하기",
-    text: "기드라 헤드리스 모드로 실행 파일을 임포트한 뒤 심볼 테이블과 참조 문자열을 마크다운 리포트로 뽑아두면, 로컬 AI 두뇌가 인터넷 연결 없이도 암호화 루틴과 네트워크 함수를 찾아 위키 시냅스에 기록할 수 있다.",
+    title: "Ghidra analyzeHeadless와 시냅스몽 역공학 해부실 연결 설계",
+    text: "Ghidra 헤드리스 모드로 바이너리에서 함수 호출 그래프와 의심 문자열을 추출해 마크다운 위키에 넣으면, 시냅스몽이 인터넷 없이도 암호화 루틴과 핵심 함수를 연결해 기억한다.",
   },
 };
 
 let graphState = { nodes: [], edges: [], selectedId: null, dragNode: null };
+let manualPoseOverride = null;
 
 async function apiGet(path) {
   const res = await fetch(path);
@@ -39,25 +40,35 @@ async function apiPost(path, payload = {}) {
   return res.json();
 }
 
-function triggerPetBounce() {
-  const svg = document.getElementById("petSvg");
-  svg.classList.remove("bounce");
-  void svg.offsetWidth;
-  svg.classList.add("bounce");
+function pulsePortrait() {
+  const frame = document.getElementById("portraitFrame");
+  frame.classList.remove("pulse");
+  void frame.offsetWidth;
+  frame.classList.add("pulse");
+}
+
+function setPetPose(poseKey) {
+  const valid = poseKey || "01_greet";
+  const img = document.getElementById("petImage");
+  const targetSrc = `assets/${valid}.jpg`;
+  if (!img.getAttribute("src").endsWith(`${valid}.jpg`)) {
+    img.setAttribute("src", targetSrc);
+  }
+  document.querySelectorAll(".pose-dot").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.pose === valid);
+  });
 }
 
 function renderStatus(data) {
-  const { soul, host, engine, graph } = data;
-  document.getElementById("petStageBadge").textContent = `Lv.${soul.level} ${soul.stage_emoji} ${soul.stage_title}`;
+  const { soul, host, forged_brains, graph } = data;
+  document.getElementById("petStageBadge").textContent =
+    `Lv.${soul.level} ${soul.stage_emoji} ${soul.stage_title}`;
   document.getElementById("petName").textContent = soul.name;
   document.getElementById("petEmotion").textContent = soul.emotion_label;
   document.getElementById("petSpeech").textContent = soul.speech;
 
-  const mouth = document.getElementById("petMouth");
-  if (soul.emotion === "hungry") {
-    mouth.setAttribute("d", "M100,121 Q110,113 120,121");
-  } else {
-    mouth.setAttribute("d", "M99,115 Q110,126 121,115");
+  if (!manualPoseOverride) {
+    setPetPose(soul.pose || "01_greet");
   }
 
   document.getElementById("barSatiety").style.width = `${soul.satiety}%`;
@@ -67,61 +78,76 @@ function renderStatus(data) {
 
   const xpPct = soul.next_xp > 0 ? Math.min(100, Math.round((soul.xp / soul.next_xp) * 100)) : 100;
   document.getElementById("barXp").style.width = `${xpPct}%`;
-  document.getElementById("valXp").textContent = `${soul.xp}/${soul.next_xp}`;
+  document.getElementById("valXp").textContent = `${soul.xp} / ${soul.next_xp} XP`;
+
+  // Environment Status Window right underneath Vital Bars
+  const env = host.environment || {};
+  const envBadge = document.getElementById("envBadge");
+  envBadge.className = `env-badge ${env.grade || "optimal"}`;
+  envBadge.textContent = `${env.label || "쾌적"} (${env.score || 85}점)`;
+
+  document.getElementById("envRamText").textContent =
+    `${host.ram_available_gb} GB 여유 / 총 ${host.ram_total_gb} GB (${env.ram_free_pct || 0}%)`;
+  document.getElementById("envRamBar").style.width = `${Math.min(100, env.ram_free_pct || 50)}%`;
+  document.getElementById("envCpuText").textContent =
+    `${host.cpu_cores}코어 · ${host.accelerator}`;
+  document.getElementById("envDiskText").textContent =
+    `${host.drive_free_gb} GB 사용 가능`;
+  document.getElementById("envTierText").textContent =
+    env.max_custom_tier || "INT4 초경량 두뇌 주조 가능";
+  document.getElementById("envComment").textContent = env.note || "";
 
   document.getElementById("kpiIq").textContent = soul.iq;
   document.getElementById("kpiNotes").textContent = soul.notes_count;
   document.getElementById("kpiEdges").textContent = soul.edges_count;
+  document.getElementById("kpiForged").textContent = (forged_brains || []).length;
 
-  document.getElementById("hostChip").textContent =
-    `🔌 숙주: ${host.cpu_cores}코어 · 여유 RAM ${host.ram_available_gb}GB`;
-
-  const engineBanner = document.getElementById("engineBanner");
-  if (engine.online) {
-    engineBanner.innerHTML = `🟢 <strong>로컬 양자화 엔진 연결됨:</strong> ${engine.engine_name} (<code>${engine.active_model}</code>)`;
-  } else {
-    engineBanner.innerHTML = `🔵 <strong>${engine.engine_name}</strong><br/><span style="font-size:11px;opacity:0.85">외장하드 models/ 에 GGUF 모델 추가 시 자동 전환</span>`;
-  }
-
-  const eventList = document.getElementById("eventList");
-  eventList.innerHTML = "";
-  (soul.recent_events || []).slice(0, 8).forEach((ev) => {
-    const li = document.createElement("li");
-    const shortTime = (ev.time || "").slice(11, 16);
-    li.textContent = `[${shortTime}] ${ev.text}`;
-    eventList.appendChild(li);
-  });
-
-  renderHostScanner(host);
+  renderForgedList(forged_brains || []);
   syncGraphData(graph);
 }
 
-function renderHostScanner(host) {
-  const specs = document.getElementById("hostSpecs");
-  specs.innerHTML = `
-    <div class="spec-tile"><span>운영체제 / 아키텍처</span><strong>${host.os} (${host.arch})</strong></div>
-    <div class="spec-tile"><span>숙주 CPU</span><strong>${host.cpu_cores}코어 · ${host.cpu_name.slice(0, 28)}</strong></div>
-    <div class="spec-tile"><span>현재 사용 가능 RAM</span><strong>${host.ram_available_gb} GB / 총 ${host.ram_total_gb} GB</strong></div>
-    <div class="spec-tile"><span>가속기 모드</span><strong>${host.accelerator}</strong></div>
-    <div class="spec-tile"><span>서식지(외장하드) 여유 공간</span><strong>${host.drive_free_gb} GB 여유</strong></div>
-    <div class="spec-tile"><span>추천 최적 두뇌</span><strong>⭐ ${host.best_slm.name}</strong></div>
-  `;
+function renderForgedList(items) {
+  const box = document.getElementById("forgedList");
+  if (!items.length) {
+    box.textContent = "아직 주조된 .sbrain 파일이 없습니다. 위 버튼을 눌러 첫 독자 두뇌를 구워보세요!";
+    return;
+  }
+  box.innerHTML = items
+    .map(
+      (b) => `
+      <div class="forged-item">
+        <div>
+          <strong>${b.filename}</strong><br/>
+          <span style="color:#94a3b8;font-size:11px">어휘 ${b.vocab_size}개 · 파라미터 ${b.total_params.toLocaleString()}개 · 정밀도 ${b.cosine_similarity_pct}%</span>
+        </div>
+        <div style="text-align:right">
+          <strong style="color:#6ee7b7">${b.file_kb} KB</strong><br/>
+          <span style="color:#94a3b8;font-size:11px">FP32 대비 -${b.saved_vs_fp32_pct}%</span>
+        </div>
+      </div>`
+    )
+    .join("");
+}
 
-  const tbody = document.getElementById("slmTableBody");
-  tbody.innerHTML = "";
-  (host.slm_matrix || []).forEach((m) => {
-    const tr = document.createElement("tr");
-    const cls = m.fit === "optimal" ? "fit-optimal" : m.fit === "tight" ? "fit-tight" : "fit-heavy";
-    tr.innerHTML = `
-      <td><strong>${m.name}</strong><br/><span style="font-size:11.5px;color:#94a3b8">${m.role}</span></td>
-      <td>${(m.fp16_mb / 1000).toFixed(1)} GB</td>
-      <td><strong>${m.file_mb} MB</strong></td>
-      <td>-${m.saved_pct}% 압축</td>
-      <td>${m.ram_needed_gb} GB</td>
-      <td class="${cls}">${m.fit_label}</td>
-    `;
-    tbody.appendChild(tr);
-  });
+async function loadAnatomy(bpId) {
+  const res = await apiGet(`api/dissect?id=${encodeURIComponent(bpId)}`);
+  const a = res.anatomy;
+  if (!a) return;
+  const box = document.getElementById("anatomyBox");
+  box.innerHTML = `
+    <div style="font-weight:700;font-size:14px;color:#e0e7ff">${a.title}</div>
+    <div style="font-size:11.5px;color:#94a3b8;margin-top:2px">${a.donor_source}</div>
+    <div class="anatomy-grid">
+      <div class="anat-item"><span>층수 / 은닉 차원</span><strong>${a.layers}층 · ${a.hidden_size}차원</strong></div>
+      <div class="anat-item"><span>어텐션 메커니즘</span><strong>${a.attention}</strong></div>
+      <div class="anat-item"><span>신경망 활성 블록</span><strong>${a.ffn}</strong></div>
+      <div class="anat-item"><span>단어 사전 구조</span><strong>${a.vocab}</strong></div>
+    </div>
+    <strong style="color:#6ee7b7">✔ 우리 두뇌 기본 틀로 흡수할 핵심 원리</strong>
+    <ul class="anat-list">${a.keep_parts.map((x) => `<li>${x}</li>`).join("")}</ul>
+    <strong style="color:#fca5a5">✂ 과감히 덜어내고 재설계할 부분</strong>
+    <ul class="anat-list" style="margin-bottom:0">${a.strip_parts.map((x) => `<li>${x}</li>`).join("")}</ul>
+  `;
 }
 
 function syncGraphData(graph) {
@@ -138,8 +164,8 @@ function syncGraphData(graph) {
     const angle = (idx / Math.max(1, graph.nodes.length)) * Math.PI * 2;
     return {
       ...n,
-      x: prev ? prev.x : w / 2 + Math.cos(angle) * 120,
-      y: prev ? prev.y : h / 2 + Math.sin(angle) * 95,
+      x: prev ? prev.x : w / 2 + Math.cos(angle) * 130,
+      y: prev ? prev.y : h / 2 + Math.sin(angle) * 105,
       vx: prev ? prev.vx : 0,
       vy: prev ? prev.vy : 0,
     };
@@ -156,16 +182,10 @@ async function openNoteBySlug(slug) {
   const res = await apiGet(`api/note?slug=${encodeURIComponent(slug)}`);
   if (!res.note) return;
   const n = res.note;
-  document.getElementById("viewerTitle").textContent = `📄 ${n.title}`;
+  document.getElementById("viewerTitle").textContent = n.title;
   document.getElementById("viewerPath").textContent = `vault/${n.rel_path}`;
   const tagBox = document.getElementById("viewerTags");
-  tagBox.innerHTML = "";
-  (n.tags || []).forEach((t) => {
-    const span = document.createElement("span");
-    span.className = "tag-chip";
-    span.textContent = `#${t}`;
-    tagBox.appendChild(span);
-  });
+  tagBox.innerHTML = (n.tags || []).map((t) => `<span class="tag-chip">#${t}</span>`).join("");
   document.getElementById("viewerBody").textContent = n.body;
 }
 
@@ -184,9 +204,7 @@ function setupGraphSimulation() {
   canvas.addEventListener("mousedown", (evt) => {
     const pos = getMousePos(evt);
     for (const n of graphState.nodes) {
-      const dx = pos.x - n.x;
-      const dy = pos.y - n.y;
-      if (Math.hypot(dx, dy) <= 22) {
+      if (Math.hypot(pos.x - n.x, pos.y - n.y) <= 22) {
         graphState.dragNode = n;
         openNoteBySlug(n.id);
         break;
@@ -197,8 +215,8 @@ function setupGraphSimulation() {
   canvas.addEventListener("mousemove", (evt) => {
     if (!graphState.dragNode) return;
     const pos = getMousePos(evt);
-    graphState.dragNode.x = Math.max(30, Math.min(canvas.width - 30, pos.x));
-    graphState.dragNode.y = Math.max(30, Math.min(canvas.height - 30, pos.y));
+    graphState.dragNode.x = Math.max(36, Math.min(canvas.width - 36, pos.x));
+    graphState.dragNode.y = Math.max(36, Math.min(canvas.height - 36, pos.y));
     graphState.dragNode.vx = 0;
     graphState.dragNode.vy = 0;
   });
@@ -213,15 +231,14 @@ function setupGraphSimulation() {
     const w = canvas.width;
     const h = canvas.height;
 
-    // Force layout
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
         const a = nodes[i];
         const b = nodes[j];
-        let dx = b.x - a.x || 0.1;
-        let dy = b.y - a.y || 0.1;
-        const dist2 = Math.max(400, dx * dx + dy * dy);
-        const force = 2600 / dist2;
+        const dx = b.x - a.x || 0.1;
+        const dy = b.y - a.y || 0.1;
+        const dist2 = Math.max(500, dx * dx + dy * dy);
+        const force = 2900 / dist2;
         const dist = Math.sqrt(dist2);
         a.vx -= (dx / dist) * force;
         a.vy -= (dy / dist) * force;
@@ -238,7 +255,7 @@ function setupGraphSimulation() {
       const dx = b.x - a.x;
       const dy = b.y - a.y;
       const dist = Math.max(1, Math.hypot(dx, dy));
-      const pull = (dist - 135) * 0.012;
+      const pull = (dist - 145) * 0.012;
       a.vx += (dx / dist) * pull;
       a.vy += (dy / dist) * pull;
       b.vx -= (dx / dist) * pull;
@@ -247,15 +264,14 @@ function setupGraphSimulation() {
 
     nodes.forEach((n) => {
       if (n === graphState.dragNode) return;
-      n.vx += (w / 2 - n.x) * 0.0025;
-      n.vy += (h / 2 - n.y) * 0.0025;
+      n.vx += (w / 2 - n.x) * 0.0024;
+      n.vy += (h / 2 - n.y) * 0.0024;
       n.vx *= 0.84;
       n.vy *= 0.84;
-      n.x = Math.max(42, Math.min(w - 42, n.x + n.vx));
-      n.y = Math.max(36, Math.min(h - 36, n.y + n.vy));
+      n.x = Math.max(46, Math.min(w - 46, n.x + n.vx));
+      n.y = Math.max(38, Math.min(h - 38, n.y + n.vy));
     });
 
-    // Render
     ctx.clearRect(0, 0, w, h);
     edges.forEach((e) => {
       const a = byId[e.source];
@@ -264,31 +280,31 @@ function setupGraphSimulation() {
       ctx.beginPath();
       ctx.moveTo(a.x, a.y);
       ctx.lineTo(b.x, b.y);
-      ctx.strokeStyle = "rgba(167, 139, 250, 0.42)";
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = "rgba(165, 180, 252, 0.34)";
+      ctx.lineWidth = 1.8;
       ctx.stroke();
     });
 
     nodes.forEach((n) => {
-      const color = CATEGORY_COLORS[n.category] || "#a78bfa";
+      const color = CATEGORY_COLORS[n.category] || "#818cf8";
       const isSel = n.id === graphState.selectedId;
       ctx.beginPath();
-      ctx.arc(n.x, n.y, isSel ? 17 : 13, 0, Math.PI * 2);
+      ctx.arc(n.x, n.y, isSel ? 15 : 11.5, 0, Math.PI * 2);
       ctx.fillStyle = color;
       ctx.shadowColor = color;
-      ctx.shadowBlur = isSel ? 18 : 8;
+      ctx.shadowBlur = isSel ? 16 : 7;
       ctx.fill();
       ctx.shadowBlur = 0;
       if (isSel) {
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 2.5;
         ctx.strokeStyle = "#ffffff";
         ctx.stroke();
       }
-      ctx.fillStyle = "#e2e8f0";
-      ctx.font = "12px sans-serif";
+      ctx.fillStyle = "#cbd5e1";
+      ctx.font = "11.5px sans-serif";
       ctx.textAlign = "center";
-      const label = n.title.length > 18 ? n.title.slice(0, 17) + "…" : n.title;
-      ctx.fillText(label, n.x, n.y + 29);
+      const label = n.title.length > 19 ? n.title.slice(0, 18) + "…" : n.title;
+      ctx.fillText(label, n.x, n.y + 27);
     });
 
     requestAnimationFrame(step);
@@ -299,30 +315,41 @@ function setupGraphSimulation() {
 
 function setupInteractions() {
   // Tabs
-  document.querySelectorAll(".tab").forEach((btn) => {
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
-      document.querySelectorAll(".tab").forEach((b) => b.classList.remove("active"));
-      document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
+      document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+      document.querySelectorAll(".tab-view").forEach((p) => p.classList.remove("active"));
       btn.classList.add("active");
       document.getElementById(btn.dataset.tab).classList.add("active");
     });
   });
 
-  // Poke
+  // Manual Pose Preview Strip
+  document.querySelectorAll(".pose-dot").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      manualPoseOverride = btn.dataset.pose;
+      setPetPose(manualPoseOverride);
+      pulsePortrait();
+    });
+  });
+
+  // Poke / Interact
   const doPoke = async () => {
-    triggerPetBounce();
+    manualPoseOverride = null;
+    pulsePortrait();
     const res = await apiPost("api/poke");
     if (res.status) renderStatus(res.status);
   };
   document.getElementById("btnPoke").addEventListener("click", doPoke);
-  document.getElementById("petSvg").addEventListener("click", doPoke);
+  document.getElementById("portraitFrame").addEventListener("click", doPoke);
 
   // Rename
   document.getElementById("btnRename").addEventListener("click", async () => {
     const current = document.getElementById("petName").textContent;
-    const next = window.prompt("다마고치 AI 두뇌의 새 이름을 지어주세요!", current);
+    const next = window.prompt("시냅스몽의 새 이름을 입력해 주세요:", current);
     if (next && next.trim()) {
-      triggerPetBounce();
+      manualPoseOverride = null;
+      pulsePortrait();
       const res = await apiPost("api/rename", { name: next.trim() });
       if (res.status) renderStatus(res.status);
     }
@@ -338,32 +365,34 @@ function setupInteractions() {
     });
   });
 
-  // Feed memory
+  // Feed memory (shows 03_swirl while digesting -> switches to 06_star / 05_drop!)
   document.getElementById("btnFeed").addEventListener("click", async () => {
     const title = document.getElementById("feedTitle").value.trim();
     const text = document.getElementById("feedText").value.trim();
     const statusEl = document.getElementById("feedStatus");
     if (!text) {
-      statusEl.textContent = "⚠️ 먼저 먹일 메모 내용을 적어주세요!";
+      statusEl.textContent = "먼저 기억시킬 내용을 입력해 주세요.";
       return;
     }
-    statusEl.textContent = "⏳ 정원사가 마크다운 카드로 소화시키는 중...";
+    manualPoseOverride = null;
+    setPetPose("03_swirl");
+    statusEl.textContent = "시냅스 소용돌이로 지식을 소화하는 중...";
     const res = await apiPost("api/feed", { title, text });
     if (res.digested) {
-      triggerPetBounce();
+      pulsePortrait();
       renderStatus(res.status);
       openNoteBySlug(res.digested.slug);
-      statusEl.textContent = "✅ 소화 완료! 시냅스 지도에 새 노드가 생겼어요!";
+      statusEl.textContent = "위키 저장 및 시냅스 연결 완료!";
       const box = document.getElementById("digestResult");
       box.classList.remove("hidden");
       box.innerHTML = `
-        <strong>🎉 새 마크다운 기억 카드 생성 완료!</strong><br/>
-        • 파일: <code>vault/${res.digested.rel_path}</code><br/>
-        • 분류: <strong>${res.digested.category}</strong> | 태그: ${res.digested.tags.map((t) => "#" + t).join(" ")}<br/>
-        • 자동 연결된 기존 기억: ${
+        <strong>새 마크다운 기억 카드 생성 완료</strong><br/>
+        • 저장 경로: <code>vault/${res.digested.rel_path}</code><br/>
+        • 분류: <strong>${res.digested.category}</strong> · 태그: ${res.digested.tags.map((t) => "#" + t).join(" ")}<br/>
+        • 연결된 시냅스: ${
           res.digested.links.length
             ? res.digested.links.map((l) => `<code>[[${l}]]</code>`).join(", ")
-            : "첫 독립 씨앗 노드"
+            : "독립 씨앗 노트"
         }
       `;
       document.getElementById("feedTitle").value = "";
@@ -371,7 +400,42 @@ function setupInteractions() {
     }
   });
 
-  // Quick questions & Chat
+  // Blueprint Dissector selector
+  document.querySelectorAll("[data-bp]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("[data-bp]").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      setPetPose("02_curious");
+      loadAnatomy(btn.dataset.bp);
+    });
+  });
+
+  // Custom Quantization Forge
+  document.getElementById("btnForge").addEventListener("click", async () => {
+    const bits = parseInt(document.getElementById("forgeBits").value, 10);
+    const hidden_dim = parseInt(document.getElementById("forgeDim").value, 10);
+    const box = document.getElementById("forgeResult");
+    manualPoseOverride = null;
+    setPetPose("03_swirl");
+    box.classList.remove("hidden");
+    box.innerHTML = "신경망 가중치를 조립하고 블록 양자화 눈금으로 깎는 중...";
+
+    const res = await apiPost("api/forge", { bits, hidden_dim });
+    if (res.forged) {
+      const f = res.forged;
+      pulsePortrait();
+      renderStatus(res.status);
+      box.innerHTML = `
+        <strong>우리만의 독자 양자화 두뇌 주조 완료! (<code>models/${f.filename}</code>)</strong><br/>
+        • 학습 어휘: <strong>${f.vocab_size}개</strong> · 총 파라미터: <strong>${f.total_params.toLocaleString()}개</strong> (${f.elapsed_ms} ms 소요)<br/>
+        • 용량 압축: 원본 FP32 <code>${f.fp32_kb} KB</code> → <strong>INT${f.bits} <code>${f.quant_weights_kb} KB</code> (-${f.saved_vs_fp32_pct}% 절감 / FP16 대비 -${f.saved_vs_fp16_pct}%)</strong><br/>
+        • 양자화 정밀도 보존율: <strong>코사인 유사도 ${f.cosine_similarity_pct}%</strong> (오차 RMSE ${f.rmse})<br/>
+        • 형성된 대표 연상 시냅스: ${f.sample_synapses.map((s) => `<code>${s}</code>`).join(" · ")}
+      `;
+    }
+  });
+
+  // Chat
   const sendQuestion = async (qText) => {
     const input = document.getElementById("chatInput");
     const question = (qText || input.value).trim();
@@ -379,19 +443,21 @@ function setupInteractions() {
     input.value = "";
     const log = document.getElementById("chatLog");
     const uDiv = document.createElement("div");
-    uDiv.className = "msg user";
-    uDiv.textContent = `🙋 주인님: ${question}`;
+    uDiv.className = "bubble user";
+    uDiv.textContent = question;
     log.appendChild(uDiv);
 
     const bDiv = document.createElement("div");
-    bDiv.className = "msg bot";
-    bDiv.textContent = "🧠 시냅스 그물망을 더듬어 기억을 꺼내는 중...";
+    bDiv.className = "bubble bot";
+    bDiv.textContent = "관련 시냅스 기억 카드를 탐색하고 있어요...";
     log.appendChild(bDiv);
     log.scrollTop = log.scrollHeight;
 
+    manualPoseOverride = null;
+    setPetPose("02_curious");
     const res = await apiPost("api/chat", { question });
-    triggerPetBounce();
-    bDiv.textContent = res.answer || "응답을 불러오지 못했어요.";
+    pulsePortrait();
+    bDiv.textContent = res.answer || "응답을 불러오지 못했습니다.";
     log.scrollTop = log.scrollHeight;
     if (res.status) renderStatus(res.status);
   };
@@ -408,8 +474,11 @@ function setupInteractions() {
 async function init() {
   setupGraphSimulation();
   setupInteractions();
-  const data = await apiGet("api/status");
-  renderStatus(data);
+  const [statusData] = await Promise.all([
+    apiGet("api/status"),
+    loadAnatomy("custom-synapse-seed"),
+  ]);
+  renderStatus(statusData);
 }
 
 init();

@@ -21,6 +21,7 @@ BRAIN_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(BRAIN_ROOT))
 
 from brain_engine.host_probe import probe_host  # noqa: E402
+from brain_engine.quant_forge import CustomBrainForge, dissect_architecture  # noqa: E402
 from brain_engine.slm_bridge import PortableSLMBridge  # noqa: E402
 from brain_engine.tamagotchi import TamagotchiSoul  # noqa: E402
 from brain_engine.wiki_gardener import WikiGardener  # noqa: E402
@@ -33,21 +34,24 @@ class BrainState:
         self.gardener = WikiGardener(root / "vault", root / "state" / "wiki_index.db")
         self.soul = TamagotchiSoul(root / "state" / "soul.json")
         self.slm = PortableSLMBridge(root / "models")
+        self.forge = CustomBrainForge(root / "models")
         self.host_info = probe_host(root)
         self.soul.register_host(self.host_info)
 
     def full_status(self) -> Dict[str, Any]:
         self.host_info = probe_host(self.root)
         graph = self.gardener.get_graph()
+        env_grade = self.host_info.get("environment", {}).get("grade", "optimal")
         return {
-            "soul": self.soul.snapshot(graph["stats"]),
+            "soul": self.soul.snapshot(graph["stats"], env_grade=env_grade),
             "host": self.host_info,
             "engine": self.slm.detect_active_engine(),
+            "forged_brains": self.forge.list_forged_brains(),
             "graph": graph,
             "roadmap": {
-                "stage_a": {"status": "active", "title": "A단계: LLM 위키 기억 그물망 & 다마고치 영혼"},
-                "stage_b": {"status": "next", "title": "B단계: CPU 초경량 강화학습 판단 훈련소"},
-                "stage_c": {"status": "upcoming", "title": "C단계: Ghidra 12.3 역공학 자동 해부실"},
+                "stage_a": {"status": "active", "title": "A단계: 마크다운 위키 & 자체 양자화 주조"},
+                "stage_b": {"status": "next", "title": "B단계: CPU 강화학습 훈련소"},
+                "stage_c": {"status": "upcoming", "title": "C단계: Ghidra 12.3 역공학 해부실"},
             },
         }
 
@@ -103,8 +107,12 @@ def make_handler(state: BrainState):
                         return
                 self._send_json({"error": "Note not found"}, status=404)
                 return
+            if route == "/api/dissect":
+                qs = parse_qs(parsed.query)
+                bp_id = (qs.get("id") or ["custom-synapse-seed"])[0]
+                self._send_json(dissect_architecture(bp_id, state.root / "models"))
+                return
 
-            # Serve static frontend files
             rel = "index.html" if route in ("", "/") else route.lstrip("/")
             target = (state.web_dir / rel).resolve()
             if not str(target).startswith(str(state.web_dir.resolve())) or not target.is_file():
@@ -166,6 +174,19 @@ def make_handler(state: BrainState):
                 )
                 return
 
+            if route == "/api/forge":
+                bits = int(body.get("bits") or 4)
+                hidden_dim = int(body.get("hidden_dim") or 64)
+                notes = state.gardener.list_notes()
+                record = state.forge.forge_from_wiki(notes, bits=bits, hidden_dim=hidden_dim)
+                state.soul.on_forge_brain(
+                    bits=record["bits"],
+                    saved_pct=record["saved_vs_fp32_pct"],
+                    cos_sim=record["cosine_similarity_pct"],
+                )
+                self._send_json({"forged": record, "status": state.full_status()})
+                return
+
             if route == "/api/poke":
                 state.soul.poke()
                 self._send_json({"status": state.full_status()})
@@ -194,17 +215,17 @@ def main() -> None:
     (BRAIN_ROOT / "runtime" / ".gitkeep").touch(exist_ok=True)
 
     state = BrainState(BRAIN_ROOT)
+    env = state.host_info["environment"]
     server = ThreadingHTTPServer((args.host, args.port), make_handler(state))
-    print(f"============================================================")
+    print("============================================================")
     print(f" 🧠 Portable Living AI Brain awake at http://{args.host}:{args.port}")
     print(f" 📂 Habitat Root : {BRAIN_ROOT}")
     print(f" 💻 Host Sensor  : {state.host_info['cpu_cores']} cores | Free RAM {state.host_info['ram_available_gb']} GB")
-    print(f" ⭐ Recommended  : {state.host_info['best_slm']['name']}")
-    print(f"============================================================", flush=True)
+    print(f" 🌡️ Workspace    : {env['label']} ({env['score']}/100)")
+    print("============================================================", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\n[ai-brain] Going back to sleep safely inside external drive...")
         server.server_close()
 
 

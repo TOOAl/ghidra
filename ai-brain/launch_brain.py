@@ -79,7 +79,7 @@ class BrainState:
             rl_trained=rl_trained,
         )
         return {
-            "ui_version": "6.7",
+            "ui_version": "6.8",
             "soul": self.soul.snapshot(graph["stats"], env_grade=env_grade),
             "hallucination": hallucination,
             "host": self.host_info,
@@ -147,6 +147,24 @@ def make_handler(state: BrainState):
                 return
             if route == "/api/evo/experience":
                 self._send_json(state.abilities.experience_report())
+                return
+            if route == "/api/semantic":
+                from brain_engine.core_ability_engine import field_context_semantic_trust
+
+                ctx_field = state.abilities.field_profile("context")
+                engine = state.gardener.semantic.status()
+                self._send_json(
+                    {
+                        "engine": engine,
+                        "trust_w_sem": round(field_context_semantic_trust(ctx_field), 3),
+                        "muscle": {
+                            "level": int(ctx_field.get("level", 1)),
+                            "tier": int(ctx_field.get("tier", 0)),
+                        },
+                        "metrics": state.abilities.field_metrics("context"),
+                        "notes": len(state.gardener.list_notes()),
+                    }
+                )
                 return
             if route == "/api/notes":
                 self._send_json({"notes": state.gardener.list_notes()})
@@ -217,6 +235,103 @@ def make_handler(state: BrainState):
                 self._send_json({"digested": digested, "status": state.full_status()})
                 return
 
+            if route == "/api/evo/feedback":
+                # 💡 Stage J: the master grades a memory the brain could not grade
+                # by itself.  This is the only honest supervision for a question
+                # that was understood partly — and it teaches the muscle how much
+                # to trust meaning.
+                from brain_engine.core_ability_engine import master_feedback_case
+
+                query = str(body.get("query") or "").strip()
+                slug = str(body.get("slug") or "").strip()
+                if not query or not slug:
+                    self._send_json({"error": "질문과 기억을 모두 알려주세요!"}, status=400)
+                    return
+                ctx_field = state.abilities.field_profile("context")
+                bundle = state.gardener.recall_memories(query, limit=3, field=ctx_field)
+                case = master_feedback_case(ctx_field, query, bundle, slug)
+                if not case:
+                    self._send_json(
+                        {"error": "그 기억이 방금 인출 목록에 없어 채점할 수 없어요 (다시 질문해 주세요)."},
+                        status=400,
+                    )
+                    return
+                state.abilities.record_experience("context", case)
+                self._send_json(
+                    {
+                        "graded": case["ok"],
+                        "note": case["note"],
+                        "metrics": state.abilities.field_metrics("context"),
+                        "semantic": bundle.get("semantic"),
+                        "status": state.full_status(),
+                    }
+                )
+                return
+
+            if route == "/api/semantic/probe":
+                # 💡 Stage J: show the master EXACTLY what changed.  The same
+                # question is answered twice on the same vault: once with the
+                # muscle's meaning trust forced to zero (the old keyword brain)
+                # and once with the trust it has actually learned.
+                from brain_engine.core_ability_engine import field_context_semantic_trust
+
+                query = str(body.get("query") or "").strip()
+                if not query:
+                    self._send_json({"error": "뜻을 알아볼 질문을 입력해 주세요!"}, status=400)
+                    return
+                base = state.abilities.field_profile("context")
+                rows = []
+                for label, trust in (("keyword", 0.0), ("meaning", field_context_semantic_trust(base))):
+                    fld = dict(base, weights=dict(base["weights"], w_sem=trust))
+                    bundle = state.gardener.recall_memories(query, limit=3, field=fld)
+                    audit = audit_chat_grounding(query, bundle)
+                    rows.append(
+                        {
+                            "mode": label,
+                            "trust_w_sem": round(trust, 3),
+                            "recalled": [
+                                {
+                                    "title": n["title"],
+                                    "slug": n["slug"],
+                                    "category": n["category"],
+                                    "why": (bundle.get("semantic") or {}).get("why", {}).get(n["slug"], ""),
+                                }
+                                for n in bundle["recalled"]
+                            ],
+                            "count": len(bundle["recalled"]),
+                            "top_score": bundle.get("top_score"),
+                            "audit": {
+                                "grade": audit["grade"],
+                                "risk_pct": audit["risk_pct"],
+                                "badge": audit["badge"],
+                                "reason": audit["reason"],
+                                "grounding_kind": audit.get("grounding_kind"),
+                                "semantic_pct": audit.get("semantic_pct"),
+                                "semantic_confidence_pct": audit.get("semantic_confidence_pct"),
+                            },
+                            "semantic": {
+                                "grounded_pct": (bundle.get("semantic") or {}).get("grounded_pct"),
+                                "coverage": (bundle.get("semantic") or {}).get("query_coverage"),
+                                "bridges": (bundle.get("semantic") or {}).get("bridges"),
+                            },
+                        }
+                    )
+                self._send_json(
+                    {
+                        "query": query,
+                        "engine": state.gardener.semantic.status(),
+                        "comparison": rows,
+                        "status": state.full_status(),
+                    }
+                )
+                return
+
+            if route == "/api/semantic/train":
+                notes = state.gardener.list_notes()
+                stats = state.gardener.semantic.train(notes)
+                self._send_json({"engine": stats, "notes": len(notes), "status": state.full_status()})
+                return
+
             if route == "/api/chat":
                 question = str(body.get("question") or "").strip()
                 if not question:
@@ -258,6 +373,7 @@ def make_handler(state: BrainState):
                         ],
                         "saved_tokens_pct": recall_bundle["saved_tokens_pct"],
                         "field_context": recall_bundle.get("field"),
+                        "semantic": recall_bundle.get("semantic"),
                         "status": state.full_status(),
                     }
                 )

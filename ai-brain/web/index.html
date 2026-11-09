@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>시냅스몽 · 나만의 양자화 AI 두뇌 연구소</title>
-  <link rel="stylesheet" href="ui-v3.css?v=6.7" />
+  <link rel="stylesheet" href="ui-v3.css?v=6.8" />
   <!--__INITIAL_STATE__-->
 </head>
 <body>
@@ -450,6 +450,31 @@
             <div class="exp-muscles" id="expMuscles"></div>
             <div class="field-ledger-head">📝 최근 실전 채점지 (최신순 · 최대 12장) — ✘ 오답이 다음 훈련의 교재가 돼요</div>
             <div class="field-ledger" id="expLedger"></div>
+          </div>
+
+          <div class="card semantic-card" id="semanticPanel">
+            <div class="field-head">
+              <div>
+                <span class="step-kicker">STAGE J · SEMANTIC MEMORY — GRADUATING FROM KEYWORD MATCHING</span>
+                <h3>💡 의미 기억 층 — 단어가 아니라 뜻으로 기억을 찾아요</h3>
+                <p class="field-status-line" id="semStatusLine">💡 의미 공간을 계측하는 중...</p>
+              </div>
+              <button class="ghost-btn" id="btnSemTrain" type="button">🧠 의미 층 다시 훈련</button>
+            </div>
+
+            <div class="sem-facts" id="semFacts"></div>
+
+            <div class="sem-probe">
+              <div class="sem-probe-head">
+                🔬 뜻 알아보기 실험 — 같은 질문에 <b>단어만 쓰는 두뇌</b>와 <b>의미를 아는 두뇌</b>를 나란히 돌려봐요
+              </div>
+              <div class="sem-probe-row">
+                <input type="text" id="semProbeInput" class="input-field"
+                       placeholder="예: 무거운 지능을 가볍게 만들어 가지고 다니는 요령" />
+                <button class="primary-btn" id="btnSemProbe" type="button">💡 뜻 알아볼까?</button>
+              </div>
+              <div class="sem-compare" id="semCompare"></div>
+            </div>
           </div>
 
           <div class="pane-grid evo-grid">
@@ -921,6 +946,6 @@
     </div>
   </div>
 
-  <script src="ui-v3.js?v=6.7"></script>
+  <script src="ui-v3.js?v=6.8"></script>
 </body>
 </html>

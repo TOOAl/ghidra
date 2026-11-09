@@ -1,0 +1,4 @@
+# Stage-J meaning space: a REBUILDABLE int8 cache of the word vectors the brain
+# learns from its own vault (re-trained in ~0.3s at first recall), so it is a
+# runtime artifact like state/models — not source, never committed.
+semantic.json

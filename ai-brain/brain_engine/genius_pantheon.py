@@ -922,7 +922,7 @@ class GeniusPantheon:
                 "key": f"debate:{'+'.join(valid_ids[:3])}",
                 "note": (
                     f"실제 담론 「{focus[:18]}」 — 논증 링크 {len(facts)}개"
-                    f"(담론 체인 {field.get('chain_hops')}hop) · 심판 합의 {gain:+}점"
+                    f"(담론 체인 {field_reasoning_hops(field)}hop) · 심판 합의 {gain:+}점"
                 ),
                 "prob": {
                     "hops": len(facts),

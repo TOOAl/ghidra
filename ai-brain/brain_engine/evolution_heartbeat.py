@@ -673,17 +673,38 @@ class EvolutionHeartbeat:
             ability = "context"
             field = self.ability.field_profile(ability)
             notes = self.gardener.list_notes()
-            query = notes[-1]["title"] if notes else "외장하드 두뇌의 원리"
+            # 💡 Stage J: asking with a note's own TITLE is word matching in
+            # disguise — the brain scores a hit without understanding anything.
+            # So the sortie asks with words from INSIDE a note that never appear
+            # in its title, which can only be answered by meaning.
+            query = "외장하드 두뇌의 원리"
+            if notes:
+                try:
+                    from brain_engine.semantic_memory import tokenize as _sem_tok
+
+                    n = notes[-1]
+                    head = set(_sem_tok(f"{n['title']} {' '.join(n.get('tags') or [])}"))
+                    inner = [w for w in _sem_tok(f"{n.get('summary', '')} {n.get('body', '')}") if w not in head]
+                    picked = list(dict.fromkeys(inner))[:3]
+                    query = " ".join(picked) if picked else n["title"]
+                except Exception:
+                    query = notes[-1]["title"]
             res = self.gardener.recall_memories(query, limit=2, field=field)
+            sem = res.get("semantic") or {}
+            cov = sem.get("query_coverage") or {}
             effect = (
                 f"📚 위키 기억 호출 「{query[:20]}」 — 기억 {res['total_notes']}장 중 "
-                f"{len(res['recalled'])}장을 문맥 가중치 6종으로 재랭킹해 선별"
+                f"{len(res['recalled'])}장 선별 · 💡 의미일치 {sem.get('grounded_pct')}% "
+                f"(질문 단어 이해 {cov.get('pct')}%, 의미 신뢰도 {sem.get('trust_w_sem')})"
             )
             metric = {
                 "recalled": len(res["recalled"]),
                 "total_notes": res["total_notes"],
                 "cards_limit": res.get("cards_limit"),
                 "top_score": res.get("top_score"),
+                "semantic_pct": sem.get("grounded_pct"),
+                "coverage_pct": cov.get("pct"),
+                "trust_w_sem": sem.get("trust_w_sem"),
             }
             # 📓 the recall sortie is graded by the hallucination audit, exactly
             # like a real chat, and the verdict goes into the experience ledger.

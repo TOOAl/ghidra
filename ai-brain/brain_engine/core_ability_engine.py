@@ -38,6 +38,20 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from brain_engine.quant_forge import BLOCK_SIZE, MAGIC, quantize_tensor_int4
 
+# 💡 Stage J — meaning trust.  `w_sem` is the context muscle's own answer to
+# "how much should a memory that shares NO words with the question still count?"
+# SEM_SCORE_SCALE maps that trust onto the recall scoreboard, where a title hit
+# is worth 5.0 points and 1.5 points is the floor for "this is real evidence".
+CONTEXT_SEM_PRIOR = 0.35
+SEM_SCORE_SCALE = 8.0
+SEM_TRUST_MAX = 1.5
+# If the meaning space understands less than a third of the question's words,
+# its score for the rest is imagination, not evidence — so it is not allowed to
+# pull a memory over the "this is real evidence" line.  (A question built from
+# one known word out of seven must stay honestly unanswerable.)
+SEM_MIN_COVERAGE_PCT = 30.0
+
+
 ABILITY_ORDER = ["reasoning", "context", "coding", "organizing"]
 
 ABILITY_META: Dict[str, Dict[str, str]] = {
@@ -379,6 +393,8 @@ def _solve_context(prob: Dict[str, Any], w: Dict[str, float], tier: int) -> Tupl
         # 📓 Stage I: a REAL recall problem — the 6 features were frozen when the
         # chat actually happened, so the same weights are exercised on real text.
         feats = prob.get("features") or []
+        sems = prob.get("sem_sims") or []
+        w_sem = float(w.get("w_sem", CONTEXT_SEM_PRIOR))
         best, best_score = None, -1e18
         for i, sent in enumerate(prob.get("sentences") or []):
             f = feats[i] if i < len(feats) else [0.0] * 6
@@ -389,6 +405,7 @@ def _solve_context(prob: Dict[str, Any], w: Dict[str, float], tier: int) -> Tupl
                 + w.get("w_assert", -0.3) * f[3]
                 + (w.get("w_owner", 0.0) * f[4] if tier >= 1 and len(f) > 4 else 0.0)
                 + (w.get("w_link", 0.0) * f[5] if tier >= 2 and len(f) > 5 else 0.0)
+                + (w_sem * float(sems[i]) if i < len(sems) else 0.0)
             )
             if score > best_score:
                 best, best_score = sent, score
@@ -442,6 +459,26 @@ def _update_context(w: Dict[str, float], prob: Dict[str, Any], chosen: str, ok: 
         for i, key in enumerate(keys):
             if i < len(f_good) and i < len(f_bad):
                 w[key] = w.get(key, 0.0) + lr_real * (f_good[i] - f_bad[i])
+        sems = prob.get("sem_sims") or []
+        if sems and gi < len(sems):
+            # 💡 Stage J: when the note that REALLY grounded the answer sat closer
+            # in meaning than the note the muscle picked, trust meaning more —
+            # and less when meaning led it astray.  This is the only place w_sem
+            # moves; invented gym puzzles emit no sem_sims, so they cannot
+            # corrupt a weight that only real memory work can teach.
+            good_sem = float(sems[gi])
+            if 0 <= bi < len(sems):
+                ref_sem = float(sems[bi])
+            else:
+                others = [float(v) for i, v in enumerate(sems) if i != gi]
+                ref_sem = sum(others) / len(others) if others else 0.0
+            w["w_sem"] = max(
+                0.0,
+                min(
+                    SEM_TRUST_MAX,
+                    float(w.get("w_sem", CONTEXT_SEM_PRIOR)) + lr_real * (good_sem - ref_sem),
+                ),
+            )
         return
 
     subj = prob["question"].split("이(가)")[0]
@@ -820,6 +857,16 @@ def field_context_features(field: Dict[str, Any], notes: List[Dict[str, Any]], q
     return feats
 
 
+def field_context_semantic_trust(field: Optional[Dict[str, Any]]) -> float:
+    """How strongly the context muscle currently trusts MEANING (learned, not fixed)."""
+    w = (field or {}).get("weights") or {}
+    try:
+        trust = float(w.get("w_sem", CONTEXT_SEM_PRIOR))
+    except (TypeError, ValueError):
+        trust = CONTEXT_SEM_PRIOR
+    return max(0.0, min(SEM_TRUST_MAX, trust))
+
+
 def field_context_rerank(field: Dict[str, Any], notes: List[Dict[str, Any]], query_terms: List[str]) -> List[float]:
     """Score REAL wiki notes with the context muscle's LEARNED weights."""
     w = field.get("weights") or {}
@@ -856,17 +903,41 @@ def context_experience_case(
     recalled = recall_bundle.get("recalled") or []
     if grade not in ("safe", "caution") or len(recalled) < 2:
         return None
+    # 💡 Stage J: a lesson needs a trustworthy right answer.  When the question
+    # was only partly understood, "which memory really grounded it" is a guess —
+    # and teaching a guess is how a brain learns to be confidently wrong.
+    sem_info = recall_bundle.get("semantic") or {}
+    try:
+        cov_pct = float((sem_info.get("query_coverage") or {}).get("pct") or 0.0)
+    except (TypeError, ValueError):
+        cov_pct = 100.0
+    if grade == "caution" and cov_pct < SEM_MIN_COVERAGE_PCT:
+        return None
     q_terms = recall_bundle.get("query_terms") or []
     matched = [str(t).lower() for t in (audit.get("matched_terms") or [])]
 
-    def evidence_count(n: Dict[str, Any]) -> int:
-        hay = f"{n.get('title', '')} {' '.join(n.get('tags') or [])} {n.get('summary', '')}".lower()
-        return sum(1 for t in matched if t and t in hay)
+    sem_by_slug = ((recall_bundle.get("semantic") or {}).get("by_slug")) or {}
 
-    best_idx = max(range(len(recalled)), key=lambda i: (evidence_count(recalled[i]), -i))
+    def grounding(n: Dict[str, Any]) -> float:
+        """Shared words PLUS closeness in meaning — both are real evidence."""
+        hay = f"{n.get('title', '')} {' '.join(n.get('tags') or [])} {n.get('summary', '')}".lower()
+        lexical = float(sum(1 for t in matched if t and t in hay))
+        try:
+            meaning = float(sem_by_slug.get(n.get("slug"), 0.0))
+        except (TypeError, ValueError):
+            meaning = 0.0
+        return lexical + meaning
+
+    best_idx = max(range(len(recalled)), key=lambda i: (grounding(recalled[i]), -i))
     ok = grade == "safe" or best_idx == 0
     answer_idx = 0 if ok else best_idx
-    prob = build_real_context_problem(field, query, recalled, q_terms, answer_idx, 0)
+    sem_sims: List[float] = []
+    for n in recalled:
+        try:
+            sem_sims.append(float(sem_by_slug.get(n.get("slug"), 0.0)))
+        except (TypeError, ValueError):
+            sem_sims.append(0.0)
+    prob = build_real_context_problem(field, query, recalled, q_terms, answer_idx, 0, sem_sims)
     if not prob:
         return None
     return {
@@ -878,7 +949,71 @@ def context_experience_case(
             + ("실제로 근거가 됐어요" if ok else f"근거 최다 기억(#{best_idx + 1}번)이 아니었어요")
         ),
         "prob": prob,
-        "metric": {"grade": grade, "risk_pct": audit.get("risk_pct"), "answer_index": answer_idx},
+        "metric": {
+            "grade": grade,
+            "risk_pct": audit.get("risk_pct"),
+            "answer_index": answer_idx,
+            "grounding_kind": audit.get("grounding_kind", "단어"),
+            "semantic_pct": audit.get("semantic_pct"),
+            "w_sem_trust": round(field_context_semantic_trust(field), 3),
+        },
+    }
+
+
+def master_feedback_case(
+    field: Dict[str, Any], query: str, recall_bundle: Dict[str, Any], answer_slug: str
+) -> Optional[Dict[str, Any]]:
+    """💡 Stage J: the master grades a recall the brain could not grade itself.
+
+    A paraphrased question is only partly understood, so no automatic report
+    card can say which memory really answered it — and a lesson built on a guess
+    is how a brain learns to be confidently wrong.  The master's click is the
+    honest oracle for exactly those cases.
+
+    Clicking the note that was ranked #1 is a hit; clicking any other recalled
+    note is a mistake WITH a known right answer, which is the most valuable
+    lesson there is: the muscle learns it had the right memory and ranked it too
+    low (and whether meaning or words led it astray).
+    """
+    recalled = recall_bundle.get("recalled") or []
+    slugs = [str(n.get("slug")) for n in recalled]
+    ans = str(answer_slug or "")
+    if not recalled or ans not in slugs:
+        return None
+    answer_idx = slugs.index(ans)
+    ok = answer_idx == 0
+    q_terms = recall_bundle.get("query_terms") or []
+    sem_info = recall_bundle.get("semantic") or {}
+    sem_by_slug = sem_info.get("by_slug") or {}
+    sem_sims: List[float] = []
+    for n in recalled:
+        try:
+            sem_sims.append(float(sem_by_slug.get(str(n.get("slug")), 0.0)))
+        except (TypeError, ValueError):
+            sem_sims.append(0.0)
+    prob = build_real_context_problem(field, query, recalled, q_terms, answer_idx, 0, sem_sims)
+    if not prob:
+        return None
+    cov = (sem_info.get("query_coverage") or {}).get("pct")
+    kind = "의미" if not (recall_bundle.get("matched_terms") or []) else "단어"
+    return {
+        "ok": ok,
+        "site": "master_feedback",
+        "key": f"feedback:{query[:28]}:{ans[:16]}",
+        "note": (
+            f"주인님 직접 채점 「{query[:18]}」 — "
+            + (f"1순위 기억이 정답이었어요 (이해 {cov}%)" if ok
+               else f"정답은 #{answer_idx + 1}번 기억이었는데 근육은 다른 걸 1순위로 올렸어요 (이해 {cov}%)")
+        ),
+        "prob": prob,
+        "metric": {
+            "grade": "master",
+            "answer_index": answer_idx,
+            "grounding_kind": kind,
+            "coverage_pct": cov,
+            "semantic_pct": sem_info.get("grounded_pct"),
+            "w_sem_trust": round(field_context_semantic_trust(field), 3),
+        },
     }
 
 
@@ -889,6 +1024,7 @@ def build_real_context_problem(
     query_terms: List[str],
     answer_index: int,
     chosen_index: int,
+    sem_sims: Optional[List[float]] = None,
 ) -> Optional[Dict[str, Any]]:
     """Turn one REAL chat recall into a re-studyable context problem.
 
@@ -912,6 +1048,7 @@ def build_real_context_problem(
         "alias_mode": False,
         "real_mode": True,
         "chosen_sentence": sentences[chosen_index] if 0 <= chosen_index < len(sentences) else "",
+        "sem_sims": [float(x) for x in (sem_sims or [])][: len(sentences)],
     }
 
 
@@ -1134,7 +1271,17 @@ class CoreAbilityEngine:
         if ability == "reasoning":
             return {"f_bias": 0.6, "f_hops": 0.05, "b_bias": 0.4, "b_hops": 0.05, "c_bias": -0.6, "c_hops": 0.0, "t_bias": -0.2, "t_hops": 0.05}
         if ability == "context":
-            return {"w_subj": 0.5, "w_verb": 0.5, "w_neg": 0.6, "w_assert": -0.3, "w_owner": 0.0, "w_link": 0.0}
+            return {
+                "w_subj": 0.5,
+                "w_verb": 0.5,
+                "w_neg": 0.6,
+                "w_assert": -0.3,
+                "w_owner": 0.0,
+                "w_link": 0.0,
+                # 💡 Stage J: a newborn trust in MEANING, not a learned one —
+                # only real chats (which freeze sem_sims into a lesson) move it.
+                "w_sem": CONTEXT_SEM_PRIOR,
+            }
         if ability == "coding":
             return {"matrix": [[0.0] * 4 for _ in range(4)], "multi": 0.0}
         return {"w_title": 0.8, "w_tag": 0.3, "w_cat": -0.2, "thr": 0.55, "w_sub": 0.0, "w_agree": 0.0}
@@ -1573,6 +1720,7 @@ class CoreAbilityEngine:
                 "site": str(rec.get("site", "")),
                 "note": str(rec.get("note", "")),
                 "key": str(rec.get("key", "")),
+                "kind": str((case.get("metric") or {}).get("grounding_kind") or ""),
                 "superseded": False,
             }
         )
@@ -1651,6 +1799,10 @@ class CoreAbilityEngine:
             "mistakes_held": len([e for e in ledger if not e["ok"]]),
             "verdict": verdict,
         }
+        if ability == "context":
+            # 💡 Stage J: the context muscle's own trust in meaning is part of its
+            # report card — it is learned from real recalls, never hardcoded.
+            out["sem_trust"] = round(field_context_semantic_trust(self.field_profile(ability)), 3)
         qn = int(st.get("quality_n", 0))
         if qn:
             out["real_quality_pct"] = round(float(st.get("quality_sum", 0.0)) / qn, 1)

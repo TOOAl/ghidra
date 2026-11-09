@@ -1254,9 +1254,22 @@ function setupInteractions() {
     const auditHtml = audit.badge
       ? `<span class="audit-pill ${aGrade}">${escapeHtml(audit.badge)}</span>`
       : "";
+    const semInfo = res.semantic || {};
+    const whyMap = semInfo.why || {};
     const recallCardsHtml = (res.recalled || []).length
-      ? `<span>📌 인출 기억 (토큰 ${res.saved_tokens_pct}% 절약):</span> ` +
-        res.recalled.map((r) => `<code>[[${escapeHtml(r.title)}]]</code>`).join(" ")
+      ? `<span>📌 인출 기억 (토큰 ${res.saved_tokens_pct}% 절약${
+          semInfo.grounded_pct ? ` · 💡 의미일치 ${semInfo.grounded_pct}%` : ""
+        }${
+          semInfo.coverage_pct !== undefined && semInfo.coverage_pct < 40
+            ? ` · 질문 이해 ${semInfo.coverage_pct}%`
+            : ""
+        }):</span> ` +
+        res.recalled.map((r) =>
+          `<span class="recall-chip"><code>[[${escapeHtml(r.title)}]]</code>` +
+          `<b class="rc-why">${escapeHtml(whyMap[r.slug] || "")}</b>` +
+          `<button class="recall-pick" type="button" data-slug="${escapeHtml(r.slug)}"` +
+          ` data-query="${escapeHtml(question)}" title="이 기억이 정답이었는지 직접 채점해 주세요">✅ 답이었어요</button></span>`
+        ).join(" ")
       : "";
     const reasonHtml = audit.reason
       ? `<span class="audit-reason">${escapeHtml(audit.reason)}</span>`
@@ -1267,6 +1280,31 @@ function setupInteractions() {
     log.scrollTop = log.scrollHeight;
     if (res.status) renderStatus(res.status);
   };
+
+  const chatLogEl = document.getElementById("chatLog");
+  if (chatLogEl) {
+    chatLogEl.addEventListener("click", async (evt) => {
+      const btn = evt.target.closest(".recall-pick");
+      if (!btn || !btn.dataset.slug) return;
+      btn.disabled = true;
+      try {
+        const res = await apiPost("api/evo/feedback", { query: btn.dataset.query, slug: btn.dataset.slug });
+        if (res && res.note) {
+          showEvoToast({
+            kind: "field",
+            beat: res.graded ? "✅" : "📓",
+            diary: res.note + (res.metrics ? ` · ${res.metrics.verdict}` : ""),
+          });
+          btn.textContent = res.graded ? "✔ 채점됨" : "✘ 오답으로 기록";
+          void loadExperience();
+          void loadSemantic();
+          if (res.status && typeof renderStatus === "function") renderStatus(res.status);
+        }
+      } catch (err) {
+        btn.disabled = false;
+      }
+    });
+  }
 
   document.getElementById("btnChat").addEventListener("click", () => sendQuestion());
   document.getElementById("chatInput").addEventListener("keydown", (e) => {
@@ -1994,6 +2032,7 @@ function setupEvoForgeInteractions() {
       }
       if (res.field_report) renderField(res.field_report);
       void loadExperience();
+      void loadSemantic();
       if (res.audit.diagnosis.sandbox) {
         renderEvoSandbox(res.audit.diagnosis.sandbox, "4단계 사전 대조");
       } else if (res.audit.diagnosis.findings.some((f) => f.severity === "toxin")) {
@@ -2420,6 +2459,7 @@ function renderGym(snap) {
   }
   if (snap.field) renderField(snap.field);
   void loadExperience();
+  void loadSemantic();
 }
 
 /* ---- ⚔️ Stage H: Field Deployment Report — muscles doing REAL work ---- */
@@ -2488,8 +2528,11 @@ function renderExperience(rep) {
     const rate = (m.real_hit_rate_pct === null || m.real_hit_rate_pct === undefined) ? null : m.real_hit_rate_pct;
     const cls = rate === null ? "none" : (rate >= 80 ? "hit" : (rate >= 50 ? "grow" : "climb"));
     const width = rate === null ? 0 : Math.max(2, Math.min(100, rate));
-    const extra = (m.real_quality_pct !== null && m.real_quality_pct !== undefined)
+    let extra = (m.real_quality_pct !== null && m.real_quality_pct !== undefined)
       ? ` · 🧹 실제 정리 품질 ${m.real_quality_pct}%` : "";
+    if (m.sem_trust !== null && m.sem_trust !== undefined) {
+      extra += ` · 💡 의미 신뢰도 ${m.sem_trust}`;
+    }
     return `
     <div class="exp-muscle em-${cls}">
       <div class="em-top">
@@ -2507,7 +2550,7 @@ function renderExperience(rep) {
       <div class="field-row exp-row ${e.ok ? "row-ok" : "row-bad"}${e.superseded ? " row-old" : ""}">
         <span class="fr-muscle">${escapeHeartHtml(e.title || e.ability || "")}</span>
         <span class="fr-lv">${e.ok ? "✔ 맞힘" : "✘ 오답"}</span>
-        <span class="fr-site">${escapeHeartHtml(e.site)}${e.superseded ? " · ♻️ 이후 상황으로 갱신됨" : ""}</span>
+        <span class="fr-site">${escapeHeartHtml(e.site)}${e.kind === "의미" ? " · 💡 의미로 근거" : (e.kind === "단어+의미" ? " · 📝+💡 근거" : "")}${e.superseded ? " · ♻️ 이후 상황으로 갱신됨" : ""}</span>
         <span class="fr-effect">${escapeHeartHtml(e.note)}</span>
         <span class="fr-ts">${e.ok ? "" : "교재로 "}복습 ${e.taught}회</span>
       </div>`).join("")
@@ -2519,6 +2562,101 @@ async function loadExperience() {
     const rep = await apiGet("/api/evo/experience");
     if (rep && rep.per_muscle) renderExperience(rep);
   } catch (err) { /* ignore transient */ }
+}
+
+/* ---- 💡 Stage J: SemanticMemory — recalling by meaning, not by matching words ---- */
+function renderSemantic(data) {
+  const line = document.getElementById("semStatusLine");
+  const facts = document.getElementById("semFacts");
+  if (!facts) return;
+  const eng = data.engine || {};
+  const trust = data.trust_w_sem;
+  const covNote = eng.trained
+    ? ""
+    : " · 아직 훈련 전 (기억을 불러오면 저절로 훈련돼요)";
+  if (line) {
+    line.textContent = eng.trained
+      ? `💡 내 위키 ${eng.notes}장에서 스스로 배운 의미 공간 — 어휘 ${eng.vocab_size}개, ` +
+        `${eng.quant_bits}비트 양자화로 ${eng.cache_kb}KB에 보관 (원본 대비 충실도 ${eng.cosine_fidelity_pct}%) · ` +
+        `문맥 근육의 의미 신뢰도 ${trust}${covNote}`
+      : `💡 의미 공간이 아직 비어 있어요 — 위키 기억을 불러오면 그 자리에서 스스로 훈련해요${covNote}`;
+  }
+  const cells = [
+    ["📚 배운 기억", `${eng.notes || 0}장`],
+    ["🔤 아는 단어", `${eng.vocab_size || 0}개`],
+    ["🗜️ 양자화", `${eng.quant_bits || 8}비트 · ${eng.cache_kb || 0}KB`],
+    ["🎯 충실도", eng.cosine_fidelity_pct === null || eng.cosine_fidelity_pct === undefined ? "—" : `${eng.cosine_fidelity_pct}%`],
+    ["💡 의미 신뢰도", trust === null || trust === undefined ? "—" : String(trust)],
+  ];
+  facts.innerHTML = cells.map((c) => `
+    <div class="sem-fact">
+      <span class="sf-k">${escapeHeartHtml(c[0])}</span>
+      <span class="sf-v">${escapeHeartHtml(c[1])}</span>
+    </div>`).join("");
+}
+
+async function loadSemantic() {
+  try {
+    const data = await apiGet("/api/semantic");
+    if (data && data.engine) renderSemantic(data);
+  } catch (err) { /* ignore transient */ }
+}
+
+function renderSemProbe(data) {
+  const box = document.getElementById("semCompare");
+  if (!box) return;
+  const rows = data.comparison || [];
+  const kw = rows.find((r) => r.mode === "keyword") || {};
+  const sm = rows.find((r) => r.mode === "meaning") || {};
+  const cov = (sm.semantic || {}).coverage || {};
+  const legs = ((sm.semantic || {}).bridges || []).map((b) =>
+    `<span class="sem-bridge">${escapeHeartHtml(b.query_word)} ↔ ${escapeHeartHtml(b.note_word)} <b>${b.similarity}</b></span>`).join("");
+  const noneRow = '<li class="ss-none">근거를 찾지 못했어요 (아는 척하지 않음)</li>';
+  const side = (r, label, icon) => {
+    const titles = (r.recalled || []).map((n) =>
+      `<li>${escapeHeartHtml(n.title)} <span class="sem-why">${escapeHeartHtml(n.why || "")}</span></li>`).join("");
+    const a = r.audit || {};
+    return `
+    <div class="sem-side sem-${a.grade || "none"}">
+      <div class="ss-head">${icon} ${label} <span class="ss-trust">의미 신뢰도 ${r.trust_w_sem}</span></div>
+      <div class="ss-grade">${escapeHeartHtml(a.badge || "")}</div>
+      <div class="ss-count">기억 ${(r.recalled || []).length}장 · 최상위 점수 ${r.top_score === undefined ? "—" : r.top_score}</div>
+      <ul class="ss-list">${titles || noneRow}</ul>
+      <div class="ss-reason">${escapeHeartHtml(a.reason || "")}</div>
+    </div>`;
+  };
+  box.innerHTML = `
+    <div class="sem-cov">질문 단어 중 뜻을 아는 비율 <b>${cov.pct === undefined ? 0 : cov.pct}%</b>
+      (${cov.known || 0}/${cov.total || 0})${(cov.unknown || []).length ? ` · 모르는 단어: ${escapeHeartHtml((cov.unknown || []).join(", "))}` : ""}
+      · 의미 일치 <b>${(sm.semantic || {}).grounded_pct}%</b></div>
+    <div class="sem-duel">${side(kw, "단어만 쓰는 두뇌 (예전)", "📝")}${side(sm, "의미를 아는 두뇌 (지금)", "💡")}</div>
+    ${legs ? `<div class="sem-legs">🌉 뜻이 건너간 다리: ${legs}</div>` : ""}`;
+}
+
+async function runSemProbe() {
+  const input = document.getElementById("semProbeInput");
+  const btn = document.getElementById("btnSemProbe");
+  const q = (input && input.value || "").trim();
+  if (!q) return;
+  if (btn) { btn.disabled = true; btn.textContent = "💡 알아보는 중..."; }
+  setPetPose("04_brainstorm");
+  try {
+    const res = await apiPost("api/semantic/probe", { query: q });
+    if (res && res.comparison) {
+      renderSemProbe(res);
+      const kw = (res.comparison[0] || {}).count || 0;
+      const sm = (res.comparison[1] || {}).count || 0;
+      showEvoToast({
+        kind: "field",
+        beat: "💡",
+        diary: `「${q.slice(0, 22)}」 — 📝 단어만: 기억 ${kw}장 / 💡 의미: 기억 ${sm}장` +
+          (sm > kw ? " → 단어가 안 겹쳐도 뜻으로 기억을 찾았어요!" : " → 이번엔 단어로 찾은 것과 같아요"),
+      });
+      if (res.status && typeof renderStatus === "function") renderStatus(res.status);
+      void loadSemantic();
+    }
+  } catch (err) { /* ignore transient */ }
+  if (btn) { btn.disabled = false; btn.textContent = "💡 뜻 알아볼까?"; }
 }
 
 async function trainAbility(abilityId, mode) {
@@ -2561,6 +2699,7 @@ async function trainAbility(abilityId, mode) {
     if (data.abilities) renderGym(data.abilities);
     if (data.status && typeof renderStatus === "function") renderStatus(data.status);
     void loadExperience();
+    void loadSemantic();
     pollHeartbeat();
   } catch (err) { /* ignore */ }
 }
@@ -2694,7 +2833,7 @@ function setupHeartbeat() {
   setInterval(pollHeartbeat, 5000);
 }
 
-const CURRENT_UI_VERSION = "6.7";
+const CURRENT_UI_VERSION = "6.8";
 
 async function init() {
   setupGraphSimulation();
@@ -2724,6 +2863,37 @@ async function init() {
 
   const sortieBtn = document.getElementById("btnFieldSortie");
   if (sortieBtn) {
+    const semTrainBtn = document.getElementById("btnSemTrain");
+    if (semTrainBtn) {
+      semTrainBtn.addEventListener("click", async () => {
+        semTrainBtn.disabled = true;
+        const label = semTrainBtn.textContent;
+        semTrainBtn.textContent = "🧠 훈련 중...";
+        try {
+          const res = await apiPost("api/semantic/train", {});
+          if (res && res.engine) {
+            renderSemantic({ engine: res.engine, trust_w_sem: undefined });
+            showEvoToast({
+              kind: "field",
+              beat: "💡",
+              diary: `의미 공간을 위키 ${res.notes}장에서 다시 훈련했어요 — 어휘 ${res.engine.vocab_size}개, ` +
+                `${res.engine.quant_bits}비트 ${res.engine.cache_kb}KB (충실도 ${res.engine.cosine_fidelity_pct}%)`,
+            });
+          }
+          void loadSemantic();
+        } catch (err) { /* ignore transient */ }
+        semTrainBtn.disabled = false;
+        semTrainBtn.textContent = label;
+      });
+    }
+    const semProbeBtn = document.getElementById("btnSemProbe");
+    if (semProbeBtn) semProbeBtn.addEventListener("click", runSemProbe);
+    const semInput = document.getElementById("semProbeInput");
+    if (semInput) {
+      semInput.addEventListener("keydown", (evt) => { if (evt.key === "Enter") runSemProbe(); });
+    }
+    void loadSemantic();
+
     const expBtn = document.getElementById("btnExpRefresh");
     if (expBtn) {
       expBtn.addEventListener("click", async () => {

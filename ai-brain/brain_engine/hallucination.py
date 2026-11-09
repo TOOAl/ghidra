@@ -48,7 +48,40 @@ def audit_chat_grounding(question: str, recall_bundle: Dict[str, Any]) -> Dict[s
     matched: List[str] = recall_bundle.get("matched_terms", [])
     missing: List[str] = recall_bundle.get("missing_terms", [])
 
-    if not recalled or top_score < 1.5:
+    # 💡 Stage J: grounding can now come from MEANING, not only from shared
+    # words.  The audit says WHICH kind it used, and a weak meaning match is
+    # never allowed to masquerade as evidence (below the 35% floor the shield
+    # still fires exactly as it did in the keyword-only brain).
+    sem = recall_bundle.get("semantic") or {}
+    try:
+        sem_pct = float(sem.get("grounded_pct") or 0.0)
+    except (TypeError, ValueError):
+        sem_pct = 0.0
+    sem_bridges = sem.get("bridges") or []
+    cov = sem.get("query_coverage") or {}
+    sem_cov = cov
+    sem_trust = sem.get("trust_w_sem")
+    try:
+        cov_pct = float(sem_cov.get("pct") or 0.0)
+    except (TypeError, ValueError):
+        cov_pct = 0.0
+    # 💡 A meaning score computed from one understood word out of seven is NOT the
+    # same claim as one computed from five out of six, so confidence is gated on
+    # how much of the question the meaning space actually knows.  Without this
+    # gate a tiny vault produces confident noise ("작은" ↔ "투명") and the brain
+    # would answer happily from a coincidence — the exact thing the shield stops.
+    meaning_grounded = sem_pct >= 55.0 and cov_pct >= 40.0 and top_score >= 3.0
+    kind = "단어+의미" if (matched and sem_pct >= 35.0) else ("의미" if sem_pct >= 35.0 else "단어")
+    extra: Dict[str, Any] = {
+        "grounding_kind": kind,
+        "semantic_pct": round(sem_pct, 1),
+        "semantic_bridges": sem_bridges,
+        "semantic_coverage": sem_cov,
+        "semantic_confidence_pct": round(sem_pct * (0.4 + 0.6 * cov_pct / 100.0), 1),
+        "semantic_trust": sem_trust,
+    }
+
+    if not recalled or (top_score < 1.5 and not meaning_grounded):
         missing_preview = ", ".join(missing[:4]) if missing else question[:20]
         return {
             "risk_pct": 84,
@@ -59,25 +92,68 @@ def audit_chat_grounding(question: str, recall_bundle: Dict[str, Any]) -> Dict[s
             "reason": f"위키 기억망에 '{missing_preview}' 근거가 0건이어서 아는 척 지어내지 않고 솔직하게 멈췄어요.",
             "matched_terms": matched,
             "missing_terms": missing,
+            "low_understanding": bool(cov_pct < 40.0),
+            **extra,
         }
 
     term_total = max(1, len(q_terms))
     coverage = len(matched) / term_total
     has_cross_links = any(len(n.get("links", [])) > 0 for n in recalled)
 
+    if meaning_grounded and coverage < 0.55:
+        # The words do not overlap, but the memory that answered is close in
+        # meaning — that IS evidence, so it is graded as safe and the reason says
+        # plainly that meaning carried it (no pretending about word matches).
+        risk_pct = max(6, min(18, round(24 - sem_pct / 8.0)))
+        bridge_txt = (
+            ", ".join(f"{b.get('query_word')}↔{b.get('note_word')}" for b in sem_bridges[:3])
+            or "이웃 개념"
+        )
+        return {
+            "risk_pct": risk_pct,
+            "grounding_pct": 100 - risk_pct,
+            "grade": "safe",
+            "shield_triggered": False,
+            "badge": f"💡 환각 위험 {risk_pct}% · 단어는 안 겹치지만 의미로 근거 확인",
+            "reason": (
+                f"질문 단어({', '.join(missing[:3]) or '핵심어'})는 위키에 그대로 없지만, "
+                f"의미 일치 {round(sem_pct)}%로 근거 기억을 찾았어요 (의미 다리: {bridge_txt})."
+            ),
+            "matched_terms": matched,
+            "missing_terms": missing,
+            **extra,
+        }
+
     if coverage < 0.55 or top_score < 4.5:
         raw_risk = round(46 - coverage * 24 - min(8.0, top_score))
+        # 💡 Stage J: understanding the QUESTION is part of the grounding too.
+        # A memory found from one word out of seven is a lead, not a source, so
+        # the risk stays near the top of the caution band and the reason says
+        # exactly how much of the question was understood.
+        if cov_pct < 40.0:
+            raw_risk += round((40.0 - cov_pct) * 0.25)
         risk_pct = max(24, min(45, raw_risk))
         miss_txt = ", ".join(missing[:3]) if missing else "일부 세부 개념"
+        understood_txt = (
+            f" 질문 뜻을 {cov_pct}%만 이해했어요({cov.get('known', 0)}/{cov.get('total', 0)} 단어)"
+            f" — 의미 일치 {round(sem_pct)}%로 기억을 찾았지만 확신은 못 해요."
+            if cov_pct < 40.0 and sem_pct >= 20.0
+            else ""
+        )
         return {
             "risk_pct": risk_pct,
             "grounding_pct": 100 - risk_pct,
             "grade": "caution",
             "shield_triggered": False,
             "badge": f"⚠️ 환각 위험 {risk_pct}% · 부분 근거 응답",
-            "reason": f"'{miss_txt}' 내용은 위키에 아직 없어, 검증된 기억 카드 범위 안에서만 조심스럽게 답했어요.",
+            "reason": (
+                f"'{miss_txt}' 내용은 위키에 아직 없어, 검증된 기억 카드 범위 안에서만 조심스럽게 답했어요."
+                + understood_txt
+            ),
             "matched_terms": matched,
             "missing_terms": missing,
+            "low_understanding": bool(cov_pct < 40.0),
+            **extra,
         }
 
     score_bonus = min(10, int(top_score // 2))
@@ -92,6 +168,7 @@ def audit_chat_grounding(question: str, recall_bundle: Dict[str, Any]) -> Dict[s
         "reason": f"질문 핵심어({', '.join(matched[:4])})가 마크다운 위키 기억 및 시냅스 연결과 정확히 일치해요.",
         "matched_terms": matched,
         "missing_terms": missing,
+        **extra,
     }
 
 

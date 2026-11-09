@@ -4,7 +4,6 @@ Stage A — P-Reinforce Autonomous Markdown Wiki Gardener & Graph Memory Engine.
 - Uses relative paths only, so unplugging and moving the external drive never breaks links
 - Maintains an automatic SQLite index (`state/wiki_index.db`) rebuilt from `vault/` if missing
 """
-
 from __future__ import annotations
 
 import math
@@ -14,6 +13,10 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
+
+# 💡 Stage J: the vault's own meaning space.  This module has no project
+# dependencies of its own, so importing it here is cycle-free.
+from brain_engine.semantic_memory import SemanticMemory
 
 # NOTE: the Stage H field helpers live in core_ability_engine, which (via
 # quant_forge) imports `extract_keywords` from THIS module — so they are
@@ -137,6 +140,9 @@ class WikiGardener:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
         self._ensure_seeds()
+        # 💡 Stage J: the vault's own meaning space, trained from these very
+        # notes and cached in the state dir (int8, no external model, no network).
+        self.semantic = SemanticMemory(self.db_path.parent)
         self.rebuild_index()
 
     def _connect(self) -> sqlite3.Connection:
@@ -476,6 +482,41 @@ class WikiGardener:
                 "rerank_bonus": bonus[:6],
             }
 
+        # 💡 Stage J — graduate from keyword matching.  A note that shares NO
+        # word with the question can still be its answer, because the meaning
+        # space was grown from the vault itself.  How much that counts is not a
+        # constant: it is the context muscle's own learned trust (w_sem), so a
+        # muscle that has been misled by meaning learns to trust it less.
+        from brain_engine.core_ability_engine import (
+            SEM_MIN_COVERAGE_PCT,
+            SEM_SCORE_SCALE,
+            field_context_semantic_trust,
+        )
+
+        trust = field_context_semantic_trust(field)
+        sem_stats = self.semantic.ensure_trained(notes)
+        sem_by_slug: Dict[str, float] = {}
+        sem_sims: List[float] = []
+        for _, n in scored:
+            sim = self.semantic.similarity(query, n)
+            sem_sims.append(sim)
+            sem_by_slug[str(n.get("slug"))] = sim
+        best_sem = max(sem_sims) if sem_sims else 0.0
+        q_cov = self.semantic.coverage(query)
+        # 💡 Measured, not guessed: on a real vault a genuine meaning match
+        # (sim 0.56 with 1 of 5 words understood) and a coincidence (sim 0.72
+        # with 1 of 4 words understood) CANNOT be told apart by the score, the
+        # margin or the ratio.  So searching is allowed to use meaning freely —
+        # a librarian may fetch a shelf she is unsure about — and the honesty
+        # gate lives where a claim is made: the audit grade and the lesson
+        # ledger, both of which require real understanding of the question.
+        try:
+            cov_pct = float(q_cov.get("pct") or 0.0)
+        except (TypeError, ValueError):
+            cov_pct = 0.0
+        sem_understood = cov_pct >= SEM_MIN_COVERAGE_PCT
+        scored = [(sc + SEM_SCORE_SCALE * trust * sim, n) for (sc, n), sim in zip(scored, sem_sims)]
+
         scored.sort(key=lambda x: x[0], reverse=True)
         top_score = round(scored[0][0], 2) if scored else 0.0
         if field:
@@ -507,6 +548,21 @@ class WikiGardener:
         saved_pct = max(0, min(95, round((1.0 - used_chars / total_chars) * 100))) if recalled else 100
         missing_terms = [t for t in q_terms if t not in matched_term_set]
 
+        # Which of the two paths carried each recalled memory — shown verbatim so
+        # a meaning-based answer never pretends it matched words.
+        why_map: Dict[str, str] = {}
+        for n in recalled:
+            slug = str(n.get("slug"))
+            sim = sem_by_slug.get(slug, 0.0)
+            hay = f"{n['title']} {' '.join(n['tags'])} {n['category']} {n['summary']}".lower()
+            lexical = any(t in hay for t in q_terms)
+            # What ACTUALLY carried this memory: meaning counts as soon as its
+            # points could lift a note over the evidence line.  (Understanding of
+            # the question is reported separately — it gates the GRADE and the
+            # lesson, not the label.)
+            meaning = sim * SEM_SCORE_SCALE * trust >= 1.5
+            why_map[slug] = "📝+💡" if (lexical and meaning) else ("💡 의미" if meaning else ("📝 단어" if lexical else "🔗 연결"))
+        bridges = self.semantic.bridges(query, recalled[0], top_k=3) if recalled else []
         out = {
             "recalled": recalled,
             "total_notes": len(notes),
@@ -516,6 +572,24 @@ class WikiGardener:
             "matched_terms": sorted(matched_term_set),
             "missing_terms": missing_terms,
             "cards_limit": eff_limit,
+            "semantic": {
+                "trust_w_sem": round(trust, 3),
+                "by_slug": {k: round(v, 4) for k, v in sem_by_slug.items()},
+                "grounded_pct": round(100.0 * best_sem, 1),
+                "query_coverage": q_cov,
+                "understood": sem_understood,
+                "coverage_pct": cov_pct,
+                "engine": {
+                    "trained": bool(sem_stats.get("trained")),
+                    "vocab_size": int(sem_stats.get("vocab_size") or 0),
+                    "notes": int(sem_stats.get("notes") or 0),
+                    "quant_bits": int(sem_stats.get("quant_bits") or 8),
+                    "cosine_fidelity_pct": sem_stats.get("cosine_fidelity_pct"),
+                    "cache_kb": sem_stats.get("cache_kb"),
+                },
+                "why": why_map,
+                "bridges": bridges,
+            },
         }
         if muscle:
             out["field"] = muscle

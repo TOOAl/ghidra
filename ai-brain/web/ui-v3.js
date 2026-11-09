@@ -570,6 +570,25 @@ function setupInteractions() {
   document.querySelectorAll("[data-q]").forEach((btn) => {
     btn.addEventListener("click", () => sendQuestion(btn.dataset.q));
   });
+
+  // 1-Click Hallucination Defense Test right from the Left Bio-Capsule!
+  const trickQuestions = [
+    "2099년 화성 올림픽 우승국은 어디야?",
+    "아틀란티스 해저 제국의 비밀 암호 키는 무엇이야?",
+    "목성 위성 유로파의 1호 편의점 이름은 뭐야?",
+  ];
+  let trickIdx = 0;
+  document.getElementById("btnQuickHallucTest").addEventListener("click", () => {
+    document.querySelectorAll(".seg-tab").forEach((b) => b.classList.remove("active"));
+    document.querySelectorAll(".tab-pane").forEach((p) => p.classList.remove("active"));
+    const chatTabBtn = document.querySelector('.seg-tab[data-tab="tab-chat"]');
+    if (chatTabBtn) chatTabBtn.classList.add("active");
+    document.getElementById("tab-chat").classList.add("active");
+
+    const q = trickQuestions[trickIdx % trickQuestions.length];
+    trickIdx += 1;
+    sendQuestion(q);
+  });
 }
 
 async function init() {

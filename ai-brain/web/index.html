@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>시냅스몽 · 나만의 양자화 AI 두뇌 연구소</title>
-  <link rel="stylesheet" href="ui-v3.css?v=3.1" />
+  <link rel="stylesheet" href="ui-v3.css?v=3.2" />
   <!--__INITIAL_STATE__-->
 </head>
 <body>
@@ -79,14 +79,19 @@
           <strong class="v-num" id="valXp">30/50</strong>
         </div>
 
-        <!-- 두뇌 환각 위험도 & 근거 신뢰도 게이지 -->
+        <!-- 두뇌 환각 위험도 & 근거 신뢰도 게이지 + 즉시 테스트 버튼 -->
         <div class="halluc-divider"></div>
         <div class="halluc-head">
           <span class="halluc-title">🛡️ 두뇌 환각 위험도 <small>(낮을수록 정확)</small></span>
-          <span class="halluc-badge safe" id="hallucBadge">안심 · 11%</span>
+          <div class="halluc-right">
+            <span class="halluc-badge safe" id="hallucBadge">안심 · 10%</span>
+            <button class="halluc-test-btn" id="btnQuickHallucTest" type="button" title="없는 지식을 물어봐서 억지 추측을 막는지 실험합니다">
+              🧪 방어 테스트
+            </button>
+          </div>
         </div>
         <div class="v-bar">
-          <div class="v-fill halluc-safe" id="barHalluc" style="width:11%"></div>
+          <div class="v-fill halluc-safe" id="barHalluc" style="width:10%"></div>
         </div>
         <div class="halluc-meta" id="hallucMeta">
           시냅스 검증 100% · 양자화 보존 99.8% · 억지추측 차단 ON
@@ -369,6 +374,6 @@
     </section>
   </main>
 
-  <script src="ui-v3.js?v=3.1"></script>
+  <script src="ui-v3.js?v=3.2"></script>
 </body>
 </html>

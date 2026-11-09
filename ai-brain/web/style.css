@@ -147,15 +147,15 @@ html, body {
 /* ── Main Cockpit Grid ── */
 .cockpit {
   display: grid;
-  grid-template-columns: 368px minmax(0, 1fr);
-  gap: 18px;
+  grid-template-columns: 356px minmax(0, 1fr);
+  gap: 16px;
   max-width: 1540px;
   margin: 0 auto;
-  padding: 16px 24px 24px;
+  padding: 14px 20px 22px;
   align-items: start;
 }
 
-@media (max-width: 1080px) {
+@media (max-width: 880px) {
   .cockpit {
     grid-template-columns: 1fr;
   }
@@ -233,7 +233,7 @@ html, body {
 /* Cosmic Glass Dome */
 .dome-stage {
   position: relative;
-  height: 224px;
+  height: 194px;
   border-radius: 14px;
   overflow: hidden;
   background: #060914;
@@ -389,6 +389,32 @@ html, body {
   justify-content: space-between;
   align-items: center;
   gap: 6px;
+}
+
+.halluc-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.halluc-test-btn {
+  appearance: none;
+  background: rgba(245, 185, 66, 0.14);
+  color: #fde68a;
+  border: 1px solid rgba(245, 185, 66, 0.45);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.halluc-test-btn:hover {
+  background: rgba(245, 185, 66, 0.28);
+  border-color: #fbbf24;
+  color: #ffffff;
 }
 
 .halluc-title {
@@ -724,9 +750,15 @@ html, body {
 
 #graphCanvas {
   width: 100%;
-  height: 470px;
+  height: 440px;
   display: block;
   cursor: grab;
+}
+
+@media (max-width: 1280px) {
+  #graphCanvas {
+    height: 300px;
+  }
 }
 
 .path-badge {

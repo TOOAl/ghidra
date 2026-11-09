@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>시냅스몽 · 나만의 양자화 AI 두뇌 연구소</title>
-  <link rel="stylesheet" href="ui-v3.css?v=6.4" />
+  <link rel="stylesheet" href="ui-v3.css?v=6.5" />
   <!--__INITIAL_STATE__-->
 </head>
 <body>
@@ -421,6 +421,21 @@
               </div>
               <div class="gym-cards" id="gymCards"></div>
             </div>
+          </div>
+
+          <!-- ⚔️ H단계: 근육 실전 투입 보고서 -->
+          <div class="card field-report-card" id="fieldReportPanel">
+            <div class="field-head">
+              <div>
+                <span class="step-kicker">STAGE H · FIELD DEPLOYMENT REPORT</span>
+                <h3>⚔️ 근육 실전 투입 보고서 — 체육관이 아니라 진짜 일터에서!</h3>
+                <p class="field-status-line" id="fieldStatusLine">⚔️ 실전 원장을 계측하는 중...</p>
+              </div>
+              <button class="primary-btn" id="btnFieldSortie" type="button">⚔️ 지금 당장 실전 투입!</button>
+            </div>
+            <div class="field-muscles" id="fieldMuscles"></div>
+            <div class="field-ledger-head">📜 최근 실전 출동 기록 (최신순 · 최대 10건)</div>
+            <div class="field-ledger" id="fieldLedger"></div>
           </div>
 
           <div class="pane-grid evo-grid">
@@ -892,6 +907,6 @@
     </div>
   </div>
 
-  <script src="ui-v3.js?v=6.4"></script>
+  <script src="ui-v3.js?v=6.5"></script>
 </body>
 </html>

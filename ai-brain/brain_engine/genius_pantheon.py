@@ -24,7 +24,9 @@ import re
 import struct
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
+
+from brain_engine.core_ability_engine import field_reasoning_boost, field_reasoning_hops
 
 from brain_engine.rl_gym import ARCHETYPES, _reward_for
 
@@ -596,7 +598,11 @@ class GeniusPantheon:
         return clean[:90]
 
     def _build_dialogue(
-        self, selected_consts: List[Dict[str, Any]], topic: str, active_bridges: List[Dict[str, Any]]
+        self,
+        selected_consts: List[Dict[str, Any]],
+        topic: str,
+        active_bridges: List[Dict[str, Any]],
+        field: Optional[Dict[str, Any]] = None,
     ) -> Tuple[List[Dict[str, Any]], str]:
         focus = self._extract_topic_focus(topic)
         dialogue: List[Dict[str, Any]] = []
@@ -681,6 +687,40 @@ class GeniusPantheon:
                 }
             )
 
+        # Phase 3 (Stage H ⚔️): the REASONING muscle chains the debate into a
+        # hop-by-hop argument trace.  More levels → more hops → a deeper chain
+        # that must carry each conclusion forward as the next premise.
+        chain_hops = field_reasoning_hops(field) if field else 0
+        if field and chain_hops:
+            pairs = [(c, g) for c in selected_consts for g in c["geniuses"]]
+            prev: Optional[Dict[str, Any]] = None
+            for h in range(chain_hops):
+                c_h, g = pairs[h % len(pairs)]
+                if prev is None:
+                    step = (
+                        f"[hop {h + 1}/{chain_hops}] 『{focus}』의 제1원리로 제 렌즈({g['lens']})를 출발점으로 삼습니다. "
+                        f"{g['credo']}"
+                    )
+                else:
+                    step = (
+                        f"[hop {h + 1}/{chain_hops}] {prev['name']}의 결론을 근거로 받아, 제 렌즈({g['lens']})를 더해 "
+                        f"『{focus}』의 다음 명제를 도출합니다. {g['credo']}"
+                    )
+                dialogue.append(
+                    {
+                        "phase": "🔗 추론 체인 역추적",
+                        "constellation_id": c_h["id"],
+                        "constellation_name": c_h["name"],
+                        "color": "#a5f3fc",
+                        "speaker": g["name"],
+                        "emoji": g["emoji"],
+                        "lens": g["lens"],
+                        "reply_to": prev["name"] if prev else None,
+                        "message": step,
+                    }
+                )
+                prev = g
+
         const_titles = " × ".join(c["name"] for c in selected_consts)
         total_speakers = sum(len(c["geniuses"]) for c in selected_consts)
         consensus = (
@@ -689,10 +729,14 @@ class GeniusPantheon:
             f"② 단일 메모리 벽에 갇히지 않도록 성좌별 4비트 모듈(.sbrain)로 외장하드에 무한 적재하며, "
             f"③ 불확실한 경계에서는 안전 경로와 다수 심판 합의로 무결성을 지킨다."
         )
+        if field and chain_hops:
+            consensus += (
+                f" (🧠 추론 근육 Lv{int(field.get('level', 1))} 실전 투입 — {chain_hops} hop 역추적 체인으로 합의까지 연결 완료!)"
+            )
         return dialogue, consensus
 
     def convene_debate(
-        self, constellation_ids: List[str], topic: str, rl_gym: Any
+        self, constellation_ids: List[str], topic: str, rl_gym: Any, field: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         t0 = time.perf_counter()
         consts: List[Dict[str, Any]] = self.data["constellations"]
@@ -707,7 +751,7 @@ class GeniusPantheon:
             b for b in self.data["bridges"] if b["a"] in sel_set and b["b"] in sel_set
         ]
 
-        dialogue, consensus = self._build_dialogue(selected_consts, topic, active_bridges)
+        dialogue, consensus = self._build_dialogue(selected_consts, topic, active_bridges, field)
 
         # Aggregate all participating geniuses' bias matrices + inter-constellation resonance bonus
         all_geniuses = [g for c in selected_consts for g in c["geniuses"]]
@@ -786,6 +830,11 @@ class GeniusPantheon:
                 # Custom user-created constellations boost broad cross-domain wisdom!
                 for a_i in range(len(ARCHETYPES)):
                     arch_strength[a_i] = min(1.25, arch_strength[a_i] + 0.45)
+
+        # ⚔️ A deeper reasoning chain teaches the baby neurons a little harder.
+        if field:
+            r_boost = field_reasoning_boost(field)
+            arch_strength = [min(1.25, x * r_boost) for x in arch_strength]
 
         distill_rng = random.Random(777 + int(self.data.get("debate_sessions", 0)))
         saved_weights = [list(ag.flat_weights()) for ag in rl_gym.agents]
@@ -871,6 +920,17 @@ class GeniusPantheon:
             "elapsed_ms": elapsed_ms,
             "wiki_note_title": wiki_title,
             "wiki_note_body": wiki_body,
+            "field": (
+                {
+                    "ability": "reasoning",
+                    "level": int(field.get("level", 1)),
+                    "tier": int(field.get("tier", 0)),
+                    "chain_hops": field_reasoning_hops(field),
+                    "distill_boost": field_reasoning_boost(field),
+                }
+                if field
+                else None
+            ),
         }
 
         self.data["active_constellation_ids"] = valid_ids

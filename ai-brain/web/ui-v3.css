@@ -3216,3 +3216,136 @@ code {
   border-color: rgba(34, 211, 238, 0.45);
   color: #cffafe;
 }
+
+/* ---------------------------------------------------------------------------
+   ⚔️ Stage H — Field Deployment Report (muscles on real duty)
+--------------------------------------------------------------------------- */
+.field-report-card {
+  border: 1px solid rgba(251, 146, 60, 0.42);
+  background:
+    radial-gradient(1000px 260px at 12% -20%, rgba(251, 146, 60, 0.16), transparent 62%),
+    radial-gradient(760px 240px at 92% 0%, rgba(167, 139, 250, 0.14), transparent 60%);
+}
+
+.field-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.field-status-line {
+  font-size: 11.8px;
+  color: #fed7aa;
+  line-height: 1.55;
+  margin-top: 4px;
+}
+
+.field-muscles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(238px, 1fr));
+  gap: 9px;
+}
+
+.field-muscle {
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 12px;
+  padding: 9px 11px;
+  background: rgba(30, 41, 59, 0.55);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fm-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.fm-title { font-weight: 800; font-size: 12.6px; color: #fef3c7; }
+
+.fm-lv {
+  font-size: 10.6px;
+  font-weight: 800;
+  color: #fdba74;
+  background: rgba(124, 45, 18, 0.5);
+  border: 1px solid rgba(251, 146, 60, 0.4);
+  border-radius: 999px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+
+.fm-site { font-size: 11.4px; color: #e2e8f0; }
+.fm-site strong { color: #fcd34d; }
+.fm-site b { color: #fb923c; }
+
+.fm-detail {
+  font-size: 10.6px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  border-top: 1px dashed rgba(148, 163, 184, 0.22);
+  padding-top: 4px;
+}
+
+.fm-last {
+  font-size: 10.8px;
+  color: #bae6fd;
+  line-height: 1.5;
+  background: rgba(8, 47, 73, 0.42);
+  border-radius: 8px;
+  padding: 4px 7px;
+}
+
+.field-ledger-head {
+  margin: 12px 0 6px;
+  font-size: 11.6px;
+  font-weight: 800;
+  color: #fdba74;
+}
+
+.field-ledger {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 128px 44px 132px 1fr 132px;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 10.9px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 9px;
+  padding: 5px 8px;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.fr-muscle { font-weight: 800; color: #fef3c7; }
+.fr-lv { font-weight: 800; color: #fb923c; }
+.fr-site { color: #a5f3fc; }
+.fr-effect { color: #e2e8f0; line-height: 1.5; }
+.fr-ts { color: var(--text-muted); text-align: right; }
+
+.field-empty {
+  font-size: 11.2px;
+  color: var(--text-muted);
+  padding: 8px;
+  text-align: center;
+  border: 1px dashed rgba(148, 163, 184, 0.28);
+  border-radius: 10px;
+}
+
+@media (max-width: 860px) {
+  .field-row { grid-template-columns: 1fr; }
+  .fr-ts { text-align: left; }
+}
+
+.journal-entry.kind-field { border-left-color: #fb923c; background: rgba(67, 20, 7, 0.32); }
+.journal-entry.kind-field .je-beat { background: linear-gradient(135deg, #fed7aa, #fb923c); }

@@ -2194,7 +2194,7 @@ function renderHeartJournal(hb) {
     return;
   }
   list.innerHTML = entries.map((e) => {
-    const kind = e.kind === "vaccine" ? "kind-vaccine" : e.kind === "stumble" ? "kind-stumble" : e.kind === "train" ? "kind-train" : e.kind === "breakthrough" ? "kind-breakthrough" : e.kind === "research" ? "kind-research" : "kind-evolve";
+    const kind = e.kind === "field" ? "kind-field" : e.kind === "vaccine" ? "kind-vaccine" : e.kind === "stumble" ? "kind-stumble" : e.kind === "train" ? "kind-train" : e.kind === "breakthrough" ? "kind-breakthrough" : e.kind === "research" ? "kind-research" : "kind-evolve";
     const kindLabel = e.kind === "vaccine" ? "🛡️ 예방접종" : e.kind === "stumble" ? "💤 깜빡" : e.kind === "train" ? "🏋️ 자율훈련" : e.kind === "breakthrough" ? "🚀 한계돌파" : e.kind === "research" ? "🔭 열린연구" : "🌱 진화";
     const chips = e.kind === "breakthrough"
       ? [
@@ -2362,6 +2362,45 @@ function renderGym(snap) {
         ? `한계 도달 ${atCap.map((a) => a.title).join(", ")} — 끝이 아니라 돌파 연구 시작!`
         : `가장 애쓰는 근육 ${sorted[0].title}(Lv ${sorted[0].level}/${sorted[0].cap}) — 심장박동이 알아서 훈련해요!`);
   }
+  if (snap.field) renderField(snap.field);
+}
+
+/* ---- ⚔️ Stage H: Field Deployment Report — muscles doing REAL work ---- */
+function renderField(field) {
+  const line = document.getElementById("fieldStatusLine");
+  const mus = document.getElementById("fieldMuscles");
+  const led = document.getElementById("fieldLedger");
+  if (!mus || !led) return;
+  const total = field.total_deployments || 0;
+  const per = field.per_muscle || [];
+  const hits = per.reduce((acc, m) => acc + (m.deployments || 0), 0);
+  if (line) {
+    line.textContent = total > 0
+      ? `⚔️ 근육들이 실전에서 총 ${total}번 일했어요! (🧠 담론 · 📖 기억 호출 · 💻 원인 감사 · 🗂️ 시냅스 엮기) — 체육관 점수가 아니라 진짜 결과로 남았습니다.`
+      : "⚔️ 아직 실전 출동 전이에요 — [지금 당장 실전 투입!] 을 누르거나, 채팅·담론·4단계 감사·시냅스 엮기를 쓰기만 해도 근육이 저절로 투입돼요!";
+  }
+  mus.innerHTML = per.map((m) => `
+    <div class="field-muscle" data-ability="${escapeHeartHtml(m.id)}">
+      <div class="fm-top">
+        <span class="fm-title">${escapeHeartHtml(m.title)}</span>
+        <span class="fm-lv">Lv ${m.level}/${m.cap} · 티어 ${m.tier + 1}</span>
+      </div>
+      <div class="fm-site">${escapeHeartHtml(m.site_title)} 에서 <strong>${escapeHeartHtml(m.verb)}</strong> 담당 · 출동 <b>${m.deployments}</b>회</div>
+      <div class="fm-detail">${escapeHeartHtml(m.detail)}</div>
+      <div class="fm-last">${escapeHeartHtml(m.last_effect)}</div>
+    </div>`).join("");
+  const recent = field.recent || [];
+  led.innerHTML = recent.length
+    ? recent.map((d) => `
+      <div class="field-row">
+        <span class="fr-muscle">${escapeHeartHtml(d.muscle_title)}</span>
+        <span class="fr-lv">Lv${d.level}</span>
+        <span class="fr-site">${escapeHeartHtml(d.site_title)}</span>
+        <span class="fr-effect">${escapeHeartHtml(d.effect)}</span>
+        <span class="fr-ts">${escapeHeartHtml(d.ts)}</span>
+      </div>`).join("")
+    : `<div class="field-empty">아직 출동 기록이 없어요 — 근육을 실전에 내보내 주세요!</div>`;
+  void hits;
 }
 
 async function trainAbility(abilityId, mode) {
@@ -2528,7 +2567,7 @@ function setupHeartbeat() {
   setInterval(pollHeartbeat, 5000);
 }
 
-const CURRENT_UI_VERSION = "6.4";
+const CURRENT_UI_VERSION = "6.5";
 
 async function init() {
   setupGraphSimulation();
@@ -2554,6 +2593,29 @@ async function init() {
   }
   if (window.__loadEvoSpecimen) {
     window.__loadEvoSpecimen("xor_rot_vault", null, true);
+  }
+
+  const sortieBtn = document.getElementById("btnFieldSortie");
+  if (sortieBtn) {
+    sortieBtn.addEventListener("click", async () => {
+      sortieBtn.disabled = true;
+      const label = sortieBtn.textContent;
+      sortieBtn.textContent = "⚔️ 출동 중...";
+      setPetPose("04_brainstorm");
+      try {
+        const res = await apiPost("api/evo/field/sortie", {});
+        if (res.field) renderField(res.field);
+        if (res.status) renderStatus(res.status);
+        if (res.sortie) {
+          showEvoToast({ kind: "field", beat: "⚔️", diary: res.sortie.diary || res.sortie.effect || "" });
+          pollHeartbeat();
+        }
+      } catch (err) {
+        /* ignore transient */
+      }
+      sortieBtn.disabled = false;
+      sortieBtn.textContent = label;
+    });
   }
 
   // Auto-refresh preview tab whenever backend serves a newer UI version

@@ -485,16 +485,19 @@ def _update_coding(w: Any, prob: Dict[str, Any], guess: str, ok: bool, tier: int
     matrix: List[List[float]] = w.setdefault("matrix", [[0.0] * 4 for _ in range(4)])
     lr = 0.4
     guessed = guess.split("+")
+    # Bounded evidence: the matrix records HOW STRONGLY each fingerprint implies
+    # each bug class, so it saturates instead of growing with every repetition.
+    lo, hi = -3.0, 3.0
     for truth_cls in prob["labels"]:
         t = _BUG_CLASSES.index(truth_cls)
         for i in range(4):
-            matrix[t][i] += lr * f[i] * (0.2 if ok else 1.0)
+            matrix[t][i] = max(lo, min(hi, matrix[t][i] + lr * f[i] * (0.2 if ok else 1.0)))
     if not ok:
         for g in guessed:
             if g not in prob["labels"]:
                 gi = _BUG_CLASSES.index(g)
                 for i in range(4):
-                    matrix[gi][i] -= lr * f[i]
+                    matrix[gi][i] = max(lo, min(hi, matrix[gi][i] - lr * f[i]))
     if tier >= 1 and len(prob["labels"]) > 1:
         w["multi"] = min(1.0, w.get("multi", 0.0) + (0.3 if ok else -0.15))
 
@@ -591,11 +594,12 @@ def _solve_organizing(prob: Dict[str, Any], w: Dict[str, Any], tier: int) -> Tup
 def _update_organizing(w: Dict[str, Any], prob: Dict[str, Any], chosen: str, ok: bool, tier: int) -> None:
     lr = 0.25
     if ok:
-        w["w_cat"] = w.get("w_cat", -0.2) + lr * 0.2
-        if tier >= 1:
-            w["w_sub"] = w.get("w_sub", 0.0) + lr * 0.2
-        if tier >= 2:
-            w["w_agree"] = w.get("w_agree", 0.0) + lr * 0.2
+        # Deliberate NO-OP on success.  Rewarding a correct clustering by raising
+        # w_cat/w_sub makes every pair look similar → drawers over-merge → the
+        # shelf threshold chases them upward until nothing links at all.  This
+        # muscle only learns from its own over/under-merge diagnosis below.
+        # (Its starting weights are already non-zero, so unlike the coding
+        # matrix it never "claims to know" an answer with zero evidence.)
         return
     parent, _ = _org_clusters(prob, w, tier)
 
@@ -616,16 +620,16 @@ def _update_organizing(w: Dict[str, Any], prob: Dict[str, Any], chosen: str, ok:
             elif same_truth and not same_cl:
                 n_under += 1
     if n_over >= n_under:  # drawers overflowing: raise the shelf threshold & trust titles
-        w["thr"] = w.get("thr", 0.55) + lr * 0.3
+        w["thr"] = min(1.15, w.get("thr", 0.55) + lr * 0.3)
         w["w_tag"] = w.get("w_tag", 0.3) - lr * 0.5
         if tier >= 2:
             w["w_agree"] = w.get("w_agree", 0.0) + lr
     else:  # scattered twins: lower threshold, trust evidence more
-        w["thr"] = w.get("thr", 0.55) - lr * 0.3
+        w["thr"] = max(0.12, w.get("thr", 0.55) - lr * 0.3)
         w["w_cat"] = w.get("w_cat", -0.2) + lr
         w["w_title"] = w.get("w_title", 0.8) + lr * 0.3
     if tier >= 1:
-        w["w_sub"] = w.get("w_sub", 0.0) + lr * 0.6
+        w["w_sub"] = min(1.5, w.get("w_sub", 0.0) + lr * 0.6)
 
 
 _GENERATORS = {
@@ -646,6 +650,168 @@ _UPDATERS = {
     "coding": _update_coding,
     "organizing": _update_organizing,
 }
+
+# ===========================================================================
+# Stage H — FIELD DEPLOYMENT ⚔️  (the muscles leave the gym and do REAL work)
+# ---------------------------------------------------------------------------
+# Master's directive: a muscle is only a real ability when it is USED.  Each of
+# the four muscles is wired into one live organ, and — crucially — the organ
+# consumes the SAME learned weights the gym trained, through the SAME feature
+# functions (`_context_features` semantics, `_code_features`, `_org_sim`).  No
+# parallel "fake" scoring: what the muscle learned is literally what the organ
+# now does, so a higher level measurably changes real output.
+# ===========================================================================
+FIELD_SITES: Dict[str, Dict[str, str]] = {
+    "reasoning": {
+        "site": "pantheon_debate",
+        "title": "🏛️ 성좌 원탁 담론",
+        "verb": "논증 체인 역추적",
+        "detail": "천재들의 발언을 hop 수(2 + Lv÷4)만큼 사슬로 엮어 결론까지 역추적하고, 그 깊이만큼 증류 강도를 올립니다.",
+    },
+    "context": {
+        "site": "wiki_recall",
+        "title": "📚 위키 기억 호출",
+        "verb": "기억 재랭킹",
+        "detail": "학습된 문맥 가중치 6종(주어·서술·부정·단정·소유주·링크)으로 실제 위키 기억 카드를 다시 정렬하고 호출 매수를 늘립니다.",
+    },
+    "coding": {
+        "site": "forge_audit",
+        "title": "🛠️ 4단계 원인 감사",
+        "verb": "버그 지문 예측",
+        "detail": "학습된 4×4 버그 지문 행렬로 실제 편집창 코드를 훑어 의심 클래스 순위를 매기고 처방전 우선순위를 재배열합니다.",
+    },
+    "organizing": {
+        "site": "wiki_weave",
+        "title": "🕸️ 위키 시냅스 엮기",
+        "verb": "자동 그룹핑",
+        "detail": "학습된 임계값(thr)과 제목·태그·카테고리·하위주제 가중치로 실제로 엮을 노트 쌍만을 선별합니다.",
+    },
+}
+
+# Honest gym-feature → real-document-feature mapping (context muscle).
+_CTX_NEG_RE = re.compile(r"(아닙니다|아니에요|없다|없음|없습니다|한계|불가|금지|주의|\bnot\b|\bnever\b)")
+_CTX_ASSERT_RE = re.compile(r"(반드시|항상|원리|핵심|공식|불변식|규칙|\bmust\b|\balways\b)")
+
+# Real finding text → gym bug class (coding muscle ground truth for scoring).
+_BUG_CLASS_TEXT_RE = {
+    "missing_mask": re.compile(r"(0xFF|0xFFFF|65535|마스크|마스킹|8비트|16비트|넘침|overflow)", re.I),
+    "off_by_one": re.compile(r"(range\(|off.by.one|1비트|마지막|한 번|반복 횟수)", re.I),
+    "wrong_init": re.compile(r"(초기값|초기화|\binit\b|0x0000|seed)", re.I),
+    "empty_guard": re.compile(r"(빈 입력|빈 배열|empty|return \[\]|길이)", re.I),
+}
+
+
+def field_reasoning_hops(field: Dict[str, Any]) -> int:
+    """How many argument hops the round-table may chain (Lv 1→2, Lv 32→6)."""
+    return max(2, min(6, 2 + int(field.get("level", 1)) // 4))
+
+
+def field_reasoning_boost(field: Dict[str, Any]) -> float:
+    """Deeper chains → slightly stronger mentorship distillation into neurons."""
+    return round(1.0 + 0.012 * min(int(field.get("level", 1)), 32), 4)
+
+
+def field_context_limit(field: Dict[str, Any]) -> int:
+    """A sharper context muscle is trusted with more recall cards (2 → 6)."""
+    return max(2, min(6, 2 + int(field.get("level", 1)) // 6))
+
+
+def field_context_rerank(field: Dict[str, Any], notes: List[Dict[str, Any]], query_terms: List[str]) -> List[float]:
+    """Score REAL wiki notes with the context muscle's LEARNED weights.
+
+    Feature order matches `_context_features`: [subj, verb, neg, assert, owner, link].
+    """
+    w = field.get("weights") or {}
+    tier = int(field.get("tier", 0))
+    subj = (query_terms[0] if query_terms else "") or ""
+    scores: List[float] = []
+    for n in notes:
+        title = str(n.get("title", ""))
+        tl = title.lower()
+        body = f"{n.get('summary', '')} {n.get('body', '')}".lower()
+        cat = str(n.get("category", "")).lower()
+        tags = " ".join(str(t) for t in (n.get("tags") or [])).lower()
+        f_subj = 1.0 if (subj and subj.lower() in tl) else 0.0
+        f_verb = 1.0 if any(t and t.lower() in body for t in query_terms) else 0.0
+        f_neg = 1.0 if _CTX_NEG_RE.search(body) else 0.0
+        f_assert = 1.0 if (_CTX_ASSERT_RE.search(body) and f_neg == 0.0) else 0.0
+        f_owner = 1.0 if (subj and (subj.lower() in cat or subj.lower() in tags)) else 0.0
+        f_link = 1.0 if n.get("links") else 0.0
+        sc = (
+            float(w.get("w_subj", 0.5)) * f_subj
+            + float(w.get("w_verb", 0.5)) * f_verb
+            + float(w.get("w_neg", 0.6)) * f_neg
+            + float(w.get("w_assert", -0.3)) * f_assert
+        )
+        if tier >= 1:
+            sc += float(w.get("w_owner", 0.0)) * f_owner
+        if tier >= 2:
+            sc += float(w.get("w_link", 0.0)) * f_link
+        scores.append(round(sc, 4))
+    return scores
+
+
+def field_org_threshold(field: Dict[str, Any]) -> float:
+    """The shelf threshold the organizing muscle learned in the gym."""
+    return float((field.get("weights") or {}).get("thr", 0.55))
+
+
+def field_org_sub(category: str, tokens: List[str]) -> str:
+    """Guess a real note's sub-topic using the LEARNED `_SUB_TOKENS` lexicon."""
+    best, best_hit = category, 0
+    low = {str(t).lower() for t in tokens}
+    for (cat, sub), toks in _SUB_TOKENS.items():
+        if cat != category:
+            continue
+        hit = len(low & {str(t).lower() for t in toks})
+        if hit > best_hit:
+            best, best_hit = sub, hit
+    return best
+
+
+def field_org_pair_sim(field: Dict[str, Any], ni: Dict[str, Any], nj: Dict[str, Any]) -> float:
+    """Reuse the gym's own `_org_sim` on two REAL notes (same math, no fake path)."""
+    return _org_sim(ni, nj, field.get("weights") or {}, int(field.get("tier", 0)))
+
+
+def field_coding_suspects(field: Dict[str, Any], code: str) -> Dict[str, Any]:
+    """Run the coding muscle's LEARNED fingerprint matrix over real workshop code."""
+    f = _code_features({"snippet": code or ""}, int(field.get("tier", 0)))
+    matrix = (field.get("weights") or {}).get("matrix") or [[0.0] * 4 for _ in range(4)]
+    scores = [sum(float(row[i]) * f[i] for i in range(4)) for row in matrix]
+    order = sorted(range(4), key=lambda k: -scores[k])
+    n_lit = sum(1 for v in f if v > 0.5)
+    top = order[:2] if (int(field.get("tier", 0)) >= 1 and n_lit >= 2) else order[:1]
+    denom = sum(abs(x) for x in scores)
+    # HONESTY GATE: an all-zero matrix has learned nothing, so it must NOT be
+    # allowed to claim a lucky argmax hit.  Report "untrained" instead.
+    if denom < 1e-9:
+        return {
+            "features": f,
+            "lit_fingerprints": n_lit,
+            "untrained": True,
+            "predicted": [],
+            "suspects": [],
+        }
+    return {
+        "features": f,
+        "lit_fingerprints": n_lit,
+        "untrained": False,
+        "predicted": [_BUG_CLASSES[k] for k in top],
+        "suspects": [
+            {
+                "cls": _BUG_CLASSES[k],
+                "score": round(scores[k], 4),
+                "confidence": round(abs(scores[k]) / denom, 3),
+            }
+            for k in order
+        ],
+    }
+
+
+def field_coding_classes_of(text: str) -> List[str]:
+    """Map a real diagnosis sentence onto gym bug classes (to score the muscle)."""
+    return [c for c, rx in _BUG_CLASS_TEXT_RE.items() if rx.search(text or "")]
 
 
 def _difficulty_for(ability: str, level: int) -> int:
@@ -723,8 +889,13 @@ class CoreAbilityEngine:
             ok, chosen = _SOLVERS[ability](prob, ab["weights"], tier)
             if ok:
                 correct += 1
-            else:
-                _UPDATERS[ability](ab["weights"], prob, chosen, ok, tier)
+            # ALWAYS let the updater see the outcome.  Every updater owns an
+            # `if ok:` reinforcement branch (reasoning: reward-weighted evidence,
+            # coding: 0.2x truth-row strengthening, organizing: drawer tightening,
+            # context: no-op) — skipping it on success froze an all-zero coding
+            # matrix forever, so the muscle could claim a lucky argmax hit with
+            # zero learned evidence.  Correct answers must build evidence too.
+            _UPDATERS[ability](ab["weights"], prob, chosen, ok, tier)
             if not example_q:
                 example_q = self._example_text(ability, prob)
 
@@ -811,14 +982,14 @@ class CoreAbilityEngine:
         )
 
         # Phase C — run the self-experiment: unlock the hypothesis, retrain, re-exam
+        saved_weights = json.loads(json.dumps(ab["weights"]))
         ab["tier"] = next_tier
         train_correct, rounds = 0, 5
         for _ in range(rounds):
             prob = _GENERATORS[ability](rng, difficulty, next_knob)
             ok, chosen = _SOLVERS[ability](prob, ab["weights"], next_tier)
             train_correct += 1 if ok else 0
-            if not ok:
-                _UPDATERS[ability](ab["weights"], prob, chosen, ok, next_tier)
+            _UPDATERS[ability](ab["weights"], prob, chosen, ok, next_tier)
         conf_correct, conf_total = 0, 4
         for _ in range(conf_total):
             prob = _GENERATORS[ability](rng, difficulty + 1, next_knob)
@@ -845,6 +1016,10 @@ class CoreAbilityEngine:
             self._freeze_capsule(ability, ab)
         else:
             ab["tier"] = tier  # hypothesis rejected — roll back, keep the doubt alive
+            # ...and roll the WEIGHTS back too: a rejected experiment must not
+            # smuggle its side-effects into the brain (209 rejects once piled up
+            # w_sub = 156.75, a residue no exam ever approved).
+            ab["weights"] = saved_weights
             ab["breakthroughs"] = (ab.get("breakthroughs") or [])[-9:] + [record]
             diary = (
                 f"{reflection} → 🧪 자기 실험 결과 숨은 시험 {conf_correct}/{conf_total} … 가설 기각! "
@@ -995,4 +1170,82 @@ class CoreAbilityEngine:
                     "sessions": sessions[-6:],
                 }
             )
-        return {"abilities": out, "max_level": max(_tier_cap(a, len(TIERS[a]) - 1) for a in ABILITY_ORDER)}
+        return {
+            "abilities": out,
+            "max_level": max(_tier_cap(a, len(TIERS[a]) - 1) for a in ABILITY_ORDER),
+            "field": self.field_report(),
+        }
+
+    # ------------------------------------------------------------------
+    # Stage H — Field Command ⚔️ : hand a muscle to a real organ & keep the report
+    # ------------------------------------------------------------------
+    def field_profile(self, ability: str) -> Dict[str, Any]:
+        """Live level + tier + LEARNED weights of one muscle, for real organs."""
+        ab = self.state["abilities"].get(ability) or self._default_ability(ability)
+        site = FIELD_SITES[ability]
+        tier = int(ab.get("tier", 0))
+        return {
+            "ability": ability,
+            "title": ABILITY_META[ability]["title"],
+            "site": site["site"],
+            "site_title": site["title"],
+            "verb": site["verb"],
+            "level": int(ab.get("level", 1)),
+            "tier": tier,
+            "cap": _tier_cap(ability, tier),
+            "weights": json.loads(json.dumps(ab.get("weights") or self._default_weights(ability))),
+        }
+
+    def log_deployment(self, ability: str, effect: str, metric: Dict[str, Any]) -> Dict[str, Any]:
+        """Record one real-world sortie of a muscle (the ⚔️ field report ledger)."""
+        prof = self.field_profile(ability)
+        rec = {
+            "ts": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+            "ability": ability,
+            "muscle_title": prof["title"],
+            "site": prof["site"],
+            "site_title": prof["site_title"],
+            "verb": prof["verb"],
+            "level": prof["level"],
+            "tier": prof["tier"],
+            "effect": effect,
+            "metric": metric,
+        }
+        deps = self.state.setdefault("deployments", [])
+        deps.append(rec)
+        self.state["deployments"] = deps[-40:]
+        counts = self.state.setdefault("field_counts", {})
+        counts[ability] = int(counts.get(ability, 0)) + 1
+        self._save()
+        return rec
+
+    def field_report(self) -> Dict[str, Any]:
+        deps = list(self.state.get("deployments") or [])
+        counts = self.state.get("field_counts") or {}
+        per_muscle = []
+        for a in ABILITY_ORDER:
+            ab = self.state["abilities"].get(a) or self._default_ability(a)
+            site = FIELD_SITES[a]
+            tier = int(ab.get("tier", 0))
+            per_muscle.append(
+                {
+                    "id": a,
+                    "title": ABILITY_META[a]["title"],
+                    "site_title": site["title"],
+                    "verb": site["verb"],
+                    "detail": site["detail"],
+                    "level": int(ab.get("level", 1)),
+                    "tier": tier,
+                    "cap": _tier_cap(a, tier),
+                    "deployments": int(counts.get(a, 0)),
+                    "last_effect": next(
+                        (d["effect"] for d in reversed(deps) if d["ability"] == a),
+                        "아직 실전 투입 전 — 체육관에서 훈련 중이에요!",
+                    ),
+                }
+            )
+        return {
+            "total_deployments": len(deps),
+            "per_muscle": per_muscle,
+            "recent": deps[-10:][::-1],
+        }

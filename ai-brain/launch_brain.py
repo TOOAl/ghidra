@@ -79,7 +79,7 @@ class BrainState:
             rl_trained=rl_trained,
         )
         return {
-            "ui_version": "6.4",
+            "ui_version": "6.5",
             "soul": self.soul.snapshot(graph["stats"], env_grade=env_grade),
             "hallucination": hallucination,
             "host": self.host_info,
@@ -141,6 +141,9 @@ def make_handler(state: BrainState):
                 return
             if route == "/api/evo/abilities":
                 self._send_json(state.abilities.snapshot())
+                return
+            if route == "/api/evo/field":
+                self._send_json(state.abilities.field_report())
                 return
             if route == "/api/notes":
                 self._send_json({"notes": state.gardener.list_notes()})
@@ -216,7 +219,19 @@ def make_handler(state: BrainState):
                 if not question:
                     self._send_json({"error": "질문을 입력해 주세요!"}, status=400)
                     return
-                recall_bundle = state.gardener.recall_memories(question, limit=2)
+                ctx_field = state.abilities.field_profile("context")
+                recall_bundle = state.gardener.recall_memories(question, limit=2, field=ctx_field)
+                state.abilities.log_deployment(
+                    "context",
+                    f"💬 채팅 질문 「{question[:22]}」 — 위키 기억 {recall_bundle['total_notes']}장 중 "
+                    f"{len(recall_bundle['recalled'])}장을 문맥 가중치로 재랭킹해 선별",
+                    {
+                        "recalled": len(recall_bundle["recalled"]),
+                        "total_notes": recall_bundle["total_notes"],
+                        "cards_limit": recall_bundle.get("cards_limit"),
+                        "top_score": recall_bundle.get("top_score"),
+                    },
+                )
                 audit = audit_chat_grounding(question, recall_bundle)
                 result = state.slm.answer_with_memories(question, recall_bundle)
                 state.soul.on_chat(
@@ -234,6 +249,7 @@ def make_handler(state: BrainState):
                             for n in recall_bundle["recalled"]
                         ],
                         "saved_tokens_pct": recall_bundle["saved_tokens_pct"],
+                        "field_context": recall_bundle.get("field"),
                         "status": state.full_status(),
                     }
                 )
@@ -257,8 +273,22 @@ def make_handler(state: BrainState):
                 if not isinstance(cids, list):
                     cids = []
                 topic = str(body.get("topic") or "").strip()
+                r_field = state.abilities.field_profile("reasoning")
                 res = state.pantheon.convene_debate(
-                    [str(x) for x in cids], topic, state.rl_gym
+                    [str(x) for x in cids], topic, state.rl_gym, field=r_field
+                )
+                rf = res.get("field") or {}
+                state.abilities.log_deployment(
+                    "reasoning",
+                    f"🏛️ 원탁 담론 「{res['topic'][:20]}」 — {rf.get('chain_hops')} hop 논증 체인을 엮어 "
+                    f"심판 합의 {res['before_score']} → {res['after_score']}점",
+                    {
+                        "chain_hops": rf.get("chain_hops"),
+                        "before_score": res["before_score"],
+                        "after_score": res["after_score"],
+                        "gain_pts": res["gain_pts"],
+                        "distill_boost": rf.get("distill_boost"),
+                    },
                 )
                 digested = state.gardener.digest_raw_memory(
                     res["wiki_note_body"], custom_title=res["wiki_note_title"]
@@ -355,7 +385,18 @@ def make_handler(state: BrainState):
                 if not isinstance(cids, list):
                     cids = []
                 topic = str(body.get("topic") or "").strip()
-                recall_bundle = state.gardener.recall_memories(user_thought, limit=2)
+                ctx_field = state.abilities.field_profile("context")
+                recall_bundle = state.gardener.recall_memories(user_thought, limit=2, field=ctx_field)
+                state.abilities.log_deployment(
+                    "context",
+                    f"🧠 주인님 생각 피드백 — 위키 기억 {recall_bundle['total_notes']}장 중 "
+                    f"{len(recall_bundle['recalled'])}장을 성좌 담론 근거로 선별",
+                    {
+                        "recalled": len(recall_bundle["recalled"]),
+                        "total_notes": recall_bundle["total_notes"],
+                        "cards_limit": recall_bundle.get("cards_limit"),
+                    },
+                )
                 fb = state.pantheon.feedback_on_user_thought(
                     constellation_ids=[str(x) for x in cids],
                     user_thought=user_thought,
@@ -403,8 +444,21 @@ def make_handler(state: BrainState):
             if route == "/api/remedy":
                 action = str(body.get("action") or "").strip()
                 if action == "relink_synapses":
-                    res = state.gardener.weave_missing_synapses()
+                    o_field = state.abilities.field_profile("organizing")
+                    res = state.gardener.weave_missing_synapses(field=o_field)
                     added = res["added_pairs"]
+                    of = res.get("field") or {}
+                    state.abilities.log_deployment(
+                        "organizing",
+                        f"🕸️ 위키 시냅스 엮기 — 노트 {res['total_notes']}장 중 {of.get('pairs_examined')}쌍을 "
+                        f"학습 임계값 {of.get('threshold')} 로 심사해 {added}쌍 엮음",
+                        {
+                            "threshold": of.get("threshold"),
+                            "pairs_examined": of.get("pairs_examined"),
+                            "pairs_approved": of.get("pairs_approved"),
+                            "total_notes": res["total_notes"],
+                        },
+                    )
                     msg = (
                         f"시냅스 그물망을 점검해 새로운 교차검증 고리 {added}쌍을 엮었어요!"
                         if added > 0
@@ -437,7 +491,20 @@ def make_handler(state: BrainState):
             if route == "/api/evo/audit":
                 spec_id = str(body.get("specimen_id") or "xor_rot_vault").strip()
                 code = str(body.get("code") or "")
-                audit = state.evo_forge.audit_code(specimen_id=spec_id, code=code)
+                c_field = state.abilities.field_profile("coding")
+                audit = state.evo_forge.audit_code(specimen_id=spec_id, code=code, field=c_field)
+                cm = audit.get("field") or {}
+                if cm:
+                    state.abilities.log_deployment(
+                        "coding",
+                        f"🛠️ 4단계 원인 감사 — 버그 지문 {cm.get('lit_fingerprints')}개 점등 · {cm.get('verdict', '')}",
+                        {
+                            "predicted": cm.get("predicted"),
+                            "truth_classes": cm.get("truth_classes"),
+                            "top1_hit": cm.get("top1_hit"),
+                            "lit_fingerprints": cm.get("lit_fingerprints"),
+                        },
+                    )
                 self._send_json({"audit": audit})
                 return
 
@@ -530,7 +597,9 @@ def make_handler(state: BrainState):
                 message = str(body.get("message") or "").strip()
                 spec = state.evo_forge._resolve_spec(spec_id)
                 cur = code or spec["initial_buggy_code"]
-                diag = state.evo_forge.audit_code(spec_id, cur)["diagnosis"]
+                diag = state.evo_forge.audit_code(
+                    spec_id, cur, field=state.abilities.field_profile("coding")
+                )["diagnosis"]
                 findings = diag.get("findings", [])
                 toxins = [f for f in findings if f.get("severity") == "toxin"]
                 sandbox = diag.get("sandbox")
@@ -554,6 +623,9 @@ def make_handler(state: BrainState):
                     hints = [f.get("fix_hint") for f in findings if f.get("fix_hint")]
                     reply = ("🩹 처방전: " + " / ".join(hints[:3])) if hints else "🩹 처방전 필요 없음! 지금 [🧩 우리 뇌에 지금 이식 적용] 을 눌러도 완벽해요."
                     reply += " [🩹 5단계: 자동 수리 & 유리방 시험] 을 누르면 제가 직접 고쳐 유리방 6/6 을 확인해요!"
+                    mus = diag.get("muscle") or {}
+                    if mus:
+                        reply += f" (💻 코딩 근육 Lv{mus.get('level')} 실전 의견: {mus.get('verdict', '')})"
                 elif any(k in message for k in ("원리", "공식", "설계도", "원본", "블루프린트")):
                     reply = (
                         f"🧬 핵심 공식: {bp.get('core_formula')} | 입력: {bp.get('inputs')} | 출력: {bp.get('outputs')} | "
@@ -579,6 +651,17 @@ def make_handler(state: BrainState):
                 message = str(body.get("message") or "")
                 talked = state.heartbeat.chat(message)
                 self._send_json(talked)
+                return
+
+            if route == "/api/evo/field/sortie":
+                entry = state.heartbeat.field_sortie(trigger="manual")
+                self._send_json(
+                    {
+                        "sortie": entry,
+                        "field": state.abilities.field_report(),
+                        "status": state.full_status(),
+                    }
+                )
                 return
 
             if route == "/api/evo/heartbeat/beat":

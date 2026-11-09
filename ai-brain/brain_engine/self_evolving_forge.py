@@ -36,6 +36,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from brain_engine.core_ability_engine import field_coding_classes_of, field_coding_suspects
+
 from brain_engine.quant_forge import BLOCK_SIZE, MAGIC, quantize_tensor_int4
 
 
@@ -1204,14 +1206,57 @@ class SelfEvolvingForge:
     # ------------------------------------------------------------------
     # Stage 4: Diagnose Bugs & Pufferfish Toxins
     # ------------------------------------------------------------------
-    def audit_code(self, specimen_id: str, code: str) -> Dict[str, Any]:
+    def audit_code(
+        self, specimen_id: str, code: str, field: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         spec = self._resolve_spec(specimen_id)
-        diag = diagnose_defects(code, spec["entry_fn"], spec["twin_tests"])
-        return {
+        target = code or spec["initial_buggy_code"]
+        diag = diagnose_defects(target, spec["entry_fn"], spec["twin_tests"])
+        out: Dict[str, Any] = {
             "specimen_id": spec["id"],
             "entry_fn": spec["entry_fn"],
             "diagnosis": diag,
         }
+        # ⚔️ Stage H: the CODING muscle sweeps the real workshop code with the
+        # 4×4 fingerprint matrix it learned, then we score it HONESTLY against
+        # the bug classes the static diagnosis actually reported.
+        if field:
+            sus = field_coding_suspects(field, target)
+            truth_classes: set = set()
+            for f in diag.get("findings", []):
+                if f.get("severity") in ("bug", "critical", "mismatch"):
+                    truth_classes.update(
+                        field_coding_classes_of(f"{f.get('root_cause', '')} {f.get('fix_hint', '')}")
+                    )
+            ranked = sus["suspects"]
+            top1_hit = bool(ranked) and ranked[0]["cls"] in truth_classes
+            if sus.get("untrained"):
+                verdict = "🍼 코딩 근육이 아직 버그 지문 행렬을 배우는 중이에요 (영점) — 체육관 훈련이 필요해요!"
+            elif not truth_classes:
+                verdict = "🧼 정적 진단이 보고한 결함 클래스가 없어 적중을 채점할 수 없어요."
+            elif top1_hit:
+                verdict = f"🎯 1순위 「{ranked[0]['cls']}」 실제 결함 적중! (신뢰도 {int(ranked[0]['confidence'] * 100)}%)"
+            else:
+                verdict = (
+                    f"❎ 1순위 「{ranked[0]['cls']}」 빗나감 — 실제 클래스: "
+                    f"{', '.join(sorted(truth_classes))}. 이 오답을 다음 훈련 교재로 쓸게요!"
+                )
+            muscle = {
+                "ability": "coding",
+                "level": int(field.get("level", 1)),
+                "tier": int(field.get("tier", 0)),
+                "predicted": sus["predicted"],
+                "suspects": ranked,
+                "untrained": bool(sus.get("untrained")),
+                "lit_fingerprints": sus["lit_fingerprints"],
+                "truth_classes": sorted(truth_classes),
+                "top1_hit": top1_hit,
+                "hits": sum(1 for r in ranked if r["cls"] in truth_classes),
+                "verdict": verdict,
+            }
+            diag["muscle"] = muscle
+            out["field"] = muscle
+        return out
 
     # ------------------------------------------------------------------
     # Stage 5: Time-Machine Savepoint + Auto/Custom Repair + Glass Sandbox

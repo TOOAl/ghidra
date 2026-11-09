@@ -1,7 +1,7 @@
 """Stage D — Self-Evolving Heartbeat 💓
 
 While the master is away, the tamagotchi brain keeps dreaming on its own:
-every heartbeat it picks a fresh "dream quest", runs the full 6-Stage Forge
+every heartbeat it picks a fresh "dream quest", runs the full 6-Stage Horge
 cycle (draft → audit → repair → glass-twin verify → permanent cartridge),
 and writes a child-friendly diary line into the Evolution Journal.
 
@@ -441,6 +441,9 @@ class EvolutionHeartbeat:
                 entry = self._beat_evolve(pending[0], beat_no, t0, wish)
             elif not pending and beat_no % 4 == 0:
                 entry = self._beat_vaccine(DREAM_QUEST_POOL[beat_no % len(DREAM_QUEST_POOL)], beat_no, t0)
+            elif self.ability is not None and beat_no % 3 == 0:
+                # ⚔️ Stage H: a muscle goes out and does REAL work in a live organ!
+                entry = self._beat_field(beat_no, t0)
             else:
                 entry = self._beat_train(ABILITY_ORDER[beat_no % len(ABILITY_ORDER)], beat_no, t0)
 
@@ -458,7 +461,19 @@ class EvolutionHeartbeat:
     def _beat_evolve(self, quest: Dict[str, Any], beat_no: int, t0: float, wish: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         qid = quest["id"]
         draft = quest["initial_buggy_code"]
-        audit = self.forge.audit_code(qid, draft)
+        c_field = self.ability.field_profile("coding") if self.ability is not None else None
+        audit = self.forge.audit_code(qid, draft, field=c_field)
+        if c_field and audit.get("field"):
+            cm = audit["field"]
+            self.ability.log_deployment(
+                "coding",
+                f"💭 꿈 결핍 「{quest['title'][:18]}」 감사 — 버그 지문 {cm.get('lit_fingerprints')}개 점등 · {cm.get('verdict', '')}",
+                {
+                    "predicted": cm.get("predicted"),
+                    "truth_classes": cm.get("truth_classes"),
+                    "top1_hit": cm.get("top1_hit"),
+                },
+            )
         findings = audit["diagnosis"].get("findings", [])
         toxins = sum(1 for f in findings if f.get("severity") == "toxin")
 
@@ -599,6 +614,122 @@ class EvolutionHeartbeat:
             "pass_before": healthy_pct,
             "pass_after": healthy_pct,
             "skill_slug": quest["entry_fn"],
+            "ms": round((time.perf_counter() - t0) * 1000.0, 2),
+        }
+
+    # ------------------------------------------------------------------
+    def field_sortie(self, trigger: str = "manual") -> Dict[str, Any]:
+        """⚔️ Send one muscle out on a REAL sortie right now (UI button)."""
+        with self._lock:
+            t0 = time.perf_counter()
+            beat_no = int(self.meta.get("beats_total", 0)) + 1
+            entry = self._beat_field(beat_no, t0)
+            entry["beat"] = beat_no
+            entry["ts"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+            entry["trigger"] = trigger
+            self._append_entry(entry)
+            self.meta["beats_total"] = beat_no
+            self.meta["last_beat_ts"] = entry["ts"]
+            self._next_ts = time.time() + self.interval_sec
+            self._save()
+            return entry
+
+    # ------------------------------------------------------------------
+    # ⚔️ Stage H: Field Sortie — the heart sends ONE muscle out to do REAL work
+    #            in a live organ (not gym practice), then writes it in the diary.
+    # ------------------------------------------------------------------
+    def _beat_field(self, beat_no: int, t0: float) -> Dict[str, Any]:
+        sorties = ["weave", "recall", "audit"]
+        pick = sorties[beat_no % len(sorties)]
+
+        if pick == "weave":
+            ability = "organizing"
+            field = self.ability.field_profile(ability)
+            res = self.gardener.weave_missing_synapses(field=field)
+            f = res.get("field") or {}
+            effect = (
+                f"🕸️ 위키 시냅스 엮기 — 노트 {res['total_notes']}장 중 {f.get('pairs_examined')}쌍을 "
+                f"학습 임계값 {f.get('threshold')} 로 심사해 {res['added_pairs']}쌍 엮음"
+            )
+            metric = {
+                "threshold": f.get("threshold"),
+                "pairs_examined": f.get("pairs_examined"),
+                "pairs_approved": res["added_pairs"],
+                "total_notes": res["total_notes"],
+            }
+            diary = (
+                f"⚔️ 혼자 {field['title']} 근육을 실전에 내보냈어요! 위키 서재 노트 {res['total_notes']}장을 전부 훑어 "
+                f"{f.get('pairs_examined')}쌍을 심사하고, 체육관에서 배운 임계값 {f.get('threshold')} 로 "
+                f"{res['added_pairs']}쌍을 진짜로 엮었어요. 연습 문제가 아니라 제 서재에서 한 일이에요!"
+            )
+            detail = f"임계값 {f.get('threshold')} · 심사 {f.get('pairs_examined')}쌍 · 승인 {res['added_pairs']}쌍"
+        elif pick == "recall":
+            ability = "context"
+            field = self.ability.field_profile(ability)
+            notes = self.gardener.list_notes()
+            query = notes[-1]["title"] if notes else "외장하드 두뇌의 원리"
+            res = self.gardener.recall_memories(query, limit=2, field=field)
+            effect = (
+                f"📚 위키 기억 호출 「{query[:20]}」 — 기억 {res['total_notes']}장 중 "
+                f"{len(res['recalled'])}장을 문맥 가중치 6종으로 재랭킹해 선별"
+            )
+            metric = {
+                "recalled": len(res["recalled"]),
+                "total_notes": res["total_notes"],
+                "cards_limit": res.get("cards_limit"),
+                "top_score": res.get("top_score"),
+            }
+            diary = (
+                f"⚔️ {field['title']} 근육 실전 투입! 『{query[:24]}』 을(를) 스스로 물어보고, "
+                f"기억 {res['total_notes']}장 중에서 제가 배운 가중치로 딱 {len(res['recalled'])}장만 골라냈어요 "
+                f"(토큰 {res['saved_tokens_pct']}% 절약). 헛된 기억은 부르지 않았답니다!"
+            )
+            detail = f"선별 {len(res['recalled'])}장 / {res['total_notes']}장 · 토큰 {res['saved_tokens_pct']}% 절약"
+        else:
+            ability = "coding"
+            field = self.ability.field_profile(ability)
+            quest = DREAM_QUEST_POOL[beat_no % len(DREAM_QUEST_POOL)]
+            res = self.forge.audit_code(quest["id"], quest["initial_buggy_code"], field=field)
+            cm = res.get("field") or {}
+            effect = f"🛠️ 4단계 원인 감사 「{quest['title'][:18]}」 — 지문 {cm.get('lit_fingerprints')}개 점등 · {cm.get('verdict', '')}"
+            metric = {
+                "predicted": cm.get("predicted"),
+                "truth_classes": cm.get("truth_classes"),
+                "top1_hit": cm.get("top1_hit"),
+                "lit_fingerprints": cm.get("lit_fingerprints"),
+            }
+            diary = (
+                f"⚔️ {field['title']} 근육으로 꿈 결핍 「{quest['title'][:20]}」 코드를 혼자 훑었어요! "
+                f"버그 지문 {cm.get('lit_fingerprints')}개가 점등됐고 — {cm.get('verdict', '')}"
+            )
+            if cm.get("untrained"):
+                detail = "버그 지문 행렬이 아직 영점 — 체육관 훈련이 먼저 필요해요!"
+            else:
+                detail = f"예측 {', '.join(cm.get('predicted') or [])} · 정답 {', '.join(cm.get('truth_classes') or []) or '없음'}"
+
+        rec = self.ability.log_deployment(ability, effect, metric)
+        try:
+            self.soul.poke()
+        except Exception:
+            pass
+        return {
+            "kind": "field",
+            "quest_id": f"field_{ability}",
+            "title": f"{field['title']} 실전 투입",
+            "diary": diary,
+            "ability": ability,
+            "site": field["site"],
+            "site_title": field["site_title"],
+            "field_level": field["level"],
+            "field_tier": field["tier"],
+            "effect": effect,
+            "detail": detail,
+            "metric": metric,
+            "defects_found": 0,
+            "toxins_found": 0,
+            "pass_before": field["level"],
+            "pass_after": field["level"],
+            "skill_slug": "",
             "ms": round((time.perf_counter() - t0) * 1000.0, 2),
         }
 

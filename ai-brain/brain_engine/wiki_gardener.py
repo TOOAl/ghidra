@@ -13,7 +13,11 @@ import sqlite3
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+# NOTE: the Stage H field helpers live in core_ability_engine, which (via
+# quant_forge) imports `extract_keywords` from THIS module — so they are
+# imported lazily inside the methods below to avoid a circular import.
 
 
 CATEGORY_RULES: List[Tuple[str, List[str]]] = [
@@ -422,7 +426,9 @@ class WikiGardener:
             "raw_path": str(raw_file.relative_to(self.vault_dir)),
         }
 
-    def recall_memories(self, query: str, limit: int = 2) -> Dict[str, Any]:
+    def recall_memories(
+        self, query: str, limit: int = 2, field: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         notes = self.list_notes()
         if not notes:
             return {"recalled": [], "total_notes": 0, "saved_tokens_pct": 0}
@@ -454,9 +460,29 @@ class WikiGardener:
                     matched_term_set.add(term)
             scored.append((score, n))
 
+        # ⚔️ Stage H: the CONTEXT muscle re-ranks these REAL memories using the
+        # very weights it learned in the gym (6 features: subj/verb/neg/assert/owner/link).
+        muscle: Optional[Dict[str, Any]] = None
+        if field:
+            from brain_engine.core_ability_engine import field_context_limit, field_context_rerank
+
+            bonus = field_context_rerank(field, [n for _, n in scored], q_terms)
+            scored = [(sc + 2.0 * bn, n) for (sc, n), bn in zip(scored, bonus)]
+            muscle = {
+                "ability": "context",
+                "level": int(field.get("level", 1)),
+                "tier": int(field.get("tier", 0)),
+                "weights_used": sorted((field.get("weights") or {}).keys()),
+                "rerank_bonus": bonus[:6],
+            }
+
         scored.sort(key=lambda x: x[0], reverse=True)
         top_score = round(scored[0][0], 2) if scored else 0.0
-        max_cards = min(limit, max(1, len(notes) - 2)) if len(notes) >= 4 else limit
+        if field:
+            eff_limit = max(limit, field_context_limit(field))
+        else:
+            eff_limit = limit
+        max_cards = min(eff_limit, max(1, len(notes) - 2)) if len(notes) >= 4 else eff_limit
 
         # Never fabricate unrelated recall when score == 0 (prevents hallucination!)
         primary = [n for sc, n in scored if sc >= 1.5][:max_cards]
@@ -481,7 +507,7 @@ class WikiGardener:
         saved_pct = max(0, min(95, round((1.0 - used_chars / total_chars) * 100))) if recalled else 100
         missing_terms = [t for t in q_terms if t not in matched_term_set]
 
-        return {
+        out = {
             "recalled": recalled,
             "total_notes": len(notes),
             "saved_tokens_pct": saved_pct,
@@ -489,10 +515,20 @@ class WikiGardener:
             "query_terms": q_terms,
             "matched_terms": sorted(matched_term_set),
             "missing_terms": missing_terms,
+            "cards_limit": eff_limit,
         }
+        if muscle:
+            out["field"] = muscle
+        return out
 
-    def weave_missing_synapses(self) -> Dict[str, Any]:
-        """Scan all Wiki notes and weave missing bidirectional [[links]] between related concepts."""
+    def weave_missing_synapses(self, field: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Scan all Wiki notes and weave missing bidirectional [[links]] between related concepts.
+
+        ⚔️ Stage H: when the ORGANIZING muscle is deployed, the weave decision is
+        made by the muscle's own `_org_sim` + learned shelf threshold instead of
+        the fixed `overlap + same_cat >= 1` heuristic — a stronger muscle links
+        fewer false pairs and catches more true ones.
+        """
         notes = self.list_notes()
         kw_map: Dict[str, Set[str]] = {}
         for n in notes:
@@ -505,7 +541,24 @@ class WikiGardener:
             )
             kw_map[n["slug"]] = kws
 
+        thr = 0.0
+        org_view: Dict[str, Dict[str, Any]] = {}
+        if field:
+            from brain_engine.core_ability_engine import field_org_sub, field_org_threshold
+
+            thr = field_org_threshold(field)
+            for n in notes:
+                toks = sorted(kw_map[n["slug"]])
+                org_view[n["slug"]] = {
+                    "title": n["title"],
+                    "tokens": toks,
+                    "cat": n["category"],
+                    "sub": field_org_sub(n["category"], toks),
+                }
+
         added_pairs = 0
+        muscle_pairs = 0
+        muscle_sims: List[float] = []
         for i in range(len(notes)):
             for j in range(i + 1, len(notes)):
                 a, b = notes[i], notes[j]
@@ -515,7 +568,17 @@ class WikiGardener:
                     continue
                 overlap = len(kw_map[a["slug"]] & kw_map[b["slug"]])
                 same_cat = 1 if a["category"] == b["category"] else 0
-                if overlap + same_cat >= 1:
+                if field:
+                    from brain_engine.core_ability_engine import field_org_pair_sim
+
+                    sim = field_org_pair_sim(field, org_view[a["slug"]], org_view[b["slug"]])
+                    muscle_pairs += 1
+                    if sim > thr:
+                        muscle_sims.append(round(sim, 3))
+                    should_link = sim > thr
+                else:
+                    should_link = overlap + same_cat >= 1
+                if should_link:
                     for src, dst in ((a, b), (b, a)):
                         p = self.vault_dir / src["rel_path"]
                         if p.exists():
@@ -527,4 +590,15 @@ class WikiGardener:
                     added_pairs += 1
 
         self.rebuild_index()
-        return {"added_pairs": added_pairs, "total_notes": len(notes)}
+        out: Dict[str, Any] = {"added_pairs": added_pairs, "total_notes": len(notes)}
+        if field:
+            out["field"] = {
+                "ability": "organizing",
+                "level": int(field.get("level", 1)),
+                "tier": int(field.get("tier", 0)),
+                "threshold": round(thr, 3),
+                "pairs_examined": muscle_pairs,
+                "pairs_approved": added_pairs,
+                "avg_sim_of_approved": round(sum(muscle_sims) / len(muscle_sims), 3) if muscle_sims else 0.0,
+            }
+        return out

@@ -2172,4 +2172,539 @@ code {
   gap: 6px;
 }
 
+/* =========================================================================
+   Stage C (v5.0): 6단계 자가 진화 시냅스 공방 & 조화 설계도 이미지 모달
+   ========================================================================= */
+.cm-pills {
+  flex-wrap: wrap;
+}
+
+.cm-btn.evo-mode-btn.active {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.28), rgba(99, 102, 241, 0.34));
+  border-color: rgba(52, 211, 153, 0.65);
+  color: #ecfdf5;
+}
+
+.cm-btn.evo-img-btn {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.22), rgba(168, 85, 247, 0.28));
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  color: #fef3c7;
+  font-weight: 700;
+}
+
+.cm-btn.evo-img-btn:hover {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.36), rgba(168, 85, 247, 0.42));
+  transform: translateY(-1px);
+}
+
+.evo-forge-region {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.evo-harmony-banner {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.92), rgba(30, 27, 75, 0.85));
+  border: 1px solid rgba(129, 140, 248, 0.38);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+.evo-banner-thumb {
+  position: relative;
+  width: 158px;
+  height: 98px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.evo-banner-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.25s ease;
+}
+
+.evo-banner-thumb:hover img {
+  transform: scale(1.06);
+}
+
+.thumb-zoom-pill {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  background: rgba(15, 23, 42, 0.86);
+  border: 1px solid rgba(251, 191, 36, 0.6);
+  color: #fde68a;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+.evo-banner-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.evo-banner-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 9px;
+}
+
+.evo-banner-top h3 {
+  font-size: 15px;
+  color: #f8fafc;
+  margin: 2px 0 0;
+}
+
+.evo-banner-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.evo-img-cta {
+  border-color: rgba(251, 191, 36, 0.55);
+  color: #fde68a;
+}
+
+.evo-stepper {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.evo-step {
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 9px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition: all 0.2s ease;
+}
+
+.evo-step strong {
+  font-size: 11.5px;
+  color: #cbd5e1;
+}
+
+.evo-step span {
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.evo-step.done {
+  border-color: rgba(52, 211, 153, 0.55);
+  background: rgba(6, 78, 59, 0.34);
+}
+
+.evo-step.done strong {
+  color: #6ee7b7;
+}
+
+.evo-step.active {
+  border-color: rgba(251, 191, 36, 0.75);
+  background: rgba(120, 53, 15, 0.36);
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.18);
+}
+
+.evo-step.active strong {
+  color: #fde68a;
+}
+
+.evo-grid {
+  grid-template-columns: 1fr 1.12fr;
+}
+
+.upload-chip {
+  border-color: rgba(56, 189, 248, 0.55) !important;
+  color: #bae6fd !important;
+}
+
+.evo-panel-box {
+  background: rgba(10, 15, 30, 0.78);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 11px;
+  padding: 11px 12px;
+  font-size: 12.2px;
+  line-height: 1.58;
+  color: #e2e8f0;
+}
+
+.evo-panel-box.blueprint-theme {
+  border-color: rgba(251, 191, 36, 0.38);
+  background: linear-gradient(180deg, rgba(30, 27, 75, 0.45), rgba(15, 23, 42, 0.85));
+}
+
+.evo-panel-box.sandbox-theme {
+  border-color: rgba(52, 211, 153, 0.38);
+}
+
+.xray-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.xray-kv {
+  background: rgba(30, 41, 59, 0.55);
+  border-radius: 7px;
+  padding: 5px 8px;
+  font-size: 11.3px;
+}
+
+.xray-sec-row {
+  display: grid;
+  grid-template-columns: 82px 92px 1fr 56px;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+.ent-track {
+  height: 7px;
+  background: rgba(30, 41, 59, 0.9);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.ent-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.asm-block {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  background: rgba(2, 6, 23, 0.85);
+  border: 1px solid rgba(99, 102, 241, 0.28);
+  border-radius: 8px;
+  padding: 7px 9px;
+  color: #a5b4fc;
+  margin: 6px 0;
+  overflow-x: auto;
+}
+
+.timemachine-bar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(30, 27, 75, 0.48);
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  border-radius: 9px;
+  padding: 6px 9px;
+  margin-bottom: 8px;
+}
+
+.tm-badge {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #c7d2fe;
+  white-space: nowrap;
+}
+
+.tm-select {
+  flex: 1;
+  height: 30px;
+  font-size: 11.5px;
+  padding: 2px 8px;
+}
+
+.code-workbench {
+  border: 1px solid rgba(99, 102, 241, 0.36);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #060b19;
+  margin-bottom: 8px;
+}
+
+.cw-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background: rgba(30, 41, 59, 0.72);
+  font-size: 11.2px;
+  color: #cbd5e1;
+}
+
+.cw-sub {
+  font-size: 10.5px;
+  color: #6ee7b7;
+}
+
+.evo-code-textarea {
+  width: 100%;
+  border: none;
+  outline: none;
+  resize: vertical;
+  background: #050914;
+  color: #f1f5f9;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.52;
+  padding: 10px 12px;
+}
+
+.evo-action-bar {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.evo-action-bar > button {
+  flex: 1;
+  min-width: 135px;
+}
+
+.finding-card {
+  border-left: 3px solid #f43f5e;
+  background: rgba(136, 19, 55, 0.22);
+  border-radius: 7px;
+  padding: 7px 9px;
+  margin-top: 6px;
+}
+
+.finding-card.toxin {
+  border-left-color: #f59e0b;
+  background: rgba(120, 53, 15, 0.34);
+}
+
+.evo-diff-box {
+  background: #050914;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.2px;
+  max-height: 175px;
+  overflow-y: auto;
+}
+
+.diff-line {
+  white-space: pre-wrap;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.diff-line.add {
+  background: rgba(16, 185, 129, 0.2);
+  color: #6ee7b7;
+}
+
+.diff-line.del {
+  background: rgba(244, 63, 94, 0.22);
+  color: #fda4af;
+}
+
+.diff-line.hunk,
+.diff-line.meta {
+  color: #93c5fd;
+}
+
+.twin-case-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.twin-case {
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 11px;
+}
+
+.twin-case.pass {
+  border-color: rgba(52, 211, 153, 0.48);
+}
+
+.twin-case.fail {
+  border-color: rgba(244, 63, 94, 0.55);
+}
+
+.cartridge-btn {
+  background: linear-gradient(135deg, #059669, #4f46e5, #d97706);
+  border: 1px solid rgba(251, 191, 36, 0.55);
+}
+
+.skill-runner-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 7px;
+  align-items: center;
+}
+
+.skill-run-out {
+  margin-top: 6px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: rgba(6, 78, 59, 0.35);
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  font-size: 11.8px;
+  color: #ecfdf5;
+}
+
+/* 조화 설계도 이미지 모달 (Lightbox + Interactive Cutaway Pins) */
+.evo-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(2, 6, 23, 0.84);
+  backdrop-filter: blur(7px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
+
+.evo-modal-dialog {
+  width: min(1080px, 96vw);
+  max-height: 93vh;
+  overflow-y: auto;
+  background: linear-gradient(180deg, #0f172a, #090d1c);
+  border: 1px solid rgba(165, 180, 252, 0.42);
+  border-radius: 18px;
+  padding: 16px 18px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.72);
+}
+
+.evo-modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.evo-modal-head h3 {
+  font-size: 16.5px;
+  color: #f8fafc;
+  margin: 2px 0 0;
+}
+
+.evo-modal-head-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.evo-cutaway-stage {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  background: #030712;
+}
+
+.evo-cutaway-img {
+  width: 100%;
+  display: block;
+  max-height: 500px;
+  object-fit: cover;
+}
+
+.evo-hotspot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(15, 23, 42, 0.88);
+  border: 1.5px solid rgba(251, 191, 36, 0.82);
+  color: #fef3c7;
+  padding: 4px 9px 4px 5px;
+  border-radius: 999px;
+  font-size: 11.2px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.65);
+  transition: all 0.18s ease;
+}
+
+.evo-hotspot:hover,
+.evo-hotspot.active {
+  background: linear-gradient(135deg, #f59e0b, #6366f1);
+  color: #ffffff;
+  transform: translate(-50%, -50%) scale(1.07);
+}
+
+.hs-num {
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+}
+
+.evo-spot-caption {
+  margin-top: 10px;
+  padding: 10px 13px;
+  border-radius: 10px;
+  background: rgba(30, 27, 75, 0.55);
+  border: 1px solid rgba(129, 140, 248, 0.4);
+  font-size: 12.6px;
+  color: #e0e7ff;
+  line-height: 1.55;
+}
+
+.harmony-three-cols {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 11px;
+}
+
+.hm-card {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 11px;
+  padding: 10px 12px;
+}
+
+.hm-card h4 {
+  font-size: 12.8px;
+  color: #fde68a;
+  margin: 0 0 6px;
+}
+
+.hm-card ul {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 11.6px;
+  line-height: 1.62;
+  color: #cbd5e1;
+}
+
+@media (max-width: 1100px) {
+  .evo-grid,
+  .harmony-three-cols {
+    grid-template-columns: 1fr;
+  }
+  .evo-stepper {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+
 

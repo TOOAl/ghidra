@@ -29,6 +29,7 @@ from brain_engine.hallucination import (  # noqa: E402
 from brain_engine.host_probe import probe_host  # noqa: E402
 from brain_engine.quant_forge import CustomBrainForge, dissect_architecture  # noqa: E402
 from brain_engine.rl_gym import PortableRLGym  # noqa: E402
+from brain_engine.self_evolving_forge import SelfEvolvingForge  # noqa: E402
 from brain_engine.slm_bridge import PortableSLMBridge  # noqa: E402
 from brain_engine.tamagotchi import TamagotchiSoul  # noqa: E402
 from brain_engine.wiki_gardener import WikiGardener  # noqa: E402
@@ -44,6 +45,7 @@ class BrainState:
         self.forge = CustomBrainForge(root / "models")
         self.rl_gym = PortableRLGym(root / "state", root / "models")
         self.pantheon = GeniusPantheon(root / "state", root / "models")
+        self.evo_forge = SelfEvolvingForge(root)
         self.host_info = probe_host(root)
         self.soul.register_host(self.host_info)
 
@@ -65,7 +67,7 @@ class BrainState:
             rl_trained=rl_trained,
         )
         return {
-            "ui_version": "4.5",
+            "ui_version": "5.0",
             "soul": self.soul.snapshot(graph["stats"], env_grade=env_grade),
             "hallucination": hallucination,
             "host": self.host_info,
@@ -73,11 +75,12 @@ class BrainState:
             "forged_brains": forged,
             "rl": rl_snap,
             "pantheon": self.pantheon.snapshot(),
+            "evo_forge": self.evo_forge.snapshot(),
             "graph": graph,
             "roadmap": {
                 "stage_a": {"status": "done", "title": "A단계: 마크다운 위키 & 자체 양자화 주조"},
-                "stage_b": {"status": "active", "title": "B단계: CPU 강화학습 & 다수 심판 합의"},
-                "stage_c": {"status": "next", "title": "C단계: Ghidra 12.3 역공학 해부실"},
+                "stage_b": {"status": "done", "title": "B단계: CPU 강화학습 & 천재 성좌 합의"},
+                "stage_c": {"status": "active", "title": "C단계: 6단계 자가 진화 역공학·코딩 공방"},
             },
         }
 
@@ -399,6 +402,74 @@ def make_handler(state: BrainState):
                     self._send_json({"message": "초기화 완료", "status": state.full_status()})
                     return
                 self._send_json({"error": "Unknown remedy action"}, status=400)
+                return
+
+            if route == "/api/evo/dissect":
+                spec_id = str(body.get("specimen_id") or "xor_rot_vault").strip()
+                up_name = str(body.get("uploaded_name") or "").strip()
+                up_b64 = str(body.get("uploaded_b64") or "").strip()
+                bundle = state.evo_forge.dissect_and_draft(
+                    specimen_id=spec_id,
+                    uploaded_name=up_name,
+                    uploaded_b64=up_b64,
+                )
+                self._send_json({"bundle": bundle, "status": state.full_status()})
+                return
+
+            if route == "/api/evo/audit":
+                spec_id = str(body.get("specimen_id") or "xor_rot_vault").strip()
+                code = str(body.get("code") or "")
+                audit = state.evo_forge.audit_code(specimen_id=spec_id, code=code)
+                self._send_json({"audit": audit})
+                return
+
+            if route == "/api/evo/repair":
+                spec_id = str(body.get("specimen_id") or "xor_rot_vault").strip()
+                current_code = str(body.get("current_code") or "")
+                mode = str(body.get("mode") or "auto").strip()
+                edited_code = str(body.get("edited_code") or "")
+                repaired = state.evo_forge.repair_and_verify(
+                    specimen_id=spec_id,
+                    current_code=current_code,
+                    mode=mode,
+                    edited_code=edited_code,
+                )
+                self._send_json({"repaired": repaired, "status": state.full_status()})
+                return
+
+            if route == "/api/evo/rollback":
+                spec_id = str(body.get("specimen_id") or "xor_rot_vault").strip()
+                snap_id = str(body.get("snap_id") or "").strip()
+                rb = state.evo_forge.rollback_snapshot(specimen_id=spec_id, snap_id=snap_id)
+                self._send_json({"rollback": rb})
+                return
+
+            if route == "/api/evo/install":
+                spec_id = str(body.get("specimen_id") or "xor_rot_vault").strip()
+                code = str(body.get("code") or "")
+                try:
+                    installed = state.evo_forge.install_skill_cartridge(
+                        specimen_id=spec_id,
+                        verified_code=code,
+                        gardener=state.gardener,
+                        rl_gym=state.rl_gym,
+                    )
+                except ValueError as exc:
+                    self._send_json({"error": str(exc)}, status=400)
+                    return
+                state.soul.on_evo_skill_installed(installed["title"], installed["entry_fn"])
+                self._send_json({"installed": installed, "status": state.full_status()})
+                return
+
+            if route == "/api/evo/run-skill":
+                skill_id = str(body.get("skill_id") or "").strip()
+                args_val = body.get("args")
+                try:
+                    ran = state.evo_forge.execute_installed_skill(skill_id, args_val)
+                except ValueError as exc:
+                    self._send_json({"error": str(exc)}, status=400)
+                    return
+                self._send_json({"ran": ran})
                 return
 
             if route == "/api/poke":

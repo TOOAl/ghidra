@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>시냅스몽 · 나만의 양자화 AI 두뇌 연구소</title>
-  <link rel="stylesheet" href="ui-v3.css?v=4.5" />
+  <link rel="stylesheet" href="ui-v3.css?v=5.0" />
   <!--__INITIAL_STATE__-->
 </head>
 <body>
@@ -17,16 +17,16 @@
           <h1>시냅스몽 AI 두뇌 연구소</h1>
           <span class="live-chip"><span class="live-dot"></span>외장하드 포터블 서식지</span>
         </div>
-        <p class="brand-sub">데이터센터 없이 자라나는 마크다운 위키 · 독자 양자화(.sbrain) · CPU 강화학습 심판단</p>
+        <p class="brand-sub">데이터센터 없이 자라나는 마크다운 위키 · 독자 양자화(.sbrain) · 천재 성좌 · 6단계 자가 진화 공방</p>
       </div>
     </div>
 
     <div class="stage-track" aria-label="통합 구축 단계">
       <div class="stage-pill done"><strong>✔ A단계</strong> 위키 &amp; 자체 양자화</div>
       <span class="stage-arrow">›</span>
-      <div class="stage-pill current"><strong>B단계</strong> CPU 강화학습 체육관</div>
+      <div class="stage-pill done"><strong>✔ B단계</strong> CPU 심판단 &amp; 천재 성좌</div>
       <span class="stage-arrow">›</span>
-      <div class="stage-pill"><strong>C단계</strong> Ghidra 역공학 해부실</div>
+      <div class="stage-pill current" id="headerStageCPill" style="cursor:pointer" title="클릭해 6단계 자가 진화 공방 열기"><strong>⚡ C단계</strong> 6단계 자가 진화 공방</div>
     </div>
   </header>
 
@@ -162,6 +162,7 @@
       <div class="console-topbar">
         <nav class="seg-tabs" role="tablist">
           <button class="seg-tab active" data-tab="tab-graph" type="button">🌟 천재·시냅스 성좌</button>
+          <button class="seg-tab" id="btnTopEvoShortcut" data-evo-jump="1" type="button">🧬 자가 진화 공방</button>
           <button class="seg-tab" data-tab="tab-feed" type="button">🌱 지식 먹이기</button>
           <button class="seg-tab" data-tab="tab-forge" type="button">⚒️ 양자화 주조</button>
           <button class="seg-tab" data-tab="tab-rl" type="button">🏋️ 강화학습 체육관</button>
@@ -169,16 +170,18 @@
           <button class="seg-tab" data-tab="tab-chat" type="button">💬 대화하기</button>
         </nav>
         <div class="engine-indicator" id="engineStatusPill">
-          위키 기억망 + 무한 모듈 성좌 엔진 가동 중
+          위키 기억망 + 무한 성좌 + 6단계 자가 진화 엔진 가동 중
         </div>
       </div>
 
-      <!-- [탭 1] 이중 성좌 천문대: 영역별 인류 천재 성좌도 ⇄ 내 위키 기억 성좌도 -->
+      <!-- [탭 1] 삼중 시냅스 천문대: 영역별 천재 성좌 ⇄ 내 마크다운 기억 성좌도 ⇄ 6단계 자가 진화 공방 -->
       <div class="tab-pane active" id="tab-graph">
         <div class="constellation-mode-bar">
           <div class="cm-pills">
             <button class="cm-btn active" id="btnModeGenius" type="button">🌌 영역별 천재 성좌 &amp; 원탁 담론</button>
             <button class="cm-btn" id="btnModeWiki" type="button">📘 내 마크다운 기억 성좌도</button>
+            <button class="cm-btn evo-mode-btn" id="btnModeEvo" type="button">🧬 6단계 자가 진화 공방</button>
+            <button class="cm-btn evo-img-btn" id="btnOpenEvoImage" type="button" title="4대 핵심 능력 × 5대 필수 기관 × 6단계 자가 진화 공방 조화 이미지 보기">🖼️ 진화 두뇌 조화도 이미지</button>
           </div>
           <span class="cm-hint" id="constellationHint">영역별 성좌 안에 모인 천재들이 서로 의견을 주고받으며 한계 없는 지혜를 꼬마 뉴런에 전수합니다!</span>
         </div>
@@ -342,6 +345,133 @@
             <div class="tag-strip" id="viewerTags"></div>
             <div class="note-content" id="viewerBody">
               왼쪽 시냅스 성좌도에서 별(노드)을 클릭하면 마크다운 기억 원문과 연결 고리가 여기에 표시됩니다.
+            </div>
+          </div>
+        </div>
+
+        <!-- 모드 C: 6단계 자가 진화 시냅스 공방 (4대 핵심 능력 × 5대 필수 기관 × 6단계 공방) -->
+        <div class="evo-forge-region hidden" id="viewEvoForge">
+          <!-- 상단 조화 배너 & 6단계 진행 트랙 -->
+          <div class="evo-harmony-banner">
+            <div class="evo-banner-thumb" id="btnBannerThumb" title="클릭해 조화 설계도 이미지 크게 보기">
+              <img src="assets/evo_forge_harmony.jpg" alt="6단계 자가 진화 두뇌 조화도" />
+              <span class="thumb-zoom-pill">🔍 크게 보기</span>
+            </div>
+            <div class="evo-banner-body">
+              <div class="evo-banner-top">
+                <div>
+                  <span class="step-kicker">STAGE C · SELF-EVOLVING SYNAPSE FORGE</span>
+                  <h3>🧬 6단계 자가 진화 시냅스 공방 (4대 핵심 능력 × 5대 필수 기관 조화)</h3>
+                </div>
+                <div class="evo-banner-actions">
+                  <button class="ghost-btn evo-img-cta" id="btnBannerOpenImage" type="button">🖼️ 두뇌 조화 설계도 이미지 보기</button>
+                  <button class="primary-btn" id="btnEvoOneClickCycle" type="button">⚡ 1~5단계 연속 해부·수리·검증</button>
+                </div>
+              </div>
+              <div class="evo-stepper" id="evoStepperBar">
+                <div class="evo-step active" data-step="1"><strong>1. 분해·해부</strong><span>능력① · X-Ray</span></div>
+                <div class="evo-step" data-step="2"><strong>2. 원리 설계도</strong><span>기관① 번역기</span></div>
+                <div class="evo-step" data-step="3"><strong>3. 우리 식 코딩</strong><span>능력② 이식</span></div>
+                <div class="evo-step" data-step="4"><strong>4. 결함·독 탐지</strong><span>능력③ · 기관③⑤</span></div>
+                <div class="evo-step" data-step="5"><strong>5. 수리 &amp; 유리방</strong><span>능력④ · 기관②④</span></div>
+                <div class="evo-step" data-step="6"><strong>6. 두뇌 영구장착</strong><span>기관⑤ 카트리지</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="pane-grid evo-grid">
+            <!-- 좌측: 1단계 역공학 해부실 + 2단계 핵심 원리 설계도 번역기 -->
+            <div class="card">
+              <div class="card-head">
+                <div>
+                  <span class="step-kicker">STEP 1 &amp; 2 · BINARY X-RAY &amp; BLUEPRINT TRANSLATOR</span>
+                  <h3>🔭 [1~2단계] 프로그램 해부 &amp; 핵심 원리 설계도 번역기</h3>
+                  <p>실행파일을 해부(능력①)하고, 복잡한 기계어 주소를 걷어내 순수 원리 설계도(기관①)로 번역합니다.</p>
+                </div>
+                <span class="tag-pill" id="evoGhidraBadge" style="border-color:rgba(56,189,248,0.45);color:#bae6fd">Ghidra 12.3 연동 준비</span>
+              </div>
+
+              <div class="chip-row" id="evoSpecimenChips">
+                <button type="button" class="preset-chip active" data-spec="xor_rot_vault">🔐 XOR-회전 금고 (.elf)</button>
+                <button type="button" class="preset-chip" data-spec="crc16_packet">📡 패킷 무결성 CRC16 (.exe)</button>
+                <button type="button" class="preset-chip" data-spec="puffer_rle_sanitizer">🐡 복어독 혼입 압축기 (.elf)</button>
+                <button type="button" class="preset-chip" data-spec="int8_clamp_filter">⚡ 센서 양자화 필터 (.bin)</button>
+                <button type="button" class="preset-chip upload-chip" id="btnEvoUpload">📂 내 파일 직접 올리기</button>
+                <input type="file" id="evoFileInput" class="hidden" />
+              </div>
+
+              <!-- 1단계: 바이너리 X-Ray & 섀넌 엔트로피 레이더 -->
+              <div class="evo-panel-box" id="evoXrayBox">
+                바이너리 표본을 해부하는 중...
+              </div>
+
+              <!-- 2단계 (기관 ①): 기계어 -> 핵심 원리 설계도 번역기 -->
+              <div class="evo-panel-box blueprint-theme" id="evoBlueprintBox" style="margin-top:10px">
+                기계어를 핵심 원리 설계도로 번역하는 중...
+              </div>
+            </div>
+
+            <!-- 우측: 3단계 코딩 -> 4단계 원인 돋보기 & 복어독 제거 -> 5단계 타임머신 & 유리방 -> 6단계 카트리지 장착 -->
+            <div class="card">
+              <div class="card-head">
+                <div>
+                  <span class="step-kicker">STEP 3~6 · CODE · DIAGNOSE · GLASS SANDBOX · CARTRIDGE</span>
+                  <h3>🛠️ [3~6단계] 코딩 · 원인 역추적 · 유리방 수리 &amp; 스킬 장착</h3>
+                  <p>코드를 직접 다듬고(능력②), 줄 번호 원인과 복어 독을 잡아내어(능력③·기관③⑤), 유리방 100% 검증 후 장착합니다.</p>
+                </div>
+              </div>
+
+              <!-- 기관 ④: 타임머신 세이브 포인트 바 -->
+              <div class="timemachine-bar">
+                <span class="tm-badge">⏪ 기관④ 타임머신 세이브</span>
+                <select id="evoSnapshotSelect" class="input-field tm-select"></select>
+                <button class="ghost-btn" id="btnEvoRollback" type="button">⏪ 0.1초 복구</button>
+              </div>
+
+              <!-- 3단계: 우리 식 코딩 워크벤치 -->
+              <div class="code-workbench">
+                <div class="cw-head">
+                  <span id="evoEditorTitle">💻 3단계 · 우리 두뇌 이식용 파이썬 코드 (직접 수정 가능!)</span>
+                  <span class="cw-sub">AST 보안 게이트 + 격리 샌드박스 보호 중</span>
+                </div>
+                <textarea id="evoCodeEditor" class="evo-code-textarea" rows="10" spellcheck="false"></textarea>
+              </div>
+
+              <div class="evo-action-bar">
+                <button class="secondary-btn" id="btnEvoAudit" type="button">🔍 4단계: 잘못된 곳 · 복어독 찾기</button>
+                <button class="primary-btn" id="btnEvoAutoRepair" type="button">🩹 5단계: 자동 수리 &amp; 유리방 시험</button>
+                <button class="ghost-btn accent" id="btnEvoTestCustom" type="button">🧪 내 직접 수정 코드 검증</button>
+              </div>
+
+              <!-- 4단계: 기관 ③ 원인 역추적 돋보기 + 기관 ⑤a 복어 독 제거기 -->
+              <div class="evo-panel-box" id="evoAuditBox" style="margin-top:9px">
+                <strong>[🔍 4단계: 잘못된 곳 · 복어독 찾기]</strong>를 누르면 정확한 줄 번호와 깨진 원인을 콕 집어냅니다.
+              </div>
+
+              <!-- 5단계: 수리 전·후 Diff & 기관 ② 투명 유리방 쌍둥이 대조 실험실 -->
+              <div id="evoDiffBox" class="evo-diff-box hidden" style="margin-top:9px"></div>
+              <div id="evoSandboxBox" class="evo-panel-box sandbox-theme" style="margin-top:9px">
+                🧪 <strong>기관② 투명 유리방 실험실 대기 중</strong> — 수리 또는 검증을 실행하면 원본 바이너리와 6가지 쌍둥이 입력값을 실시간 대조합니다.
+              </div>
+
+              <!-- 6단계: 기관 ⑤b 영구 스킬 카트리지 슬롯 -->
+              <div class="cartridge-install-box" style="margin-top:10px">
+                <button class="primary-btn full cartridge-btn" id="btnEvoInstall" type="button">
+                  🧩 6단계: 유리방 100% 합격 스킬을 우리 두뇌에 영구 장착 (.py + .sbrain + 위키)
+                </button>
+                <div id="evoInstallFeedback" class="clinic-feedback hidden" style="margin-top:8px;margin-bottom:0"></div>
+
+                <div class="installed-dock" style="margin-top:10px">
+                  <div class="vb-head">🧩 우리 두뇌에 영구 장착된 스킬 카트리지 &amp; 실전 호출 테스트</div>
+                  <div id="evoInstalledList" class="vb-list"></div>
+                  <div class="skill-runner-row" id="evoSkillRunnerRow">
+                    <select id="evoRunSkillSelect" class="input-field" style="max-width:190px"></select>
+                    <input type="text" id="evoRunArgsInput" class="input-field" value="[[16, 32, 255, 129]]" placeholder="실전 테스트 인자 JSON (예: [[16, 32, 255, 129]])" />
+                    <button class="ghost-btn accent" id="btnEvoRunSkill" type="button">▶ 스킬 실행</button>
+                  </div>
+                  <div id="evoRunSkillOutput" class="skill-run-out hidden"></div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -621,6 +751,78 @@
     </section>
   </main>
 
-  <script src="ui-v3.js?v=4.5"></script>
+  <!-- 🖼️ 4대 핵심 능력 × 5대 필수 기관 × 6단계 자가 진화 공방 조화 설계도 이미지 모달 -->
+  <div class="evo-modal-backdrop hidden" id="evoHarmonyModal" role="dialog" aria-modal="true" aria-labelledby="evoModalTitle">
+    <div class="evo-modal-dialog">
+      <div class="evo-modal-head">
+        <div>
+          <span class="step-kicker">SYNAPSE BRAIN ARCHITECTURE · 4 × 5 × 6 HARMONY MAP</span>
+          <h3 id="evoModalTitle">🖼️ 우리 두뇌의 「4대 핵심 능력 × 5대 필수 기관 × 6단계 자가 진화 공방」 조화 설계도</h3>
+        </div>
+        <div class="evo-modal-head-actions">
+          <button class="primary-btn" id="btnModalGoForge" type="button">🚀 6단계 공방에서 직접 해부·수리해보기</button>
+          <button class="ghost-btn" id="btnCloseEvoModal" type="button">✕ 닫기</button>
+        </div>
+      </div>
+
+      <div class="evo-cutaway-stage">
+        <img src="assets/evo_forge_harmony.jpg" alt="외장하드 자가 진화 AI 두뇌 6단계 공방 단면도" class="evo-cutaway-img" />
+        <button type="button" class="evo-hotspot active" data-spot="1" style="left:21%;top:27%">
+          <span class="hs-num">1</span><span class="hs-txt">분해·해부 (X-Ray)</span>
+        </button>
+        <button type="button" class="evo-hotspot" data-spot="2" style="left:46%;top:23%">
+          <span class="hs-num">2</span><span class="hs-txt">기관① 원리 설계도 번역</span>
+        </button>
+        <button type="button" class="evo-hotspot" data-spot="3" style="left:69%;top:35%">
+          <span class="hs-num">3</span><span class="hs-txt">우리 식 코딩 이식</span>
+        </button>
+        <button type="button" class="evo-hotspot" data-spot="4" style="left:21%;top:68%">
+          <span class="hs-num">4</span><span class="hs-txt">기관③ 돋보기 &amp; ⑤ 복어독 제거</span>
+        </button>
+        <button type="button" class="evo-hotspot" data-spot="5" style="left:46%;top:72%">
+          <span class="hs-num">5</span><span class="hs-txt">기관② 유리방 &amp; ④ 타임머신</span>
+        </button>
+        <button type="button" class="evo-hotspot" data-spot="6" style="left:73%;top:71%">
+          <span class="hs-num">6</span><span class="hs-txt">기관⑤ 카트리지 &amp; 기억나무</span>
+        </button>
+      </div>
+
+      <div class="evo-spot-caption" id="evoSpotCaption">
+        <strong>① [1단계 · 분해/해부]</strong> — 파란 X-Ray 프리즘이 실행파일(`.elf` / `.exe`)의 기계어와 숨은 암호 구역(엔트로피)을 투명하게 발라냅니다! *(그림 위의 ①~⑥ 번호 핀을 눌러 각 방의 역할을 확인해 보세요!)*
+      </div>
+
+      <div class="harmony-three-cols">
+        <div class="hm-card">
+          <h4>👑 주인님의 4대 핵심 능력</h4>
+          <ul>
+            <li><strong>능력 ① 분해·파악·해석</strong> — Ghidra 12.3 &amp; Binary X-Ray 해부</li>
+            <li><strong>능력 ② 우리 식 코딩</strong> — 우리 두뇌 규격 파이썬 스킬로 합성</li>
+            <li><strong>능력 ③ 잘못된 곳 찾기</strong> — 버그·경계값·위험 명령 정밀 적발</li>
+            <li><strong>능력 ④ 직접·자동 수정</strong> — 코드 수리 및 전·후 비교 완성</li>
+          </ul>
+        </div>
+        <div class="hm-card">
+          <h4>🛡️ 5가지 필수 안전·연결 기관</h4>
+          <ul>
+            <li><strong>기관 ① 🧬 원리 설계도 번역기</strong> — 기계어 주소 제거 → 순수 공식화</li>
+            <li><strong>기관 ② 🧪 투명 유리방 쌍둥이 실험실</strong> — 격리 실행 6종 정답 대조</li>
+            <li><strong>기관 ③ 🔍 원인 역추적 돋보기</strong> — 정확한 줄 번호·깨진 이유 진단</li>
+            <li><strong>기관 ④ ⏪ 타임머신 세이브 포인트</strong> — 수리 전 백업 &amp; 0.1초 복구</li>
+            <li><strong>기관 ⑤ 🚦 복어 독 제거 &amp; 🧩 카트리지</strong> — 위험 명령 차단 후 영구 장착</li>
+          </ul>
+        </div>
+        <div class="hm-card">
+          <h4>🔄 6단계 자가 진화 순환 고리</h4>
+          <ul>
+            <li><strong>1→2단계</strong>: 남의 프로그램을 해부해 순수 원리만 흡수</li>
+            <li><strong>3→4단계</strong>: 코딩 초안에서 숨은 버그와 복어 독 색출</li>
+            <li><strong>5→6단계</strong>: 유리방 100% 합격 코드만 <code>.py</code> + <code>.sbrain</code> + <code>[[위키]]</code>로 영구 진화!</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="ui-v3.js?v=5.0"></script>
 </body>
 </html>

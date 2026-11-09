@@ -270,6 +270,20 @@ class TamagotchiSoul:
         self._log_event(f"자체 INT{bits} 두뇌 주조 성공 (정밀도 {cos_sim}%, 압축 -{saved_pct}%)")
         self._save()
 
+    def on_evo_skill_installed(self, title: str, entry_fn: str) -> None:
+        self.data["xp"] = int(self.data.get("xp", 0)) + 45
+        self.data["mood"] = min(100, int(self.data.get("mood", 85)) + 12)
+        self.data["satiety"] = min(100, int(self.data.get("satiety", 75)) + 12)
+        self.data["rl_iq_bonus"] = int(self.data.get("rl_iq_bonus", 0)) + 6
+        self.data["brains_forged"] = int(self.data.get("brains_forged", 0)) + 1
+        self.data["pose"] = "07_eureka"
+        self.data["last_speech"] = (
+            f"유레카!! [{title}]을 분해·수리하고 유리방 100% 검증을 통과해 "
+            f"`{entry_fn}` 영구 스킬 카트리지(.py + .sbrain + 위키)로 제 두뇌에 장착했어요! (+45 XP)"
+        )
+        self._log_event(f"6단계 자가 진화 스킬 장착: {entry_fn}")
+        self._save()
+
     def poke(self) -> Dict[str, Any]:
         self.data["mood"] = min(100, int(self.data.get("mood", 75)) + 7)
         self.data["xp"] = int(self.data.get("xp", 0)) + 3

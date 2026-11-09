@@ -147,10 +147,11 @@ function renderStatus(data) {
     env.hot_slot_sub || "성좌 모듈 스왑 · 한계 없음";
   document.getElementById("envComment").textContent = env.note || "";
 
-  // KPI Dock (includes wiki .sbrain + modular constellation .sbrain capsules!)
+  // KPI Dock (includes wiki .sbrain + modular constellation capsules + Stage C skill cartridges!)
   const brains = forged_brains || [];
   const modCapsules = (pantheon && pantheon.modular_capsules) || [];
-  const totalModules = brains.length + modCapsules.length;
+  const evoSkills = (data.evo_forge && data.evo_forge.installed_skills) || [];
+  const totalModules = brains.length + modCapsules.length + evoSkills.length;
   const rlEp = (rl && rl.total_episodes) || soul.rl_episodes || 0;
   document.getElementById("kpiIq").textContent = soul.iq;
   document.getElementById("kpiNotes").textContent = soul.notes_count;
@@ -158,12 +159,13 @@ function renderStatus(data) {
   document.getElementById("kpiForged").textContent = totalModules;
 
   document.getElementById("engineStatusPill").textContent =
-    `✦ 무한 성좌 ${(pantheon && pantheon.total_constellations) || 5}개 · 모듈 ${totalModules}개 · RL ${rlEp.toLocaleString()}판`;
+    `✦ 무한 성좌 ${(pantheon && pantheon.total_constellations) || 5}개 · 모듈 ${totalModules}개 · 자가진화 스킬 ${evoSkills.length}개`;
 
   renderForgedList(brains);
   if (rl) renderRlStatus(rl);
   if (pantheon) syncPantheon(pantheon);
   if (graph) syncGraphData(graph);
+  if (data.evo_forge) renderEvoInstalledDock(data.evo_forge);
 }
 
 function syncPantheon(p) {
@@ -1080,7 +1082,19 @@ function setupGraphSimulation() {
 function setupInteractions() {
   // Segmented Console Tabs
   document.querySelectorAll(".seg-tab").forEach((btn) => {
-    btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+    btn.addEventListener("click", () => {
+      if (btn.dataset.evoJump === "1") {
+        switchTab("tab-graph");
+        document.querySelectorAll(".seg-tab").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        if (window.__activateSubmode) window.__activateSubmode("evo");
+        return;
+      }
+      switchTab(btn.dataset.tab);
+      if (btn.dataset.tab === "tab-graph" && window.__currentSubmode === "evo") {
+        window.__activateSubmode("genius");
+      }
+    });
   });
 
   // Open Clinic shortcut from Left Bio-Capsule
@@ -1318,23 +1332,84 @@ function setupInteractions() {
     });
   });
 
-  // Dual Constellation Switcher (Domain Genius Constellations <-> Wiki Memories)
-  document.getElementById("btnModeGenius").addEventListener("click", () => {
-    document.getElementById("btnModeGenius").classList.add("active");
-    document.getElementById("btnModeWiki").classList.remove("active");
-    document.getElementById("viewGeniusConstellation").classList.remove("hidden");
-    document.getElementById("viewWikiConstellation").classList.add("hidden");
-    document.getElementById("constellationHint").textContent =
-      "영역별 성좌 안에 모인 천재들이 서로 의견을 주고받으며 한계 없는 지혜를 꼬마 뉴런에 전수합니다!";
+  // Triple Synapse Region Switcher (Genius Constellations <-> Wiki Memories <-> 6-Stage Self-Evolving Forge)
+  function activateSubmode(mode) {
+    window.__currentSubmode = mode;
+    document.getElementById("btnModeGenius").classList.toggle("active", mode === "genius");
+    document.getElementById("btnModeWiki").classList.toggle("active", mode === "wiki");
+    document.getElementById("btnModeEvo").classList.toggle("active", mode === "evo");
+
+    document.getElementById("viewGeniusConstellation").classList.toggle("hidden", mode !== "genius");
+    document.getElementById("viewWikiConstellation").classList.toggle("hidden", mode !== "wiki");
+    document.getElementById("viewEvoForge").classList.toggle("hidden", mode !== "evo");
+
+    const topShortcut = document.getElementById("btnTopEvoShortcut");
+    const topGraphTab = document.querySelector('.seg-tab[data-tab="tab-graph"]');
+    if (topShortcut && topGraphTab && document.getElementById("tab-graph").classList.contains("active")) {
+      topShortcut.classList.toggle("active", mode === "evo");
+      topGraphTab.classList.toggle("active", mode !== "evo");
+    }
+
+    const hints = {
+      genius: "영역별 성좌 안에 모인 천재들이 서로 의견을 주고받으며 한계 없는 지혜를 꼬마 뉴런에 전수합니다!",
+      wiki: "내 마크다운 위키 노트들과 역공학·스킬 기억이 양방향 시냅스로 연결된 기억 별자리입니다.",
+      evo: "4대 핵심 능력 × 5대 필수 기관 × 6단계 자가 진화 공방이 조화를 이루며 프로그램을 해부·수리·장착합니다!",
+    };
+    document.getElementById("constellationHint").textContent = hints[mode] || hints.genius;
+  }
+  window.__activateSubmode = activateSubmode;
+
+  document.getElementById("btnModeGenius").addEventListener("click", () => activateSubmode("genius"));
+  document.getElementById("btnModeWiki").addEventListener("click", () => activateSubmode("wiki"));
+  document.getElementById("btnModeEvo").addEventListener("click", () => {
+    setPetPose("04_brainstorm");
+    activateSubmode("evo");
+  });
+  document.getElementById("headerStageCPill").addEventListener("click", () => {
+    switchTab("tab-graph");
+    activateSubmode("evo");
   });
 
-  document.getElementById("btnModeWiki").addEventListener("click", () => {
-    document.getElementById("btnModeWiki").classList.add("active");
-    document.getElementById("btnModeGenius").classList.remove("active");
-    document.getElementById("viewWikiConstellation").classList.remove("hidden");
-    document.getElementById("viewGeniusConstellation").classList.add("hidden");
-    document.getElementById("constellationHint").textContent =
-      "내 마크다운 위키 노트들과 성좌 원탁 담론 결정문이 양방향 시냅스로 연결된 기억 별자리입니다.";
+  // Harmony Architecture Blueprint Image Modal (next to 내 마크다운 기억 성좌도!)
+  const SPOT_CAPTIONS = {
+    "1": "<strong>① [1단계 · 분해/해부 (능력①)]</strong> — 파란 X-Ray 프리즘이 실행파일(<code>.elf</code> / <code>.exe</code>)의 섹션·기계어·암호 엔트로피를 투명하게 발라냅니다! (Ghidra 12.3 연동)",
+    "2": "<strong>② [2단계 · 기관① 핵심 원리 설계도 번역기]</strong> — 복잡한 기계어 주소(<code>0x401000</code>)를 걷어내고 천재 성좌 톱니바퀴가 순수 동작 공식과 불변식으로 번역합니다!",
+    "3": "<strong>③ [3단계 · 우리 식 코딩 이식 (능력②)]</strong> — 번역된 원리 설계도를 우리 두뇌가 어디서든 안전하게 돌릴 수 있는 깔끔한 파이썬 스킬 코드로 빚어냅니다!",
+    "4": "<strong>④ [4단계 · 기관③ 원인 역추적 돋보기 &amp; 기관⑤ 복어 독 제거기 (능력③)]</strong> — 붉은 돋보기가 몇 번째 줄에서 왜 논리가 깨졌는지 콕 집어내고, 가시 돋친 위험 시스템 명령(복어 독)은 그물망에서 원천 차단합니다!",
+    "5": "<strong>⑤ [5단계 · 기관② 투명 유리방 쌍둥이 실험실 &amp; 기관④ 타임머신 (능력④)]</strong> — 모래시계 세이브 포인트에 백업한 뒤 수리하고, 유리 돔 안에서 원본과 쌍둥이 6종 입력이 100% 똑같이 나오는지 실제 실행 대조합니다!",
+    "6": "<strong>⑥ [6단계 · 기관⑤ 영구 스킬 카트리지 슬롯]</strong> — 유리방 100% 합격 코드만 황금 카트리지(<code>.py</code> + <code>.sbrain</code> + <code>[[위키 기억나무]]</code>)로 두뇌에 영구 장착합니다!",
+  };
+
+  function openEvoHarmonyModal() {
+    document.getElementById("evoHarmonyModal").classList.remove("hidden");
+    setPetPose("06_star");
+  }
+  function closeEvoHarmonyModal() {
+    document.getElementById("evoHarmonyModal").classList.add("hidden");
+  }
+
+  document.getElementById("btnOpenEvoImage").addEventListener("click", openEvoHarmonyModal);
+  document.getElementById("btnBannerOpenImage").addEventListener("click", openEvoHarmonyModal);
+  document.getElementById("btnBannerThumb").addEventListener("click", openEvoHarmonyModal);
+  document.getElementById("btnCloseEvoModal").addEventListener("click", closeEvoHarmonyModal);
+  document.getElementById("evoHarmonyModal").addEventListener("click", (evt) => {
+    if (evt.target.id === "evoHarmonyModal") closeEvoHarmonyModal();
+  });
+  document.addEventListener("keydown", (evt) => {
+    if (evt.key === "Escape") closeEvoHarmonyModal();
+  });
+  document.getElementById("btnModalGoForge").addEventListener("click", () => {
+    closeEvoHarmonyModal();
+    switchTab("tab-graph");
+    activateSubmode("evo");
+  });
+  document.querySelectorAll("#evoHarmonyModal .evo-hotspot").forEach((pin) => {
+    pin.addEventListener("click", () => {
+      document.querySelectorAll("#evoHarmonyModal .evo-hotspot").forEach((p) => p.classList.remove("active"));
+      pin.classList.add("active");
+      const cap = SPOT_CAPTIONS[pin.dataset.spot] || SPOT_CAPTIONS["1"];
+      document.getElementById("evoSpotCaption").innerHTML = cap;
+    });
   });
 
   // Agora Topic Preset Chips
@@ -1597,12 +1672,410 @@ function setupInteractions() {
   });
 }
 
-const CURRENT_UI_VERSION = "4.5";
+// =========================================================================
+// Stage C (v5.0): 6-Stage Self-Evolving Synapse Forge Client Controller
+// =========================================================================
+let activeEvoSpecimenId = "xor_rot_vault";
+let activeEvoEntryFn = "transform_payload";
+
+function setEvoStepper(doneUpTo, activeStep) {
+  document.querySelectorAll("#evoStepperBar .evo-step").forEach((el) => {
+    const s = parseInt(el.dataset.step, 10);
+    el.classList.toggle("done", s <= doneUpTo && s !== activeStep);
+    el.classList.toggle("active", s === activeStep);
+  });
+}
+
+function renderEvoInstalledDock(evoSnap) {
+  const listEl = document.getElementById("evoInstalledList");
+  const selEl = document.getElementById("evoRunSkillSelect");
+  const badgeEl = document.getElementById("evoGhidraBadge");
+  if (!listEl || !selEl) return;
+
+  if (badgeEl && evoSnap.ghidra_bridge) {
+    badgeEl.textContent = evoSnap.ghidra_bridge.headless_ready
+      ? "🟢 Ghidra 12.3 직결 가동"
+      : "⚡ X-Ray + Ghidra 12.3 스크립트 연동";
+  }
+
+  const skills = evoSnap.installed_skills || [];
+  if (!skills.length) {
+    listEl.innerHTML = `<div style="font-size:11.5px;color:#94a3b8">아직 장착된 스킬이 없습니다. 위에서 5단계 유리방 100% 통과 후 <strong>[🧩 6단계 영구 장착]</strong>을 눌러보세요!</div>`;
+    selEl.innerHTML = `<option value="">장착 스킬 없음</option>`;
+    return;
+  }
+
+  listEl.innerHTML = skills
+    .map(
+      (s) => `
+      <div class="vb-item" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <div>
+          <strong style="color:#6ee7b7">🧩 ${escapeHtml(s.entry_fn)}()</strong>
+          <span style="font-size:11px;color:#cbd5e1"> — ${escapeHtml(s.title)}</span><br/>
+          <span style="font-size:10.5px;color:#94a3b8"><code>${escapeHtml(s.py_file)}</code> · 캡슐 <code>${escapeHtml(s.sbrain_file)}</code> (${s.sbrain_kb} KB) · 검증 ${escapeHtml(s.tests_passed)}</span>
+        </div>
+        <span class="tag-pill" style="border-color:rgba(52,211,153,0.5);color:#6ee7b7">장착됨</span>
+      </div>
+    `
+    )
+    .join("");
+
+  const prevVal = selEl.value;
+  selEl.innerHTML = skills
+    .map(
+      (s) =>
+        `<option value="${escapeHtml(s.skill_id)}" data-sample='${escapeHtml(JSON.stringify(s.sample_args || []))}'>${escapeHtml(s.entry_fn)}()</option>`
+    )
+    .join("");
+  if (prevVal && [...selEl.options].some((o) => o.value === prevVal)) {
+    selEl.value = prevVal;
+  }
+}
+
+function renderEvoSnapshots(snaps) {
+  const sel = document.getElementById("evoSnapshotSelect");
+  if (!sel || !Array.isArray(snaps)) return;
+  sel.innerHTML = snaps
+    .slice()
+    .reverse()
+    .map((s) => `<option value="${escapeHtml(s.snap_id)}">${escapeHtml(s.label)} (${escapeHtml(s.created_at || "")})</option>`)
+    .join("");
+}
+
+function renderEvoXrayAndBlueprint(bundle) {
+  const sp = bundle.specimen;
+  const xr = bundle.stage1_xray;
+  const bp = bundle.stage2_blueprint;
+  activeEvoSpecimenId = sp.id;
+  activeEvoEntryFn = sp.entry_fn;
+
+  const secHtml = (xr.sections || [])
+    .map((s) => {
+      const pct = Math.min(100, Math.round((s.entropy / 8.0) * 100));
+      const color = s.entropy >= 7.0 ? "#f43f5e" : s.entropy >= 4.5 ? "#f59e0b" : "#38bdf8";
+      return `
+        <div class="xray-sec-row">
+          <code>${escapeHtml(s.name)} (${escapeHtml(s.rwx)})</code>
+          <span style="color:#94a3b8">${escapeHtml(s.addr)}</span>
+          <div class="ent-track"><div class="ent-fill" style="width:${pct}%;background:${color}"></div></div>
+          <strong style="color:${color};text-align:right">${s.entropy}b</strong>
+        </div>
+      `;
+    })
+    .join("");
+
+  const strs = (xr.strings || [])
+    .slice(0, 5)
+    .map((st) => `<code>${escapeHtml(st.offset)}: "${escapeHtml(st.value)}"</code>`)
+    .join(" ");
+
+  const clues = (xr.opcode_clues || [])
+    .map((c) => `<span class="tag-pill" style="font-size:10.5px">${escapeHtml(c)}</span>`)
+    .join(" ");
+
+  document.getElementById("evoXrayBox").innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:6px">
+      <strong style="color:#38bdf8;font-size:12.8px">🔬 1단계 해부 결과: ${escapeHtml(sp.title)}</strong>
+      <span class="tag-pill">${escapeHtml(sp.badge)}</span>
+    </div>
+    <div class="xray-meta-grid">
+      <div class="xray-kv">포맷: <strong>${escapeHtml(xr.format)}</strong></div>
+      <div class="xray-kv">아키텍처: <strong>${escapeHtml(xr.arch)}</strong></div>
+      <div class="xray-kv">진입점: <code>${escapeHtml(xr.entry_point)}</code> (${xr.size_bytes} B)</div>
+      <div class="xray-kv">전체 엔트로피: <strong>${xr.overall_entropy} / 8.0 bits</strong></div>
+    </div>
+    <div style="font-size:11px;color:#cbd5e1;margin-bottom:3px">📊 섹션별 섀넌 엔트로피 레이더 (7.0b 이상은 암호화·압축 의심)</div>
+    ${secHtml}
+    <div style="margin-top:7px;display:flex;flex-wrap:wrap;gap:4px">${clues}</div>
+    <div style="margin-top:6px;font-size:11px;color:#94a3b8">추출 문자열: ${strs || "없음"}</div>
+  `;
+
+  const asmHtml = (sp.pseudo_asm || []).map((l) => escapeHtml(l)).join("\n");
+  const invHtml = (bp.invariants || []).map((i) => `<li>${escapeHtml(i)}</li>`).join("");
+  document.getElementById("evoBlueprintBox").innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <strong style="color:#fde68a;font-size:12.8px">🧬 2단계 [기관①] 기계어 → 핵심 원리 설계도 번역</strong>
+      <span style="font-size:10.8px;color:#c7d2fe">감수: ${escapeHtml((sp.mentors || []).join(" · "))}</span>
+    </div>
+    <pre class="asm-block">${asmHtml}</pre>
+    <div style="margin-top:5px"><strong style="color:#6ee7b7">✦ 추출 핵심 공식:</strong> <code>${escapeHtml(bp.core_formula)}</code></div>
+    <div style="margin-top:4px;font-size:11.3px;color:#cbd5e1"><strong>입출력 규격:</strong> ${escapeHtml(bp.inputs)} → ${escapeHtml(bp.outputs)}</div>
+    <ul style="margin:5px 0 6px;padding-left:17px;font-size:11.3px;color:#e2e8f0">${invHtml}</ul>
+    <div style="padding:6px 9px;border-radius:8px;background:rgba(99,102,241,0.16);font-size:11.2px;color:#e0e7ff">
+      💡 ${escapeHtml(bp.mentor_comment)}
+    </div>
+  `;
+
+  document.getElementById("evoEditorTitle").textContent =
+    `💻 3단계 · 우리 두뇌 이식 코드 (${sp.entry_fn}) — 자유롭게 직접 수정 가능!`;
+  document.getElementById("evoCodeEditor").value = bundle.stage3_draft_code || "";
+  renderEvoSnapshots(bundle.snapshots || []);
+  document.getElementById("evoDiffBox").classList.add("hidden");
+  document.getElementById("evoInstallFeedback").classList.add("hidden");
+  document.getElementById("evoAuditBox").innerHTML =
+    `1차 자동 이식 코드가 준비되었습니다! <strong>[🔍 4단계: 잘못된 곳 · 복어독 찾기]</strong> 또는 상단 <strong>[⚡ 1~5단계 연속 실행]</strong>을 눌러 숨은 함정을 색출해 보세요.`;
+  document.getElementById("evoSandboxBox").innerHTML =
+    `🧪 <strong>기관② 투명 유리방 실험실 대기 중</strong> — 원본 바이너리와 대조할 쌍둥이 테스트 <strong>${(bundle.twin_tests || []).length}건</strong>이 장전되었습니다.`;
+  setEvoStepper(2, 3);
+}
+
+function renderEvoAudit(diag) {
+  const box = document.getElementById("evoAuditBox");
+  if (diag.clean) {
+    box.innerHTML = `<strong style="color:#6ee7b7">✅ [기관③ 돋보기 &amp; 기관⑤ 복어독 스캐너] 결함 0건 · 위험 명령 0건 깨끗합니다!</strong>`;
+    return;
+  }
+  const cards = (diag.findings || [])
+    .map(
+      (f) => `
+      <div class="finding-card ${f.severity === "toxin" ? "toxin" : ""}">
+        <div style="display:flex;justify-content:space-between;gap:6px">
+          <strong style="color:${f.severity === "toxin" ? "#fde68a" : "#fda4af"}">${escapeHtml(f.badge)} — 줄 번호 Line ${f.line}</strong>
+          <code>${escapeHtml(f.code_line)}</code>
+        </div>
+        <div style="margin-top:3px;color:#f1f5f9">• <strong>원인 역추적:</strong> ${escapeHtml(f.root_cause)}</div>
+        <div style="margin-top:2px;color:#a5b4fc;font-size:11px">• <strong>수리 힌트:</strong> ${escapeHtml(f.fix_hint)}</div>
+      </div>
+    `
+    )
+    .join("");
+
+  box.innerHTML = `
+    <strong style="color:#fda4af">🔍 4단계 [기관③ 원인 역추적 돋보기 &amp; 기관⑤ 복어독 제거기] 총 ${(diag.findings || []).length}건 적발!</strong>
+    ${cards}
+  `;
+}
+
+function renderEvoSandbox(sb, labelPrefix = "5단계") {
+  const box = document.getElementById("evoSandboxBox");
+  if (!sb) return;
+  if (sb.blocked_by_toxin) {
+    box.innerHTML = `
+      <strong style="color:#fbbf24">🚦 [기관⑤ 복어 독 제거기 작동!] 위험 시스템 명령(${sb.toxins.length}건)이 포함되어 유리방 실행을 사전 격리 차단했습니다!</strong><br/>
+      <span style="font-size:11.3px;color:#fde68a"><strong>[🩹 5단계: 자동 수리]</strong>를 누르면 위험 명령을 깨끗이 발라내고 순수 알고리즘만 실행합니다.</span>
+    `;
+    return;
+  }
+  if (sb.syntax_error) {
+    box.innerHTML = `<strong style="color:#fda4af">🚨 실행 중단 (Line ${sb.syntax_error.line}): ${escapeHtml(sb.syntax_error.msg)}</strong>`;
+    return;
+  }
+
+  const allPass = sb.pass_rate_pct === 100;
+  const casesHtml = (sb.results || [])
+    .map(
+      (r) => `
+      <div class="twin-case ${r.passed ? "pass" : "fail"}">
+        <div style="display:flex;justify-content:space-between">
+          <strong>${r.passed ? "✅" : "❌"} ${escapeHtml(r.name)}</strong>
+          <span style="color:#94a3b8">입력: <code>${escapeHtml(JSON.stringify(r.args))}</code></span>
+        </div>
+        <div style="margin-top:2px;color:${r.passed ? "#6ee7b7" : "#fda4af"}">
+          원본 정답: <code>${escapeHtml(JSON.stringify(r.expected))}</code> ↔ 실행 결과: <code>${escapeHtml(r.error ? r.error : JSON.stringify(r.actual))}</code>
+        </div>
+      </div>
+    `
+    )
+    .join("");
+
+  box.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+      <strong style="color:${allPass ? "#6ee7b7" : "#fda4af"};font-size:12.8px">
+        🧪 ${escapeHtml(labelPrefix)} [기관② 투명 유리방 쌍둥이 대조 결과]: ${sb.passed_count}/${sb.total_count} 통과 (${sb.pass_rate_pct}%)
+      </strong>
+      <span style="font-size:11px;color:#94a3b8">격리 프로세스 실측 ${sb.elapsed_ms} ms</span>
+    </div>
+    <div class="twin-case-grid">${casesHtml}</div>
+  `;
+}
+
+function renderEvoDiff(diffRows) {
+  const diffEl = document.getElementById("evoDiffBox");
+  if (!diffRows || !diffRows.length) {
+    diffEl.classList.add("hidden");
+    return;
+  }
+  diffEl.classList.remove("hidden");
+  diffEl.innerHTML =
+    `<div style="font-size:11px;color:#fde68a;margin-bottom:4px;font-family:sans-serif"><strong>⏪ [기관④ 타임머신 비교] 수리 전(빨간 줄) ↔ 수리 후(초록 줄) 변경 내역</strong></div>` +
+    diffRows
+      .map((r) => `<div class="diff-line ${escapeHtml(r.kind)}">${escapeHtml(r.text)}</div>`)
+      .join("");
+}
+
+function setupEvoForgeInteractions() {
+  async function loadSpecimen(specId, uploadedFile = null, silent = false) {
+    if (!silent) setPetPose("02_curious");
+    let payload = { specimen_id: specId || "xor_rot_vault" };
+    if (uploadedFile) {
+      const buf = await uploadedFile.arrayBuffer();
+      const bytes = new Uint8Array(buf.slice(0, 65536));
+      let binary = "";
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      payload = {
+        specimen_id: "custom_upload",
+        uploaded_name: uploadedFile.name,
+        uploaded_b64: btoa(binary),
+      };
+    }
+    const res = await apiPost("api/evo/dissect", payload);
+    if (res.bundle) {
+      renderEvoXrayAndBlueprint(res.bundle);
+      if (res.status) renderStatus(res.status);
+    }
+  }
+  window.__loadEvoSpecimen = loadSpecimen;
+
+  document.querySelectorAll("#evoSpecimenChips [data-spec]").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      document.querySelectorAll("#evoSpecimenChips .preset-chip").forEach((c) => c.classList.remove("active"));
+      chip.classList.add("active");
+      loadSpecimen(chip.dataset.spec);
+    });
+  });
+
+  document.getElementById("btnEvoUpload").addEventListener("click", () => {
+    document.getElementById("evoFileInput").click();
+  });
+  document.getElementById("evoFileInput").addEventListener("change", (evt) => {
+    const file = evt.target.files && evt.target.files[0];
+    if (file) {
+      document.querySelectorAll("#evoSpecimenChips .preset-chip").forEach((c) => c.classList.remove("active"));
+      document.getElementById("btnEvoUpload").classList.add("active");
+      loadSpecimen("custom_upload", file);
+    }
+  });
+
+  async function doAudit() {
+    const code = document.getElementById("evoCodeEditor").value;
+    setPetPose("04_brainstorm");
+    const res = await apiPost("api/evo/audit", { specimen_id: activeEvoSpecimenId, code });
+    if (res.audit && res.audit.diagnosis) {
+      renderEvoAudit(res.audit.diagnosis);
+      if (res.audit.diagnosis.sandbox) {
+        renderEvoSandbox(res.audit.diagnosis.sandbox, "4단계 사전 대조");
+      } else if (res.audit.diagnosis.findings.some((f) => f.severity === "toxin")) {
+        renderEvoSandbox({ blocked_by_toxin: true, toxins: res.audit.diagnosis.findings }, "4단계");
+      }
+      setEvoStepper(3, 4);
+    }
+  }
+
+  async function doRepair(mode) {
+    const curCode = document.getElementById("evoCodeEditor").value;
+    setPetPose("03_swirl");
+    const res = await apiPost("api/evo/repair", {
+      specimen_id: activeEvoSpecimenId,
+      current_code: curCode,
+      mode,
+      edited_code: mode === "manual" ? curCode : "",
+    });
+    if (res.repaired) {
+      const rp = res.repaired;
+      document.getElementById("evoCodeEditor").value = rp.after_code;
+      renderEvoSnapshots(rp.snapshots || []);
+      renderEvoAudit(rp.after_diagnosis);
+      renderEvoDiff(rp.diff);
+      renderEvoSandbox(rp.after_sandbox, "5단계 수리 후");
+      if (res.status) renderStatus(res.status);
+      if (rp.after_sandbox.pass_rate_pct === 100) {
+        setPetPose("07_eureka");
+        setEvoStepper(5, 6);
+      } else {
+        setEvoStepper(4, 5);
+      }
+    }
+  }
+
+  document.getElementById("btnEvoAudit").addEventListener("click", doAudit);
+  document.getElementById("btnEvoAutoRepair").addEventListener("click", () => doRepair("auto"));
+  document.getElementById("btnEvoTestCustom").addEventListener("click", () => doRepair("manual"));
+
+  document.getElementById("btnEvoRollback").addEventListener("click", async () => {
+    const snapId = document.getElementById("evoSnapshotSelect").value;
+    const res = await apiPost("api/evo/rollback", { specimen_id: activeEvoSpecimenId, snap_id: snapId });
+    if (res.rollback && res.rollback.restored_snapshot) {
+      document.getElementById("evoCodeEditor").value = res.rollback.restored_snapshot.code;
+      document.getElementById("evoDiffBox").classList.add("hidden");
+      renderEvoAudit(res.rollback.diagnosis);
+      if (res.rollback.diagnosis.sandbox) {
+        renderEvoSandbox(res.rollback.diagnosis.sandbox, "타임머신 복구 상태");
+      }
+      setEvoStepper(3, 4);
+    }
+  });
+
+  document.getElementById("btnEvoInstall").addEventListener("click", async () => {
+    const code = document.getElementById("evoCodeEditor").value;
+    const fb = document.getElementById("evoInstallFeedback");
+    fb.classList.remove("hidden");
+    fb.textContent = "유리방 100% 합격 확인 중... 스킬 카트리지(.py + .sbrain + 위키 도감)를 주조합니다!";
+    const res = await apiPost("api/evo/install", { specimen_id: activeEvoSpecimenId, code });
+    if (res.error) {
+      fb.innerHTML = `⚠️ <strong>장착 보류:</strong> ${escapeHtml(res.error)} 먼저 <strong>[🩹 5단계: 자동 수리 &amp; 유리방 시험]</strong>을 통과시켜 주세요!`;
+      return;
+    }
+    if (res.installed) {
+      const inst = res.installed;
+      pulsePortrait();
+      renderStatus(res.status);
+      setEvoStepper(6, 6);
+      document.getElementById("evoRunArgsInput").value = JSON.stringify(inst.sample_args || []);
+      fb.innerHTML = `
+        🎉 <strong>6단계 두뇌 영구 접목 완료!</strong><br/>
+        • 실행 모듈: <code>${escapeHtml(inst.py_file)}</code> · 4비트 신경 캡슐: <code>models/${escapeHtml(inst.sbrain_file)}</code> (${inst.sbrain_kb} KB)<br/>
+        • 마크다운 기억 성좌 연결: <code>[[${escapeHtml(inst.ghidra_note_title)}]]</code> ⇄ <code>[[${escapeHtml(inst.skill_note_title)}]]</code>
+      `;
+    }
+  });
+
+  document.getElementById("evoRunSkillSelect").addEventListener("change", (evt) => {
+    const opt = evt.target.selectedOptions[0];
+    if (opt && opt.dataset.sample) {
+      document.getElementById("evoRunArgsInput").value = opt.dataset.sample;
+    }
+  });
+
+  document.getElementById("btnEvoRunSkill").addEventListener("click", async () => {
+    const skillId = document.getElementById("evoRunSkillSelect").value;
+    const outEl = document.getElementById("evoRunSkillOutput");
+    if (!skillId) return;
+    let parsedArgs = [];
+    try {
+      parsedArgs = JSON.parse(document.getElementById("evoRunArgsInput").value);
+    } catch (_) {
+      outEl.classList.remove("hidden");
+      outEl.textContent = "⚠️ 인자를 올바른 JSON 배열 형식(예: [[16, 32, 255, 129]])으로 입력해 주세요!";
+      return;
+    }
+    const res = await apiPost("api/evo/run-skill", { skill_id: skillId, args: parsedArgs });
+    outEl.classList.remove("hidden");
+    if (res.ran) {
+      outEl.innerHTML = `▶ <strong>실전 스킬 출력 (${res.ran.elapsed_ms}ms):</strong> <code>${escapeHtml(entryCallLabel(res.ran))}</code> → <strong style="color:#fde68a"><code>${escapeHtml(JSON.stringify(res.ran.output))}</code></strong>`;
+    } else if (res.error) {
+      outEl.textContent = `⚠️ ${res.error}`;
+    }
+  });
+
+  function entryCallLabel(ran) {
+    const inner = (ran.args || []).map((a) => JSON.stringify(a)).join(", ");
+    return `${ran.entry_fn}(${inner})`;
+  }
+
+  document.getElementById("btnEvoOneClickCycle").addEventListener("click", async () => {
+    await doAudit();
+    await new Promise((r) => setTimeout(r, 420));
+    await doRepair("auto");
+  });
+}
+
+const CURRENT_UI_VERSION = "5.0";
 
 async function init() {
   setupGraphSimulation();
   setupGeniusCanvas();
   setupInteractions();
+  setupEvoForgeInteractions();
 
   // Instant 0ms render from server-injected initial state (never stuck on "측정 중...")
   if (window.__INITIAL_STATUS__) {
@@ -1617,6 +2090,9 @@ async function init() {
   renderStatus(freshStatus);
   if (window.__runScout) {
     window.__runScout("이성계");
+  }
+  if (window.__loadEvoSpecimen) {
+    window.__loadEvoSpecimen("xor_rot_vault", null, true);
   }
 
   // Auto-refresh preview tab whenever backend serves a newer UI version

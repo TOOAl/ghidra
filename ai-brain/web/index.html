@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>시냅스몽 · 나만의 양자화 AI 두뇌 연구소</title>
-  <link rel="stylesheet" href="ui-v3.css?v=6.6" />
+  <link rel="stylesheet" href="ui-v3.css?v=6.7" />
   <!--__INITIAL_STATE__-->
 </head>
 <body>
@@ -436,6 +436,20 @@
             <div class="field-muscles" id="fieldMuscles"></div>
             <div class="field-ledger-head">📜 최근 실전 출동 기록 (최신순 · 최대 10건)</div>
             <div class="field-ledger" id="fieldLedger"></div>
+          </div>
+
+          <div class="card exp-notebook-card" id="expNotebookPanel">
+            <div class="field-head">
+              <div>
+                <span class="step-kicker">STAGE I · EXPERIENCE NOTEBOOK</span>
+                <h3>📓 실전 오답 노트 — 근육이 자기 경험으로 다시 배워요</h3>
+                <p class="field-status-line" id="expStatusLine">📓 오답 노트를 불러오는 중...</p>
+              </div>
+              <button class="ghost-btn" id="btnExpRefresh" type="button">🔄 노트 다시 보기</button>
+            </div>
+            <div class="exp-muscles" id="expMuscles"></div>
+            <div class="field-ledger-head">📝 최근 실전 채점지 (최신순 · 최대 12장) — ✘ 오답이 다음 훈련의 교재가 돼요</div>
+            <div class="field-ledger" id="expLedger"></div>
           </div>
 
           <div class="pane-grid evo-grid">
@@ -907,6 +921,6 @@
     </div>
   </div>
 
-  <script src="ui-v3.js?v=6.6"></script>
+  <script src="ui-v3.js?v=6.7"></script>
 </body>
 </html>

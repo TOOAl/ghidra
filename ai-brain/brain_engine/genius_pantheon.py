@@ -902,6 +902,38 @@ class GeniusPantheon:
             + f"\n\n최종 성좌 합의 공식: {consensus}"
         )
 
+        # 📓 Stage I: the debate's own outcome is the reasoning muscle's report
+        # card.  A chain that RAISED the judges' score is worth re-studying as a
+        # valid chain; a chain that REGRESSED is taught as a broken chain whose
+        # honest answer is "unknown" — never a confident guess.
+        exp_case = None
+        chain_lines = [d for d in dialogue if str(d.get("phase", "")).startswith("🔗")]
+        if field and len(chain_lines) >= 2:
+            names = [d["speaker"] for d in chain_lines]
+            facts = [(names[i], names[i + 1]) for i in range(len(names) - 1)]
+            prob_facts = [list(x) for x in facts]
+            answer: Any = True
+            if gain < 0 and len(prob_facts) >= 3:
+                del prob_facts[len(prob_facts) // 2]
+                answer = "unknown"
+            exp_case = {
+                "ok": gain >= 0,
+                "site": "pantheon_debate",
+                "key": f"debate:{'+'.join(valid_ids[:3])}",
+                "note": (
+                    f"실제 담론 「{focus[:18]}」 — 논증 링크 {len(facts)}개"
+                    f"(담론 체인 {field.get('chain_hops')}hop) · 심판 합의 {gain:+}점"
+                ),
+                "prob": {
+                    "hops": len(facts),
+                    "facts": prob_facts,
+                    "question": [names[0], names[-1]],
+                    "answer": answer,
+                    "real_mode": True,
+                },
+                "metric": {"gain_pts": gain, "hops": len(facts), "after_score": after_score},
+            }
+
         debate_record = {
             "topic": focus,
             "constellations": const_names,
@@ -920,6 +952,7 @@ class GeniusPantheon:
             "elapsed_ms": elapsed_ms,
             "wiki_note_title": wiki_title,
             "wiki_note_body": wiki_body,
+            "experience_case": exp_case,
             "field": (
                 {
                     "ability": "reasoning",

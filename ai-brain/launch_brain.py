@@ -21,7 +21,7 @@ BRAIN_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(BRAIN_ROOT))
 
 from brain_engine.core_ability_engine import ABILITY_ORDER as ABILITY_ROTATION  # noqa: E402
-from brain_engine.core_ability_engine import CoreAbilityEngine  # noqa: E402
+from brain_engine.core_ability_engine import CoreAbilityEngine, context_experience_case  # noqa: E402
 from brain_engine.evolution_heartbeat import EvolutionHeartbeat  # noqa: E402
 from brain_engine.genius_pantheon import GeniusPantheon  # noqa: E402
 from brain_engine.genius_scout import analyze_candidate_genius  # noqa: E402
@@ -79,7 +79,7 @@ class BrainState:
             rl_trained=rl_trained,
         )
         return {
-            "ui_version": "6.6",
+            "ui_version": "6.7",
             "soul": self.soul.snapshot(graph["stats"], env_grade=env_grade),
             "hallucination": hallucination,
             "host": self.host_info,
@@ -144,6 +144,9 @@ def make_handler(state: BrainState):
                 return
             if route == "/api/evo/field":
                 self._send_json(state.abilities.field_report())
+                return
+            if route == "/api/evo/experience":
+                self._send_json(state.abilities.experience_report())
                 return
             if route == "/api/notes":
                 self._send_json({"notes": state.gardener.list_notes()})
@@ -233,6 +236,11 @@ def make_handler(state: BrainState):
                     },
                 )
                 audit = audit_chat_grounding(question, recall_bundle)
+                ctx_case = context_experience_case(ctx_field, question, recall_bundle, audit)
+                if ctx_case:
+                    ctx_case["key"] = f"recall:{question[:28]}"
+                if ctx_case:
+                    state.abilities.record_experience("context", ctx_case)
                 result = state.slm.answer_with_memories(question, recall_bundle)
                 state.soul.on_chat(
                     len(recall_bundle["recalled"]),
@@ -278,6 +286,8 @@ def make_handler(state: BrainState):
                     [str(x) for x in cids], topic, state.rl_gym, field=r_field
                 )
                 rf = res.get("field") or {}
+                if res.get("experience_case"):
+                    state.abilities.record_experience("reasoning", res["experience_case"])
                 state.abilities.log_deployment(
                     "reasoning",
                     f"🏛️ 원탁 담론 「{res['topic'][:20]}」 — {rf.get('chain_hops')} hop 논증 체인을 엮어 "
@@ -448,6 +458,8 @@ def make_handler(state: BrainState):
                     res = state.gardener.weave_missing_synapses(field=o_field)
                     added = res["added_pairs"]
                     of = res.get("field") or {}
+                    if res.get("experience_case"):
+                        state.abilities.record_experience("organizing", res["experience_case"])
                     state.abilities.log_deployment(
                         "organizing",
                         f"🕸️ 위키 시냅스 엮기 — 노트 {res['total_notes']}장 중 {of.get('pairs_examined')}쌍을 "
@@ -495,6 +507,8 @@ def make_handler(state: BrainState):
                 audit = state.evo_forge.audit_code(specimen_id=spec_id, code=code, field=c_field)
                 cm = audit.get("field") or {}
                 if cm:
+                    if cm.get("experience_case"):
+                        state.abilities.record_experience("coding", cm["experience_case"])
                     state.abilities.log_deployment(
                         "coding",
                         f"🛠️ 4단계 원인 감사 — 버그 지문 {cm.get('lit_fingerprints')}개 점등 · {cm.get('verdict', '')}",

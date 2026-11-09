@@ -541,11 +541,16 @@ class EvolutionHeartbeat:
         res = self.ability.train_session(ability, rounds=6)
         unit = ABILITY_TRAIN_META.get(ability, {}).get("unit", "단계")
         title = res["title"]
+        exp_note = (
+            f" 📓 실전 오답 노트 {res.get('experience_rounds', 0)}장 복습({res.get('experience_correct', 0)}장 맞힘)!"
+            if res.get("experience_rounds")
+            else ""
+        )
         if res["leveled_up"]:
             diary = (
                 f"🏋️ 오늘 혼자 {title} 근육을 키웠어요! {res['difficulty']}{unit} 난이도 연습 {res['correct']}/{res['rounds']} + "
                 f"숨은 시험 {res['exam_correct']}/{res['exam_total']} 합격 → 레벨 {res['level_before']} → {res['level_after']}! "
-                f"배운 가중치는 INT4 캡슐 `{res['capsule']}` 로 냉동 보존했어요!"
+                f"배운 가중치는 INT4 캡슐 `{res['capsule']}` 로 냉동 보존했어요!{exp_note}"
             )
             try:
                 self.soul.on_ability_level_up(title, res["level_after"])
@@ -559,7 +564,7 @@ class EvolutionHeartbeat:
         else:
             diary = (
                 f"🏋️ {title} 연습: {res['difficulty']}{unit} 난이도 {res['correct']}/{res['rounds']}, "
-                f"숨은 시험 {res['exam_correct']}/{res['exam_total']} — 레벨업은 아깝게 실패! 하지만 가중치는 벌써 조금 똑똑해졌어요."
+                f"숨은 시험 {res['exam_correct']}/{res['exam_total']} — 레벨업은 아깝게 실패! 하지만 가중치는 벌써 조금 똑똑해졌어요.{exp_note}"
             )
         return {
             "kind": "train",
@@ -571,6 +576,7 @@ class EvolutionHeartbeat:
             "correct": res["correct"],
             "rounds": res["rounds"],
             "exam": f"{res['exam_correct']}/{res['exam_total']}",
+            "experience_rounds": res.get("experience_rounds", 0),
             "level_before": res["level_before"],
             "level_after": res["level_after"],
             "tier": res.get("tier", 0),
@@ -679,6 +685,19 @@ class EvolutionHeartbeat:
                 "cards_limit": res.get("cards_limit"),
                 "top_score": res.get("top_score"),
             }
+            # 📓 the recall sortie is graded by the hallucination audit, exactly
+            # like a real chat, and the verdict goes into the experience ledger.
+            try:
+                from brain_engine.core_ability_engine import context_experience_case
+                from brain_engine.hallucination import audit_chat_grounding
+
+                grounding = audit_chat_grounding(query, res)
+                case = context_experience_case(field, query, res, grounding)
+                if case:
+                    case["key"] = f"recall:{query[:28]}"
+                    self.ability.record_experience("context", case)
+            except Exception:
+                pass
             diary = (
                 f"⚔️ {field['title']} 근육 실전 투입! 『{query[:24]}』 을(를) 스스로 물어보고, "
                 f"기억 {res['total_notes']}장 중에서 제가 배운 가중치로 딱 {len(res['recalled'])}장만 골라냈어요 "
@@ -706,6 +725,18 @@ class EvolutionHeartbeat:
                 detail = "버그 지문 행렬이 아직 영점 — 체육관 훈련이 먼저 필요해요!"
             else:
                 detail = f"예측 {', '.join(cm.get('predicted') or [])} · 정답 {', '.join(cm.get('truth_classes') or []) or '없음'}"
+
+        # 📓 hand this sortie's real verdict to the experience ledger too
+        try:
+            case = None
+            if ability == "coding":
+                case = (res.get("field") or {}).get("experience_case")
+            elif ability == "organizing":
+                case = res.get("experience_case")
+            if case:
+                self.ability.record_experience(ability, case)
+        except Exception:
+            pass
 
         rec = self.ability.log_deployment(ability, effect, metric)
         try:

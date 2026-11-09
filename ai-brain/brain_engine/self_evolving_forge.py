@@ -1254,6 +1254,27 @@ class SelfEvolvingForge:
                 "hits": sum(1 for r in ranked if r["cls"] in truth_classes),
                 "verdict": verdict,
             }
+            # 📓 Stage I: hand this REAL verdict to the experience ledger so the
+            # muscle re-studies its own mistakes on the very code it misjudged.
+            if truth_classes:
+                labels = sorted(truth_classes)
+                muscle["experience_case"] = {
+                    "ok": top1_hit,
+                    "site": "forge_audit",
+                    "key": f"audit:{spec['id']}",
+                    "note": (
+                        f"실제 코드 감사 — 근육 예측 「{', '.join(sus['predicted']) or '없음'}」 vs "
+                        f"정적 진단 실제 클래스 「{', '.join(labels)}」"
+                    ),
+                    "prob": {
+                        "cls": labels[0],
+                        "labels": labels,
+                        "snippet": target if len(target) <= 1200 else target[:1200],
+                        "fix": " / ".join(str(f.get("fix_hint", ""))[:70] for f in diag.get("findings", [])[:2]),
+                        "real_mode": True,
+                    },
+                    "metric": {"top1_hit": top1_hit, "predicted": sus["predicted"], "truth_classes": labels},
+                }
             diag["muscle"] = muscle
             out["field"] = muscle
         return out

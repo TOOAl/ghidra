@@ -1993,6 +1993,7 @@ function setupEvoForgeInteractions() {
         showEvoToast({ kind: "field", beat: "💻", diary: `코딩 근육 Lv${mus.level} 실전 의견 — ${mus.verdict || ""}` });
       }
       if (res.field_report) renderField(res.field_report);
+      void loadExperience();
       if (res.audit.diagnosis.sandbox) {
         renderEvoSandbox(res.audit.diagnosis.sandbox, "4단계 사전 대조");
       } else if (res.audit.diagnosis.findings.some((f) => f.severity === "toxin")) {
@@ -2418,6 +2419,7 @@ function renderGym(snap) {
         : `가장 애쓰는 근육 ${sorted[0].title}(Lv ${sorted[0].level}/${sorted[0].cap}) — 심장박동이 알아서 훈련해요!`);
   }
   if (snap.field) renderField(snap.field);
+  void loadExperience();
 }
 
 /* ---- ⚔️ Stage H: Field Deployment Report — muscles doing REAL work ---- */
@@ -2434,16 +2436,25 @@ function renderField(field) {
       ? `⚔️ 근육들이 실전에서 총 ${total}번 일했어요! (🧠 담론 · 📖 기억 호출 · 💻 원인 감사 · 🗂️ 시냅스 엮기) — 체육관 점수가 아니라 진짜 결과로 남았습니다.`
       : "⚔️ 아직 실전 출동 전이에요 — [지금 당장 실전 투입!] 을 누르거나, 채팅·담론·4단계 감사·시냅스 엮기를 쓰기만 해도 근육이 저절로 투입돼요!";
   }
-  mus.innerHTML = per.map((m) => `
-    <div class="field-muscle" data-ability="${escapeHeartHtml(m.id)}">
+  mus.innerHTML = per.map((m) => {
+    const mt = m.metrics || null;
+    const rate = mt && mt.real_hit_rate_pct !== null && mt.real_hit_rate_pct !== undefined
+      ? mt.real_hit_rate_pct : null;
+    const cls = rate === null ? "none" : (rate >= 80 ? "hit" : (rate >= 50 ? "grow" : "climb"));
+    const width = rate === null ? 0 : Math.max(2, Math.min(100, rate));
+    return `
+    <div class="field-muscle fm-${cls}" data-ability="${escapeHeartHtml(m.id)}">
       <div class="fm-top">
         <span class="fm-title">${escapeHeartHtml(m.title)}</span>
-        <span class="fm-lv">Lv ${m.level}/${m.cap} · 티어 ${m.tier + 1}</span>
+        <span class="fm-rate">${rate === null ? "📓 경험 0건" : `🎯 실전 적중률 ${rate}%`}</span>
       </div>
+      <div class="fm-metric"><i style="width:${width}%"></i></div>
+      <div class="fm-lvline">Lv ${m.level}/${m.cap} · 티어 ${m.tier + 1} <span class="fm-why">(레벨은 숨은 시험 도장일 뿐 — 위 적중률이 진짜 성적표예요)</span></div>
       <div class="fm-site">${escapeHeartHtml(m.site_title)} 에서 <strong>${escapeHeartHtml(m.verb)}</strong> 담당 · 출동 <b>${m.deployments}</b>회</div>
       <div class="fm-detail">${escapeHeartHtml(m.detail)}</div>
       <div class="fm-last">${escapeHeartHtml(m.last_effect)}</div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
   const recent = field.recent || [];
   led.innerHTML = recent.length
     ? recent.map((d) => `
@@ -2456,6 +2467,58 @@ function renderField(field) {
       </div>`).join("")
     : `<div class="field-empty">아직 출동 기록이 없어요 — 근육을 실전에 내보내 주세요!</div>`;
   void hits;
+}
+
+/* ---- 📓 Stage I: Experience Notebook — muscles re-studying their OWN field work ---- */
+function renderExperience(rep) {
+  const line = document.getElementById("expStatusLine");
+  const mus = document.getElementById("expMuscles");
+  const led = document.getElementById("expLedger");
+  if (!mus || !led) return;
+  const per = rep.per_muscle || [];
+  const total = rep.total_experiences || 0;
+  const mistakes = rep.total_mistakes || 0;
+  const taught = per.reduce((acc, m) => acc + (m.experience_rounds_taught || 0), 0);
+  if (line) {
+    line.textContent = total > 0
+      ? `📓 실전 채점지 ${total}장 · 오답 ${mistakes}장 · 그 오답으로 다시 공부한 훈련 ${taught}라운드 — 인공 퍼즐이 아니라 근육이 실제로 저지른 실수가 교재예요!`
+      : "📓 아직 노트가 비어 있어요 — 채팅·담론·4단계 감사·시냅스 엮기를 한 번만 써보세요. 근육이 자기 결과로 배우기 시작해요!";
+  }
+  mus.innerHTML = per.map((m) => {
+    const rate = (m.real_hit_rate_pct === null || m.real_hit_rate_pct === undefined) ? null : m.real_hit_rate_pct;
+    const cls = rate === null ? "none" : (rate >= 80 ? "hit" : (rate >= 50 ? "grow" : "climb"));
+    const width = rate === null ? 0 : Math.max(2, Math.min(100, rate));
+    const extra = (m.real_quality_pct !== null && m.real_quality_pct !== undefined)
+      ? ` · 🧹 실제 정리 품질 ${m.real_quality_pct}%` : "";
+    return `
+    <div class="exp-muscle em-${cls}">
+      <div class="em-top">
+        <span class="em-title">${escapeHeartHtml(m.title)}</span>
+        <span class="em-rate">${rate === null ? "경험 0건" : `적중률 ${rate}%`}</span>
+      </div>
+      <div class="em-bar"><i style="width:${width}%"></i></div>
+      <div class="em-counts">실전 시도 ${m.real_attempts} · 적중 ${m.real_hits} · 오답 ${m.real_mistakes} · 복습 ${m.experience_rounds_taught}라운드${extra}</div>
+      <div class="em-verdict">${escapeHeartHtml(m.verdict || "")}</div>
+    </div>`;
+  }).join("");
+  const recent = rep.recent || [];
+  led.innerHTML = recent.length
+    ? recent.map((e) => `
+      <div class="field-row exp-row ${e.ok ? "row-ok" : "row-bad"}${e.superseded ? " row-old" : ""}">
+        <span class="fr-muscle">${escapeHeartHtml(e.title || e.ability || "")}</span>
+        <span class="fr-lv">${e.ok ? "✔ 맞힘" : "✘ 오답"}</span>
+        <span class="fr-site">${escapeHeartHtml(e.site)}${e.superseded ? " · ♻️ 이후 상황으로 갱신됨" : ""}</span>
+        <span class="fr-effect">${escapeHeartHtml(e.note)}</span>
+        <span class="fr-ts">${e.ok ? "" : "교재로 "}복습 ${e.taught}회</span>
+      </div>`).join("")
+    : `<div class="field-empty">아직 채점지가 없어요 — 근육에게 실제로 일을 시켜주세요!</div>`;
+}
+
+async function loadExperience() {
+  try {
+    const rep = await apiGet("/api/evo/experience");
+    if (rep && rep.per_muscle) renderExperience(rep);
+  } catch (err) { /* ignore transient */ }
 }
 
 async function trainAbility(abilityId, mode) {
@@ -2486,9 +2549,18 @@ async function trainAbility(abilityId, mode) {
           diary: `${sRow.title} 레벨업! Lv ${sRow.level_before} → ${sRow.level_after} (숨은 시험 ${sRow.exam_correct}/${sRow.exam_total})`,
         });
       }
+      if (sRow.experience_rounds) {
+        showEvoToast({
+          kind: "field",
+          beat: "📓",
+          diary: `${sRow.title} 훈련 ${sRow.rounds || 0}라운드 중 ${sRow.experience_rounds}라운드를 자기 오답 노트 복습에 썼어요` +
+            ` (맞힌 오답 ${sRow.experience_correct || 0}/${sRow.experience_rounds}) — 인공 퍼즐이 아니라 실제 실전 채점지예요!`,
+        });
+      }
     }
     if (data.abilities) renderGym(data.abilities);
     if (data.status && typeof renderStatus === "function") renderStatus(data.status);
+    void loadExperience();
     pollHeartbeat();
   } catch (err) { /* ignore */ }
 }
@@ -2622,7 +2694,7 @@ function setupHeartbeat() {
   setInterval(pollHeartbeat, 5000);
 }
 
-const CURRENT_UI_VERSION = "6.6";
+const CURRENT_UI_VERSION = "6.7";
 
 async function init() {
   setupGraphSimulation();
@@ -2652,6 +2724,17 @@ async function init() {
 
   const sortieBtn = document.getElementById("btnFieldSortie");
   if (sortieBtn) {
+    const expBtn = document.getElementById("btnExpRefresh");
+    if (expBtn) {
+      expBtn.addEventListener("click", async () => {
+        expBtn.disabled = true;
+        await loadExperience();
+        expBtn.disabled = false;
+        showEvoToast({ kind: "field", beat: "📓", diary: "오답 노트를 다시 불러왔어요 — 근육이 실제로 한 일의 성적표예요!" });
+      });
+    }
+    void loadExperience();
+
     sortieBtn.addEventListener("click", async () => {
       sortieBtn.disabled = true;
       const label = sortieBtn.textContent;
@@ -2661,6 +2744,7 @@ async function init() {
         const res = await apiPost("api/evo/field/sortie", {});
         if (res.field) renderField(res.field);
         if (res.status) renderStatus(res.status);
+        void loadExperience();
         if (res.sortie) {
           showEvoToast({ kind: "field", beat: "⚔️", diary: res.sortie.diary || res.sortie.effect || "" });
           pollHeartbeat();

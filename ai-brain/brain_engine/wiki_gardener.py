@@ -544,17 +544,13 @@ class WikiGardener:
         thr = 0.0
         org_view: Dict[str, Dict[str, Any]] = {}
         if field:
-            from brain_engine.core_ability_engine import field_org_sub, field_org_threshold
+            from brain_engine.core_ability_engine import field_org_threshold, real_org_note_view
 
             thr = field_org_threshold(field)
             for n in notes:
-                toks = sorted(kw_map[n["slug"]])
-                org_view[n["slug"]] = {
-                    "title": n["title"],
-                    "tokens": toks,
-                    "cat": n["category"],
-                    "sub": field_org_sub(n["category"], toks),
-                }
+                # Same translation the experience lesson uses, so revision
+                # actually transfers to the weaving the muscle does here.
+                org_view[n["slug"]] = real_org_note_view(n["title"], n["category"], sorted(kw_map[n["slug"]]))
 
         added_pairs = 0
         muscle_pairs = 0
@@ -592,6 +588,43 @@ class WikiGardener:
         self.rebuild_index()
         out: Dict[str, Any] = {"added_pairs": added_pairs, "total_notes": len(notes)}
         if field:
+            # 📓 Stage I: grade the muscle on the REAL vault — cluster these very
+            # notes and compare against each note's own inferred category.
+            try:
+                from brain_engine.core_ability_engine import build_real_org_problem, grade_real_org_problem
+
+                real_notes = [
+                    {
+                        "title": n["title"],
+                        "category": n["category"],
+                        "tags": n["tags"],
+                        "keywords": sorted(kw_map[n["slug"]])[:8],
+                    }
+                    for n in notes
+                ]
+                prob = build_real_org_problem(real_notes)
+                if prob:
+                    grade = grade_real_org_problem(field, prob)
+                    out["experience_case"] = {
+                        "ok": grade["ok"],
+                        "site": "wiki_weave",
+                        "key": "weave:vault",
+                        "note": (
+                            f"실제 위키 {len(prob['notes'])}장 묶기 — 과잉병합 {grade['over']}쌍 / "
+                            f"누락 {grade['under']}쌍 → 묶음 {grade['clusters']}개 (품질 {grade['quality_pct']}%)"
+                        ),
+                        "prob": prob,
+                        "metric": {
+                            "over": grade["over"],
+                            "under": grade["under"],
+                            "clusters": grade["clusters"],
+                            "notes": len(prob["notes"]),
+                            "total_pairs": grade["total_pairs"],
+                            "quality_pct": grade["quality_pct"],
+                        },
+                    }
+            except Exception:
+                pass
             out["field"] = {
                 "ability": "organizing",
                 "level": int(field.get("level", 1)),

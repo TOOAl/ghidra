@@ -206,7 +206,9 @@ def _reasoning_components(facts: List[Tuple[str, str]]) -> Dict[str, int]:
 
 
 def _solve_reasoning(prob: Dict[str, Any], w: Dict[str, float], tier: int) -> Tuple[Any, str]:
-    facts = prob["facts"]
+    # Stored experiences come back from JSON as lists of lists; `set(facts)` below
+    # needs hashable pairs, so normalise once at the door.
+    facts = [tuple(f) for f in prob["facts"]]
     a, b = prob["question"]
     hops = prob["hops"]
     strategies = {
@@ -373,6 +375,25 @@ def _context_features(sentence: str, question_subj: str, tier: int, link_obj: Op
 
 
 def _solve_context(prob: Dict[str, Any], w: Dict[str, float], tier: int) -> Tuple[bool, str]:
+    if prob.get("real_mode"):
+        # 📓 Stage I: a REAL recall problem — the 6 features were frozen when the
+        # chat actually happened, so the same weights are exercised on real text.
+        feats = prob.get("features") or []
+        best, best_score = None, -1e18
+        for i, sent in enumerate(prob.get("sentences") or []):
+            f = feats[i] if i < len(feats) else [0.0] * 6
+            score = (
+                w.get("w_subj", 0.5) * f[0]
+                + w.get("w_verb", 0.5) * f[1]
+                + w.get("w_neg", 0.6) * f[2]
+                + w.get("w_assert", -0.3) * f[3]
+                + (w.get("w_owner", 0.0) * f[4] if tier >= 1 and len(f) > 4 else 0.0)
+                + (w.get("w_link", 0.0) * f[5] if tier >= 2 and len(f) > 5 else 0.0)
+            )
+            if score > best_score:
+                best, best_score = sent, score
+        return best == prob.get("answer_sentence"), best or ""
+
     subj = prob["question"].split("이(가)")[0]
     link_obj = None
     if prob.get("alias_mode") and tier >= 2:
@@ -404,6 +425,25 @@ def _solve_context(prob: Dict[str, Any], w: Dict[str, float], tier: int) -> Tupl
 def _update_context(w: Dict[str, float], prob: Dict[str, Any], chosen: str, ok: bool, tier: int) -> None:
     if ok:
         return
+    keys = ["w_subj", "w_verb", "w_neg", "w_assert"] + (["w_owner"] if tier >= 1 else []) + (["w_link"] if tier >= 2 else [])
+    if prob.get("real_mode"):
+        # Same perceptron rule as the gym, applied to the frozen REAL features:
+        # move toward the note that truly grounded the answer, away from the one
+        # the muscle actually picked.
+        sents = prob.get("sentences") or []
+        feats = prob.get("features") or []
+        gi = sents.index(prob.get("answer_sentence")) if prob.get("answer_sentence") in sents else -1
+        bi = sents.index(chosen) if chosen in sents else -1
+        if gi < 0:
+            return
+        lr_real = 0.3
+        f_good = feats[gi] if gi < len(feats) else [0.0] * len(keys)
+        f_bad = feats[bi] if 0 <= bi < len(feats) else [0.0] * len(keys)
+        for i, key in enumerate(keys):
+            if i < len(f_good) and i < len(f_bad):
+                w[key] = w.get(key, 0.0) + lr_real * (f_good[i] - f_bad[i])
+        return
+
     subj = prob["question"].split("이(가)")[0]
     link_obj = None
     if prob.get("alias_mode") and tier >= 2:
@@ -546,11 +586,21 @@ def _gen_organizing(rng: random.Random, n_notes: int, knob: Dict[str, Any]) -> D
     return {"notes": notes, "truth": truth}
 
 
-def _org_sim(ni: Dict[str, Any], nj: Dict[str, Any], w: Dict[str, Any], tier: int) -> float:
+def _org_sim(
+    ni: Dict[str, Any], nj: Dict[str, Any], w: Dict[str, Any], tier: int, real: bool = False
+) -> float:
     t_i = set(ni["title"].split())
     t_j = set(nj["title"].split())
     title_ov = len(t_i & t_j) / max(1, len(t_i | t_j))
-    tag_ov = len(set(ni["tokens"]) & set(nj["tokens"])) / 2.0
+    shared = set(ni["tokens"]) & set(nj["tokens"])
+    if real:
+        # Jaccard: real notes carry 4-8 tags, and the gym's "/2.0" (tuned for
+        # 2-tag puzzles) would score a SINGLE shared tag as 0.5 = near max,
+        # gluing unrelated notes together no matter what the muscle learns.
+        union = set(ni["tokens"]) | set(nj["tokens"])
+        tag_ov = len(shared) / len(union) if union else 0.0
+    else:
+        tag_ov = len(shared) / 2.0
     cat_i = ni["cat"] if ni["cat"] in ni["title"] else ""
     cat_j = nj["cat"] if nj["cat"] in nj["title"] else ""
     cat_mt = 1.0 if (cat_i and cat_i == cat_j) else 0.0
@@ -580,7 +630,7 @@ def _org_clusters(prob: Dict[str, Any], w: Dict[str, Any], tier: int) -> Tuple[L
 
     for i in range(n):
         for j in range(i + 1, n):
-            if _org_sim(notes[i], notes[j], w, tier) > w.get("thr", 0.55):
+            if _org_sim(notes[i], notes[j], w, tier, bool(prob.get("real_mode"))) > w.get("thr", 0.55):
                 parent[find(i)] = find(j)
     ok = all((find(i) == find(j)) == (prob["truth"][i] == prob["truth"][j]) for i in range(n) for j in range(i + 1, n))
     return parent, ok
@@ -619,6 +669,30 @@ def _update_organizing(w: Dict[str, Any], prob: Dict[str, Any], chosen: str, ok:
                 n_over += 1
             elif same_truth and not same_cl:
                 n_under += 1
+    total_pairs = len(notes) * (len(notes) - 1) // 2
+    if prob.get("real_mode") and total_pairs:
+        # Damped proportional control for REAL vaults.  The gym's fixed 0.075
+        # step is tuned for a 6-12 note puzzle; on a 20-note vault (190 pairs)
+        # one step flips 21 missing links into 8 wrong merges, so the shelf
+        # threshold oscillates forever instead of settling.  Scale the step by
+        # the measured confusion and freeze it when over/under balance out.
+        need_merge = (n_under - n_over) / float(total_pairs)   # >0 = merge more
+        step = max(-lr * 0.3, min(lr * 0.3, 0.45 * need_merge))
+        w["thr"] = round(max(0.12, min(1.15, float(w.get("thr", 0.55)) - step)), 4)
+        over_rate = n_over / float(total_pairs)
+        under_rate = n_under / float(total_pairs)
+        # Independent valves: the old code braked w_tag ONLY when over >= under,
+        # so a vault that both over- and under-merges could never shed its wrong
+        # links (8 stubborn over-merges survived every round).
+        if over_rate:
+            w["w_tag"] = max(-0.4, w.get("w_tag", 0.3) - lr * 0.5 * min(1.0, over_rate * 8.0))
+        if under_rate:
+            w["w_cat"] = min(1.2, w.get("w_cat", -0.2) + lr * min(1.0, under_rate * 8.0))
+            w["w_title"] = min(1.6, w.get("w_title", 0.8) + lr * 0.3 * min(1.0, under_rate * 8.0))
+        if tier >= 1 and under_rate > over_rate:
+            w["w_sub"] = min(1.5, w.get("w_sub", 0.0) + lr * 0.6)
+        return
+
     if n_over >= n_under:  # drawers overflowing: raise the shelf threshold & trust titles
         w["thr"] = min(1.15, w.get("thr", 0.55) + lr * 0.3)
         w["w_tag"] = w.get("w_tag", 0.3) - lr * 0.5
@@ -716,39 +790,129 @@ def field_context_limit(field: Dict[str, Any]) -> int:
     return max(2, min(6, 2 + int(field.get("level", 1)) // 6))
 
 
-def field_context_rerank(field: Dict[str, Any], notes: List[Dict[str, Any]], query_terms: List[str]) -> List[float]:
-    """Score REAL wiki notes with the context muscle's LEARNED weights.
+def field_context_features(field: Dict[str, Any], notes: List[Dict[str, Any]], query_terms: List[str]) -> List[List[float]]:
+    """The 6 REAL-document features per note, in `_context_features` order.
 
-    Feature order matches `_context_features`: [subj, verb, neg, assert, owner, link].
+    [subj, verb, neg, assert, owner, link] — the same six concepts the gym
+    trains, mapped onto wiki notes (see FIELD_SITES for the mapping).  Exposed
+    separately so a real recall can be stored as a re-studyable problem.
     """
-    w = field.get("weights") or {}
     tier = int(field.get("tier", 0))
-    subj = (query_terms[0] if query_terms else "") or ""
-    scores: List[float] = []
+    subj = ((query_terms[0] if query_terms else "") or "").lower()
+    feats: List[List[float]] = []
     for n in notes:
-        title = str(n.get("title", ""))
-        tl = title.lower()
+        tl = str(n.get("title", "")).lower()
         body = f"{n.get('summary', '')} {n.get('body', '')}".lower()
         cat = str(n.get("category", "")).lower()
         tags = " ".join(str(t) for t in (n.get("tags") or [])).lower()
-        f_subj = 1.0 if (subj and subj.lower() in tl) else 0.0
-        f_verb = 1.0 if any(t and t.lower() in body for t in query_terms) else 0.0
+        f_subj = 1.0 if (subj and subj in tl) else 0.0
+        f_verb = 1.0 if any(t and str(t).lower() in body for t in query_terms) else 0.0
         f_neg = 1.0 if _CTX_NEG_RE.search(body) else 0.0
         f_assert = 1.0 if (_CTX_ASSERT_RE.search(body) and f_neg == 0.0) else 0.0
-        f_owner = 1.0 if (subj and (subj.lower() in cat or subj.lower() in tags)) else 0.0
+        f_owner = 1.0 if (subj and (subj in cat or subj in tags)) else 0.0
         f_link = 1.0 if n.get("links") else 0.0
-        sc = (
-            float(w.get("w_subj", 0.5)) * f_subj
-            + float(w.get("w_verb", 0.5)) * f_verb
-            + float(w.get("w_neg", 0.6)) * f_neg
-            + float(w.get("w_assert", -0.3)) * f_assert
-        )
+        f = [f_subj, f_verb, f_neg, f_assert]
         if tier >= 1:
-            sc += float(w.get("w_owner", 0.0)) * f_owner
+            f.append(f_owner)
         if tier >= 2:
-            sc += float(w.get("w_link", 0.0)) * f_link
+            f.append(f_link)
+        feats.append(f)
+    return feats
+
+
+def field_context_rerank(field: Dict[str, Any], notes: List[Dict[str, Any]], query_terms: List[str]) -> List[float]:
+    """Score REAL wiki notes with the context muscle's LEARNED weights."""
+    w = field.get("weights") or {}
+    tier = int(field.get("tier", 0))
+    feats = field_context_features(field, notes, query_terms)
+    scores: List[float] = []
+    for f in feats:
+        sc = (
+            float(w.get("w_subj", 0.5)) * f[0]
+            + float(w.get("w_verb", 0.5)) * f[1]
+            + float(w.get("w_neg", 0.6)) * f[2]
+            + float(w.get("w_assert", -0.3)) * f[3]
+        )
+        if tier >= 1 and len(f) > 4:
+            sc += float(w.get("w_owner", 0.0)) * f[4]
+        if tier >= 2 and len(f) > 5:
+            sc += float(w.get("w_link", 0.0)) * f[5]
         scores.append(round(sc, 4))
     return scores
+
+
+def context_experience_case(
+    field: Dict[str, Any], query: str, recall_bundle: Dict[str, Any], audit: Dict[str, Any]
+) -> Optional[Dict[str, Any]]:
+    """📓 Stage I: the hallucination audit IS the context muscle's report card.
+
+    safe    -> the note it ranked first truly grounded the answer   (ok)
+    caution -> another recalled note carried more matched evidence, so THAT note
+               becomes the answer the muscle must learn to pick      (mistake)
+    high    -> the vault holds no evidence at all; that is not the muscle's
+               fault, so no lesson is written (honest bookkeeping)
+    """
+    grade = str(audit.get("grade") or "")
+    recalled = recall_bundle.get("recalled") or []
+    if grade not in ("safe", "caution") or len(recalled) < 2:
+        return None
+    q_terms = recall_bundle.get("query_terms") or []
+    matched = [str(t).lower() for t in (audit.get("matched_terms") or [])]
+
+    def evidence_count(n: Dict[str, Any]) -> int:
+        hay = f"{n.get('title', '')} {' '.join(n.get('tags') or [])} {n.get('summary', '')}".lower()
+        return sum(1 for t in matched if t and t in hay)
+
+    best_idx = max(range(len(recalled)), key=lambda i: (evidence_count(recalled[i]), -i))
+    ok = grade == "safe" or best_idx == 0
+    answer_idx = 0 if ok else best_idx
+    prob = build_real_context_problem(field, query, recalled, q_terms, answer_idx, 0)
+    if not prob:
+        return None
+    return {
+        "ok": ok,
+        "site": "wiki_recall",
+        "note": (
+            f"실제 채팅 「{query[:20]}」 — 환각 감사 {grade} (위험 {audit.get('risk_pct')}%) · "
+            f"근육이 고른 1순위 기억이 "
+            + ("실제로 근거가 됐어요" if ok else f"근거 최다 기억(#{best_idx + 1}번)이 아니었어요")
+        ),
+        "prob": prob,
+        "metric": {"grade": grade, "risk_pct": audit.get("risk_pct"), "answer_index": answer_idx},
+    }
+
+
+def build_real_context_problem(
+    field: Dict[str, Any],
+    query: str,
+    notes: List[Dict[str, Any]],
+    query_terms: List[str],
+    answer_index: int,
+    chosen_index: int,
+) -> Optional[Dict[str, Any]]:
+    """Turn one REAL chat recall into a re-studyable context problem.
+
+    The six features are frozen at capture time, so re-studying never depends on
+    the vault still holding those notes.
+    """
+    if not notes or answer_index < 0 or answer_index >= len(notes):
+        return None
+    feats = field_context_features(field, notes, query_terms)
+    pad = len(feats[0])
+    for f in feats:
+        while len(f) < pad:
+            f.append(0.0)
+    sentences = [str(n.get("summary") or n.get("title") or "") for n in notes]
+    return {
+        "question": query,
+        "sentences": sentences,
+        "answer_sentence": sentences[answer_index],
+        "features": feats,
+        "distractors": max(0, len(notes) - 1),
+        "alias_mode": False,
+        "real_mode": True,
+        "chosen_sentence": sentences[chosen_index] if 0 <= chosen_index < len(sentences) else "",
+    }
 
 
 def field_org_threshold(field: Dict[str, Any]) -> float:
@@ -769,9 +933,119 @@ def field_org_sub(category: str, tokens: List[str]) -> str:
     return best
 
 
+def _real_cat_alias(category: str, title: str) -> str:
+    """Pick the part of a compound category that ACTUALLY appears in the title.
+
+    The gym's evidence test is `cat in title`, and real categories are compound
+    ("Ghidra·역공학").  Without this alias the test is always false on real
+    notes, so the w_cat weight the muscle learned would be silently dead.
+    """
+    for part in re.split(r"[·/,|\s]+", str(category)):
+        part = part.strip()
+        if len(part) >= 2 and part in title:
+            return part
+    return str(category)
+
+
+def _real_doc_kind(title: str) -> str:
+    """The document kind = the head of the title before the first em dash.
+
+    Real vault titles look like "역공학 해부 도감 — 🎚️ 데드존 양자화기", so the
+    head is a genuine sub-topic the muscle can learn to group by.
+    """
+    head = re.split(r"[—–]", str(title))[0].strip()
+    return head[:28] if head else ""
+
+
+def real_org_note_view(title: str, category: str, tokens: List[str]) -> Dict[str, Any]:
+    """Translate ONE real note into the gym's note shape.
+
+    Single source of truth on purpose: the experience lesson and the muscle's
+    real act (gardener weaving) must see the SAME translation, otherwise what
+    it learns in revision never transfers to what it does in the field.
+    """
+    toks = sorted({str(t).lower() for t in tokens if t})[:8]
+    cat = str(category)
+    return {
+        "title": str(title),
+        "cat": _real_cat_alias(cat, str(title)),
+        "sub": _real_doc_kind(str(title)) or field_org_sub(cat, toks),
+        "tokens": toks,
+    }
+
+
+def build_real_org_problem(notes: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Turn the REAL wiki vault into a clustering problem the gym can solve.
+
+    `notes`: [{"title","category","tags","keywords"}].  Ground truth is each
+    note's own inferred category plus its document kind, so the muscle must
+    group real memories from title/tag evidence alone — no hidden fields.
+    """
+    usable = [n for n in notes if n.get("title") and n.get("category")]
+    if len(usable) < 6:
+        return None
+    cats = sorted({str(n["category"]) for n in usable})
+    if len(cats) < 2:
+        return None
+    cat_idx = {c: i for i, c in enumerate(cats)}
+    org_notes: List[Dict[str, Any]] = []
+    truth: List[Tuple[int, str]] = []
+    for n in usable[:24]:
+        cat = str(n["category"])
+        view = real_org_note_view(
+            n["title"], cat, list(n.get("tags") or []) + list(n.get("keywords") or [])
+        )
+        org_notes.append(view)
+        truth.append((cat_idx[cat], view["sub"]))
+    return {"notes": org_notes, "truth": truth, "real_mode": True, "categories": cats}
+
+
 def field_org_pair_sim(field: Dict[str, Any], ni: Dict[str, Any], nj: Dict[str, Any]) -> float:
     """Reuse the gym's own `_org_sim` on two REAL notes (same math, no fake path)."""
-    return _org_sim(ni, nj, field.get("weights") or {}, int(field.get("tier", 0)))
+    return _org_sim(ni, nj, field.get("weights") or {}, int(field.get("tier", 0)), real=True)
+
+
+def grade_real_org_problem(field: Dict[str, Any], prob: Dict[str, Any]) -> Dict[str, Any]:
+    """Solve a REAL vault clustering problem with the muscle's current weights.
+
+    Returns an honest over-merge / under-merge count so the experience ledger
+    records WHY the decision was wrong, not just that it was.
+    """
+    w = field.get("weights") or {}
+    tier = int(field.get("tier", 0))
+    ok, _ = _solve_organizing(prob, w, tier)
+    parent, _ = _org_clusters(prob, w, tier)
+
+    def find(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    notes, truth = prob["notes"], prob["truth"]
+    n_over = n_under = 0
+    for i in range(len(notes)):
+        for j in range(i + 1, len(notes)):
+            same_truth = truth[i] == truth[j]
+            same_cl = find(i) == find(j)
+            if same_cl and not same_truth:
+                n_over += 1
+            elif same_truth and not same_cl:
+                n_under += 1
+    clusters = len({find(i) for i in range(len(notes))})
+    total_pairs = len(notes) * (len(notes) - 1) // 2
+    # `ok` stays strict (a perfect partition) because that strictness is what
+    # drives learning, but a 190-pair vault hides real progress behind it — so
+    # report the continuous quality too.
+    quality = round(100.0 * (1.0 - (n_over + n_under) / total_pairs), 1) if total_pairs else 100.0
+    return {
+        "ok": ok,
+        "over": n_over,
+        "under": n_under,
+        "clusters": clusters,
+        "total_pairs": total_pairs,
+        "quality_pct": quality,
+    }
 
 
 def field_coding_suspects(field: Dict[str, Any], code: str) -> Dict[str, Any]:
@@ -881,14 +1155,31 @@ class CoreAbilityEngine:
         difficulty = _difficulty_for(ability, level_before)
         rng = random.Random(seed if seed is not None else int(time.time() * 1000) % (2**31))
 
+        # 📓 Stage I: part of every session re-studies the brain's OWN real
+        # field records — mistakes first, because they are why the ledger exists.
+        pool_size = len(self.state.get("experiences", {}).get(ability) or [])
+        want = max(1, rounds // 3)
+        if pool_size:
+            # Real field lessons come first; invented puzzles only fill what is
+            # left.  More distinct lessons -> more of the session is real.
+            want = max(want, min(rounds - 1, pool_size * 3))
+        exp_probs = self.experience_curriculum(ability, rng, want=want)
+        exp_used = 0
+        exp_correct = 0
         correct = 0
         example_q = ""
         for i in range(rounds):
             d = difficulty + 1 if (ability == "reasoning" and i % 2 == 1) else difficulty
-            prob = _GENERATORS[ability](rng, d, knob)
+            if i < len(exp_probs):
+                prob = exp_probs[i]
+                exp_used += 1
+            else:
+                prob = _GENERATORS[ability](rng, d, knob)
             ok, chosen = _SOLVERS[ability](prob, ab["weights"], tier)
             if ok:
                 correct += 1
+                if exp_used and i < exp_used:
+                    exp_correct += 1
             # ALWAYS let the updater see the outcome.  Every updater owns an
             # `if ok:` reinforcement branch (reasoning: reward-weighted evidence,
             # coding: 0.2x truth-row strengthening, organizing: drawer tightening,
@@ -915,11 +1206,22 @@ class CoreAbilityEngine:
             "correct": correct,
             "rounds": rounds,
             "exam": f"{exam_correct}/{exam_total}",
+            "experience_rounds": exp_used,
             "level_before": level_before,
             "level_after": int(ab["level"]),
             "tier": tier,
         }
         ab["sessions"] = (ab.get("sessions") or [])[-19:] + [session]
+        if exp_used:
+            st = self.state.setdefault("field_stats", {}).setdefault(
+                ability, {"attempts": 0, "hits": 0, "quality_sum": 0.0, "quality_n": 0, "taught": 0}
+            )
+            st["taught"] = int(st.get("taught", 0)) + exp_used
+            for e in self.state.get("experiences", {}).get(ability) or []:
+                if e.get("prob") in exp_probs[:exp_used]:
+                    e["taught"] = int(e.get("taught", 0)) + 1
+        session["experience_rounds"] = exp_used
+        session["experience_correct"] = exp_correct
         self._save()
 
         capsule = ""
@@ -935,6 +1237,9 @@ class CoreAbilityEngine:
             "rounds": rounds,
             "exam_correct": exam_correct,
             "exam_total": exam_total,
+            "experience_rounds": exp_used,
+            "experience_correct": exp_correct,
+            "experience_available": len(self.state.get("experiences", {}).get(ability) or []),
             "level_before": level_before,
             "level_after": int(ab["level"]),
             "tier": tier,
@@ -1168,12 +1473,14 @@ class CoreAbilityEngine:
                     "next_idea": (TIERS[a][tier + 1]["hypo"] if tier + 1 < len(TIERS[a]) else TIERS[a][tier]["hypo"]),
                     "last_session": sessions[-1] if sessions else None,
                     "sessions": sessions[-6:],
+                    "field_metrics": self.field_metrics(a),
                 }
             )
         return {
             "abilities": out,
             "max_level": max(_tier_cap(a, len(TIERS[a]) - 1) for a in ABILITY_ORDER),
             "field": self.field_report(),
+            "experience": self.experience_report(),
         }
 
     # ------------------------------------------------------------------
@@ -1219,6 +1526,157 @@ class CoreAbilityEngine:
         self._save()
         return rec
 
+    # ------------------------------------------------------------------
+    # Stage I — EXPERIENCE LEDGER 📓 (the brain studies its OWN real mistakes)
+    # ------------------------------------------------------------------
+    # A muscle that only ever solves problems I invented is a puzzle solver,
+    # not an ability.  Every real organ already produces a genuine verdict:
+    #   💻 coding    — audit `top1_hit` (predicted class vs the classes the
+    #                   static diagnosis actually reported)
+    #   📖 context   — `audit_chat_grounding` grade (safe / caution / high risk)
+    #   🗂️ organizing — the wiki graph after weaving (orphan notes, edge count)
+    #   🧠 reasoning  — debate `gain_pts` (did the judges' score rise or regress?)
+    # Each verdict is stored here as a REAL problem, and `train_session` now
+    # spends part of every session re-studying those problems — mistakes first.
+
+    def record_experience(self, ability: str, case: Dict[str, Any]) -> Dict[str, Any]:
+        """Store one real-world outcome as tomorrow's teaching material."""
+        if ability not in ABILITY_ORDER or not case.get("prob"):
+            return {}
+        rec = {
+            "ts": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+            "ok": bool(case.get("ok")),
+            "site": str(case.get("site") or FIELD_SITES[ability]["site"]),
+            "note": str(case.get("note") or ""),
+            "prob": case["prob"],
+            "metric": case.get("metric") or {},
+            "key": str(case.get("key") or ""),
+        }
+        stats = self.state.setdefault("field_stats", {}).setdefault(
+            ability, {"attempts": 0, "hits": 0, "quality_sum": 0.0, "quality_n": 0, "taught": 0}
+        )
+        stats["attempts"] = int(stats["attempts"]) + 1
+        if rec["ok"]:
+            stats["hits"] = int(stats["hits"]) + 1
+        q = (case.get("metric") or {}).get("quality_pct")
+        if q is not None:
+            stats["quality_sum"] = float(stats["quality_sum"]) + float(q)
+            stats["quality_n"] = int(stats["quality_n"]) + 1
+
+        log = self.state.setdefault("experience_log", [])
+        log.append(
+            {
+                "ts": rec["ts"],
+                "ability": ability,
+                "title": ABILITY_META[ability]["title"],
+                "ok": bool(rec["ok"]),
+                "site": str(rec.get("site", "")),
+                "note": str(rec.get("note", "")),
+                "key": str(rec.get("key", "")),
+                "superseded": False,
+            }
+        )
+        del log[:-24]
+
+        exps = self.state.setdefault("experiences", {}).setdefault(ability, [])
+        # A living vault keeps changing, so an old snapshot of the SAME situation
+        # is a stale textbook: one key = one lesson, always the latest verdict.
+        # (Without this, the organizing muscle re-studied contradictory vault
+        # snapshots and its shelf threshold oscillated instead of settling.)
+        if rec["key"]:
+            exps = [e for e in exps if e.get("key") != rec["key"]]
+        exps.append(rec)
+        # Mistakes are the reason this ledger exists, so they outlive successes.
+        mistakes = [e for e in exps if not e["ok"]][-40:]
+        successes = [e for e in exps if e["ok"]][-20:]
+        self.state["experiences"][ability] = mistakes + successes
+        self._save()
+        return rec
+
+    def experience_curriculum(self, ability: str, rng: random.Random, want: int) -> List[Dict[str, Any]]:
+        """Build training problems out of the brain's own real field records."""
+        exps = self.state.get("experiences", {}).get(ability) or []
+        usable = [e for e in exps if e.get("prob")]
+        if not usable or want <= 0:
+            return []
+        mistakes = [e for e in usable if not e["ok"]]
+        successes = [e for e in usable if e["ok"]]
+        rng.shuffle(mistakes)
+        rng.shuffle(successes)
+        n_miss = min(len(mistakes), max(1, (want * 2) // 3))
+        picked = mistakes[:n_miss] + successes[: max(0, want - n_miss)]
+        if not picked:
+            return []
+        out_probs: List[Dict[str, Any]] = []
+        i = 0
+        while len(out_probs) < want:
+            # Repeating a real lesson is how a skill settles; being dragged
+            # between one real lesson and four invented ones is what made the
+            # organizing muscle's threshold oscillate.
+            out_probs.append(picked[i % len(picked)]["prob"])
+            i += 1
+        return out_probs
+
+    def field_metrics(self, ability: str) -> Dict[str, Any]:
+        """The honest ability indicator: how the muscle does in REAL work.
+
+        Reads the cumulative counters, because the ledger itself only keeps the
+        latest lesson per situation (a living vault must not be re-studied from
+        a stale snapshot).
+        """
+        st = (self.state.get("field_stats") or {}).get(ability) or {}
+        attempts = int(st.get("attempts", 0))
+        hits = int(st.get("hits", 0))
+        mistakes = attempts - hits
+        rate = round(100.0 * hits / attempts, 1) if attempts else None
+        taught = int(st.get("taught", 0))
+        ledger = self.state.get("experiences", {}).get(ability) or []
+        if not attempts:
+            verdict = "📓 경험 0건 — 아직 실전 채점지가 없어요 (실제로 일을 시켜주세요!)"
+        elif rate is not None and rate >= 80:
+            verdict = f"🎯 실전 적중률 {rate}% ({hits}/{attempts}) — 오답 노트 {len([e for e in ledger if not e['ok']])}장을 교재로 쓰는 중!"
+        elif rate is not None and rate >= 50:
+            verdict = f"🌱 실전 적중률 {rate}% ({hits}/{attempts}) — 오답 노트를 복습하며 자라는 중!"
+        else:
+            verdict = f"🧗 실전 적중률 {rate}% ({hits}/{attempts}) — 오답 노트가 두껍지만, 그게 바로 교재예요!"
+        out = {
+            "ability": ability,
+            "title": ABILITY_META[ability]["title"],
+            "real_attempts": attempts,
+            "real_hits": hits,
+            "real_mistakes": mistakes,
+            "real_hit_rate_pct": rate,
+            "experience_rounds_taught": taught,
+            "lessons_held": len(ledger),
+            "mistakes_held": len([e for e in ledger if not e["ok"]]),
+            "verdict": verdict,
+        }
+        qn = int(st.get("quality_n", 0))
+        if qn:
+            out["real_quality_pct"] = round(float(st.get("quality_sum", 0.0)) / qn, 1)
+            out["verdict"] += f" · 🧹 실제 정리 품질 {out['real_quality_pct']}%"
+        return out
+
+    def experience_report(self) -> Dict[str, Any]:
+        per = [self.field_metrics(a) for a in ABILITY_ORDER]
+        taught_by_key: Dict[str, int] = {}
+        for a in ABILITY_ORDER:
+            for e in self.state.get("experiences", {}).get(a) or []:
+                taught_by_key[f"{a}|{e.get('key', '')}"] = int(e.get("taught", 0))
+        recent: List[Dict[str, Any]] = []
+        for entry in reversed(list(self.state.get("experience_log") or [])):
+            row = dict(entry)
+            row["taught"] = taught_by_key.get(f"{entry['ability']}|{entry['key']}", 0)
+            recent.append(row)
+        return {
+            "total_experiences": sum(m["real_attempts"] for m in per),
+            "total_mistakes": sum(m["real_mistakes"] for m in per),
+            "lessons_held": sum(m["lessons_held"] for m in per),
+            "mistakes_held": sum(m["mistakes_held"] for m in per),
+            "per_muscle": per,
+            "recent": recent[:14],
+        }
+
     def field_report(self) -> Dict[str, Any]:
         deps = list(self.state.get("deployments") or [])
         counts = self.state.get("field_counts") or {}
@@ -1238,6 +1696,7 @@ class CoreAbilityEngine:
                     "tier": tier,
                     "cap": _tier_cap(a, tier),
                     "deployments": int(counts.get(a, 0)),
+                    "metrics": self.field_metrics(a),
                     "last_effect": next(
                         (d["effect"] for d in reversed(deps) if d["ability"] == a),
                         "아직 실전 투입 전 — 체육관에서 훈련 중이에요!",

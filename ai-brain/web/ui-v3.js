@@ -914,6 +914,28 @@ async function openNoteBySlug(slug) {
   bodyEl.querySelectorAll(".wiki-link-chip").forEach((chip) => {
     chip.addEventListener("click", () => openNoteBySlug(chip.dataset.link));
   });
+
+  // 💡 Stage K: what this memory MEANS next to — the neighbours the meaning space
+  // offers even where no [[link]] exists, with the words that carry each bridge.
+  const semEl = document.getElementById("viewerSemantic");
+  if (semEl) {
+    const nb = res.semantic_neighbors || [];
+    semEl.innerHTML = nb.length
+      ? `<div class="vs-head">💡 뜻이 가까운 기억 — 링크가 없어도 의미가 이어진 노트예요</div>` +
+        nb.map((r) => `
+        <div class="vs-row" data-slug="${escapeHeartHtml(r.slug || "")}">
+          <span class="vs-cos">cos ${r.cos}</span>
+          <span class="vs-title">${escapeHeartHtml(r.title || "")}</span>
+          <span class="vs-leg">${(r.bridges || []).map((b) => `${escapeHeartHtml(b.query_word)}↔${escapeHeartHtml(b.note_word)}(${b.similarity})`).join(" · ") || ""}</span>
+        </div>`).join("")
+      : "";
+    semEl.querySelectorAll(".vs-row").forEach((el) => {
+      el.addEventListener("click", () => {
+        const s = el.dataset.slug;
+        if (s) openNoteBySlug(s);
+      });
+    });
+  }
 }
 
 function syncGraphData(graph) {
@@ -2568,9 +2590,14 @@ async function loadExperience() {
 function renderSemantic(data) {
   const line = document.getElementById("semStatusLine");
   const facts = document.getElementById("semFacts");
+  const gapsEl = document.getElementById("semGaps");
   if (!facts) return;
   const eng = data.engine || {};
   const trust = data.trust_w_sem;
+  // 💡 Stage K: meaning now has TWO muscles trusting it — recall (context) and
+  // the synapse weaver (organizing).  Both numbers are learned, so both are shown.
+  const org = data.organizing || {};
+  const orgTrust = org.trust_w_sem === null || org.trust_w_sem === undefined ? "—" : String(org.trust_w_sem);
   const covNote = eng.trained
     ? ""
     : " · 아직 훈련 전 (기억을 불러오면 저절로 훈련돼요)";
@@ -2578,7 +2605,7 @@ function renderSemantic(data) {
     line.textContent = eng.trained
       ? `💡 내 위키 ${eng.notes}장에서 스스로 배운 의미 공간 — 어휘 ${eng.vocab_size}개, ` +
         `${eng.quant_bits}비트 양자화로 ${eng.cache_kb}KB에 보관 (원본 대비 충실도 ${eng.cosine_fidelity_pct}%) · ` +
-        `문맥 근육의 의미 신뢰도 ${trust}${covNote}`
+        `문맥 근육 신뢰도 ${trust} · 🕸️ 정리 근육 신뢰도 ${orgTrust}${covNote}`
       : `💡 의미 공간이 아직 비어 있어요 — 위키 기억을 불러오면 그 자리에서 스스로 훈련해요${covNote}`;
   }
   const cells = [
@@ -2586,13 +2613,44 @@ function renderSemantic(data) {
     ["🔤 아는 단어", `${eng.vocab_size || 0}개`],
     ["🗜️ 양자화", `${eng.quant_bits || 8}비트 · ${eng.cache_kb || 0}KB`],
     ["🎯 충실도", eng.cosine_fidelity_pct === null || eng.cosine_fidelity_pct === undefined ? "—" : `${eng.cosine_fidelity_pct}%`],
-    ["💡 의미 신뢰도", trust === null || trust === undefined ? "—" : String(trust)],
+    ["💡 문맥 근육 신뢰도", trust === null || trust === undefined ? "—" : String(trust)],
+    ["🕸️ 정리 근육 신뢰도", orgTrust],
   ];
   facts.innerHTML = cells.map((c) => `
     <div class="sem-fact">
       <span class="sf-k">${escapeHeartHtml(c[0])}</span>
       <span class="sf-v">${escapeHeartHtml(c[1])}</span>
     </div>`).join("");
+
+  // 🕳️ Stage K — the vault's blind spots.  A brain that cannot answer should say
+  // so BEFORE being asked, and the most useful form of that is pointing at the
+  // memories it holds most loosely: notes whose strongest meaning neighbour is
+  // still weak.  Clicking one opens it, so the gap is one tap from being filled.
+  if (gapsEl) {
+    const gaps = data.gaps || [];
+    if (!eng.trained) {
+      gapsEl.innerHTML = "";
+    } else if (!gaps.length) {
+      gapsEl.innerHTML = `<div class="sem-gaps-none">🕳️ 뜻으로 봐서 외톨이인 노트가 없어요 — ` +
+        `모든 기억이 적어도 하나와는 뜻이 이어져 있어요 (임계 cos ${data.gap_cos_min})</div>`;
+    } else {
+      gapsEl.innerHTML =
+        `<div class="sg-head">🕳️ 지식의 구멍 ${gaps.length}장 — 뜻으로 봐도 누구와도 가까워지지 못한 노트 (임계 cos ${data.gap_cos_min})</div>` +
+        gaps.map((g) => `
+        <div class="sem-gap" data-slug="${escapeHeartHtml(g.slug || "")}">
+          <div class="sg-title">${escapeHeartHtml(g.title || "")}</div>
+          <div class="sg-meta">제일 가까운 이웃과도 cos ${g.best_cos} — ${escapeHeartHtml(g.nearest || "이웃 없음")}</div>
+          <div class="sg-leg">${(g.bridges || []).map((b) => `${escapeHeartHtml(b.query_word)}↔${escapeHeartHtml(b.note_word)}(${b.similarity})`).join(" ") || "다리를 놓을 단어조차 없어요"}</div>
+          <div class="sg-why">이 노트를 이해할 문맥이 아직 서재에 없어요 — 관련 기억을 한 장 더 가르치면 이 구멍은 메워져요.</div>
+        </div>`).join("");
+      gapsEl.querySelectorAll(".sem-gap").forEach((el) => {
+        el.addEventListener("click", () => {
+          const s = el.dataset.slug;
+          if (s) openNoteBySlug(s);
+        });
+      });
+    }
+  }
 }
 
 async function loadSemantic() {
@@ -2833,7 +2891,7 @@ function setupHeartbeat() {
   setInterval(pollHeartbeat, 5000);
 }
 
-const CURRENT_UI_VERSION = "6.8";
+const CURRENT_UI_VERSION = "6.9";
 
 async function init() {
   setupGraphSimulation();

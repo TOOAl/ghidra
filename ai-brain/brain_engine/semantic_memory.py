@@ -515,6 +515,103 @@ class SemanticMemory:
         # that actually carried it, even when they are weak.
         return [{"similarity": round(s, 3), "query_word": q, "note_word": n} for s, q, n in pairs[:top_k]]
 
+    # ------------------------------------------------------------------
+    # Stage K — note ↔ note meaning.  Stage J only ever compared a QUESTION
+    # with a note (recall).  The organizing muscle, the synapse weaver and the
+    # vault's own blind spots all need to compare a NOTE with a NOTE, so the
+    # same self-learned space gets a second door here.  Nothing new is
+    # downloaded or invented: it is the very same vectors, squared.
+    # ------------------------------------------------------------------
+    def pair_similarity(self, a: Dict[str, Any], b: Dict[str, Any]) -> float:
+        """How close two NOTES are in meaning (0..1) — what weaving decides on."""
+        if not self.vectors:
+            return 0.0
+        va, vb = self.note_vector(a), self.note_vector(b)
+        if not va or not vb:
+            return 0.0
+        return max(0.0, round(cosine(va, vb), 4))
+
+    def pair_bridges(self, a: Dict[str, Any], b: Dict[str, Any], top_k: int = 3) -> List[Dict[str, Any]]:
+        """The words that carry a note↔note link, so weaving stays inspectable."""
+        return self.bridges(f"{a.get('title','')} {a.get('summary','')}", b, top_k=top_k)
+
+    def neighbours(self, note: Dict[str, Any], notes: Sequence[Dict[str, Any]], top_k: int = 3) -> List[Dict[str, Any]]:
+        """The notes closest in MEANING to this one, with the words that bridge them.
+
+        Sorted strongest first; empty when the space is untrained, because an
+        untrained guess dressed up as a neighbour would be a lie.
+        """
+        if not self.vectors or not notes:
+            return []
+        v = self.note_vector(note)
+        if not v:
+            return []
+        me = note.get("slug") or note.get("title")
+        out: List[Dict[str, Any]] = []
+        for m in notes:
+            if (m.get("slug") or m.get("title")) == me:
+                continue
+            mv = self.note_vector(m)
+            if not mv:
+                continue
+            c = cosine(v, mv)
+            if c <= 0.02:
+                continue
+            out.append(
+                {
+                    "slug": m.get("slug"),
+                    "title": m.get("title"),
+                    "cos": round(c, 3),
+                    "bridges": self.pair_bridges(note, m, top_k=3),
+                }
+            )
+        out.sort(key=lambda r: -r["cos"])
+        return out[:top_k]
+
+    def orphans(self, notes: Sequence[Dict[str, Any]], cos_min: float = 0.30, top_k: int = 6) -> List[Dict[str, Any]]:
+        """Blind spots: notes whose STRONGEST meaning neighbour is still weak.
+
+        This is the vault asking for help.  A note nobody is close to in meaning
+        is either brand new (nothing else covers that idea yet) or written in
+        words the rest of the vault never uses — in both cases the honest move
+        is to point at it and say "I have no context for this", not to glue it
+        to the nearest thing.  Weakest first, and only up to `top_k`.
+        """
+        if not self.vectors or len(notes) < 2:
+            return []
+        vecs = {}
+        for n in notes:
+            v = self.note_vector(n)
+            if v:
+                vecs[n.get("slug") or n.get("title")] = v
+        out: List[Dict[str, Any]] = []
+        for n in notes:
+            key = n.get("slug") or n.get("title")
+            v = vecs.get(key)
+            if not v:
+                continue
+            best, best_key = 0.0, ""
+            for k2, v2 in vecs.items():
+                if k2 == key:
+                    continue
+                c = cosine(v, v2)
+                if c > best:
+                    best, best_key = c, k2
+            if best < cos_min:
+                nb = next((m for m in notes if (m.get("slug") or m.get("title")) == best_key), None)
+                out.append(
+                    {
+                        "slug": n.get("slug"),
+                        "title": n.get("title"),
+                        "best_cos": round(best, 3),
+                        "nearest": (nb or {}).get("title"),
+                        "nearest_slug": best_key,
+                        "bridges": self.pair_bridges(n, nb, top_k=2) if nb else [],
+                    }
+                )
+        out.sort(key=lambda r: r["best_cos"])
+        return out[:top_k]
+
     def status(self) -> Dict[str, Any]:
         """Always the same keys, trained or not — callers must not have to guess."""
         st = {

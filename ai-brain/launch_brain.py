@@ -37,6 +37,14 @@ from brain_engine.slm_bridge import PortableSLMBridge  # noqa: E402
 from brain_engine.tamagotchi import TamagotchiSoul  # noqa: E402
 from brain_engine.wiki_gardener import WikiGardener  # noqa: E402
 
+# 🕳️ Stage K — a note counts as a BLIND SPOT when even its strongest meaning
+# neighbour sits below this cosine.  0.45 is measured, not chosen: on the real
+# vault pairs inside one drawer average 0.452 (median 0.374) while pairs across
+# drawers average 0.117 (median 0.069), so this is where "related" stops being
+# evidence.  At 0.30 only a true orphan shows up; at 0.45 the vault reports the
+# notes it holds most loosely, which is what a gardener needs to see.
+GAP_COS_MIN = 0.45
+
 
 class BrainState:
     def __init__(self, root: Path) -> None:
@@ -79,7 +87,7 @@ class BrainState:
             rl_trained=rl_trained,
         )
         return {
-            "ui_version": "6.8",
+            "ui_version": "6.9",
             "soul": self.soul.snapshot(graph["stats"], env_grade=env_grade),
             "hallucination": hallucination,
             "host": self.host_info,
@@ -149,10 +157,26 @@ def make_handler(state: BrainState):
                 self._send_json(state.abilities.experience_report())
                 return
             if route == "/api/semantic":
-                from brain_engine.core_ability_engine import field_context_semantic_trust
+                from brain_engine.core_ability_engine import (
+                    field_context_semantic_trust,
+                    field_org_semantic_trust,
+                    field_org_threshold,
+                )
 
                 ctx_field = state.abilities.field_profile("context")
+                org_field = state.abilities.field_profile("organizing")
                 engine = state.gardener.semantic.status()
+                notes = state.gardener.list_notes()
+                # 🕳️ Stage K: the vault's blind spots — notes whose STRONGEST
+                # meaning neighbour is still weak.  Only reported once the space
+                # is actually trained; an untrained guess about what the brain
+                # does not know would be worse than silence.
+                gaps = []
+                if engine.get("trained"):
+                    try:
+                        gaps = state.gardener.semantic.orphans(notes, cos_min=GAP_COS_MIN, top_k=8)
+                    except Exception:
+                        gaps = []
                 self._send_json(
                     {
                         "engine": engine,
@@ -162,7 +186,18 @@ def make_handler(state: BrainState):
                             "tier": int(ctx_field.get("tier", 0)),
                         },
                         "metrics": state.abilities.field_metrics("context"),
-                        "notes": len(state.gardener.list_notes()),
+                        # 💡 Stage K: the organizing muscle now trusts meaning too,
+                        # and its trust is learned from real weaving.
+                        "organizing": {
+                            "trust_w_sem": round(field_org_semantic_trust(org_field), 3),
+                            "shelf_threshold": round(field_org_threshold(org_field), 3),
+                            "level": int(org_field.get("level", 1)),
+                            "tier": int(org_field.get("tier", 0)),
+                            "metrics": state.abilities.field_metrics("organizing"),
+                        },
+                        "notes": len(notes),
+                        "gaps": gaps,
+                        "gap_cos_min": GAP_COS_MIN,
                     }
                 )
                 return
@@ -172,9 +207,19 @@ def make_handler(state: BrainState):
             if route == "/api/note":
                 qs = parse_qs(parsed.query)
                 slug = (qs.get("slug") or [""])[0]
-                for note in state.gardener.list_notes():
+                all_notes = state.gardener.list_notes()
+                for note in all_notes:
                     if note["slug"] == slug:
-                        self._send_json({"note": note})
+                        # 💡 Stage K: what this memory MEANS next to, with the
+                        # words that bridge them — so a reader can follow the
+                        # train of thought instead of only the [[links]].
+                        neighbours = []
+                        try:
+                            if state.gardener.semantic.status().get("trained"):
+                                neighbours = state.gardener.semantic.neighbours(note, all_notes, top_k=4)
+                        except Exception:
+                            neighbours = []
+                        self._send_json({"note": note, "semantic_neighbors": neighbours})
                         return
                 self._send_json({"error": "Note not found"}, status=404)
                 return
@@ -574,24 +619,41 @@ def make_handler(state: BrainState):
                     res = state.gardener.weave_missing_synapses(field=o_field)
                     added = res["added_pairs"]
                     of = res.get("field") or {}
+                    # 💡 Stage K: the manual remedy must report the SAME evidence
+                    # the heartbeat sortie does, or the two paths tell the master
+                    # different stories about one and the same act.
+                    sem_added = int(res.get("semantic_pairs") or 0)
+                    gap_count = int(res.get("gap_count") or 0)
+                    sem_trust = res.get("sem_trust")
                     if res.get("experience_case"):
                         state.abilities.record_experience("organizing", res["experience_case"])
                     state.abilities.log_deployment(
                         "organizing",
                         f"🕸️ 위키 시냅스 엮기 — 노트 {res['total_notes']}장 중 {of.get('pairs_examined')}쌍을 "
-                        f"학습 임계값 {of.get('threshold')} 로 심사해 {added}쌍 엮음",
+                        f"학습 임계값 {of.get('threshold')} 로 심사해 {added}쌍 엮음"
+                        + (f" · 💡 그중 {sem_added}쌍은 뜻으로 이음 (의미 신뢰도 {sem_trust})" if sem_added else "")
+                        + (f" · 🕳️ 외톨이 노트 {gap_count}장" if gap_count else ""),
                         {
                             "threshold": of.get("threshold"),
                             "pairs_examined": of.get("pairs_examined"),
                             "pairs_approved": of.get("pairs_approved"),
                             "total_notes": res["total_notes"],
+                            "semantic_pairs": sem_added,
+                            "sem_trust": sem_trust,
+                            "gap_count": gap_count,
                         },
                     )
-                    msg = (
-                        f"시냅스 그물망을 점검해 새로운 교차검증 고리 {added}쌍을 엮었어요!"
-                        if added > 0
-                        else "모든 노트의 시냅스 교차검증 그물망을 재정비 완료했어요!"
-                    )
+                    if added > 0 and sem_added:
+                        msg = (
+                            f"시냅스 그물망을 점검해 고리 {added}쌍을 엮었어요 — "
+                            f"그중 {sem_added}쌍은 단어가 아니라 뜻이 통해서 이어졌어요!"
+                        )
+                        if gap_count:
+                            msg += f" 뜻으로 봐도 외톨이인 노트 {gap_count}장은 제 지식의 구멍이에요."
+                    elif added > 0:
+                        msg = f"시냅스 그물망을 점검해 새로운 교차검증 고리 {added}쌍을 엮었어요!"
+                    else:
+                        msg = "모든 노트의 시냅스 교차검증 그물망을 재정비 완료했어요!"
                     state.soul.on_remedy(msg)
                     self._send_json({"remedy": res, "message": msg, "status": state.full_status()})
                     return

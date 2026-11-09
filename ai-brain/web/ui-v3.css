@@ -3660,3 +3660,36 @@ code {
 
 .recall-pick:hover { background: rgba(22, 101, 52, 0.6); }
 .recall-pick:disabled { opacity: 0.65; cursor: default; }
+
+/* 💡 Stage K — blind spots of the vault, and the neighbours meaning offers */
+.sem-gaps { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.sem-gaps-none {
+  font-size: 11.5px; padding: 6px 9px; border-radius: 8px; opacity: .78;
+  border: 1px dashed rgba(150, 190, 225, .28);
+}
+.sg-head { font-size: 12px; font-weight: 700; color: #ffd9a0; }
+.sem-gap {
+  padding: 7px 9px; border-radius: 9px; cursor: pointer;
+  background: rgba(255, 190, 120, .07);
+  border: 1px solid rgba(255, 190, 120, .28);
+  transition: background .15s ease;
+}
+.sem-gap:hover { background: rgba(255, 190, 120, .14); }
+.sg-title { font-size: 12.5px; font-weight: 700; }
+.sg-meta { font-size: 11px; opacity: .85; margin-top: 2px; }
+.sg-leg { font-size: 10.5px; opacity: .7; margin-top: 2px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.sg-why { font-size: 10.5px; opacity: .62; margin-top: 3px; }
+.viewer-semantic { margin: 8px 0 10px; display: flex; flex-direction: column; gap: 5px; }
+.viewer-semantic:empty { display: none; }
+.vs-head { font-size: 11.5px; font-weight: 700; color: #a8e6ff; }
+.vs-row {
+  display: flex; gap: 8px; align-items: baseline; padding: 5px 8px;
+  border-radius: 8px; cursor: pointer;
+  background: rgba(120, 200, 255, .07);
+  border: 1px solid rgba(120, 200, 255, .2);
+  transition: background .15s ease;
+}
+.vs-row:hover { background: rgba(120, 200, 255, .15); }
+.vs-cos { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px; opacity: .8; min-width: 56px; }
+.vs-title { font-size: 12px; font-weight: 600; }
+.vs-leg { font-size: 10.5px; opacity: .62; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }

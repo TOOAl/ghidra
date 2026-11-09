@@ -653,22 +653,52 @@ class EvolutionHeartbeat:
             field = self.ability.field_profile(ability)
             res = self.gardener.weave_missing_synapses(field=field)
             f = res.get("field") or {}
+            # 💡 Stage K: the sortie now reports WHICH evidence did the weaving and
+            # which notes the meaning space cannot connect to anything.  A diary
+            # that only counts approved pairs hides the interesting part.
+            sem_pairs = int(res.get("semantic_pairs") or 0)
+            gap_count = int(res.get("gap_count") or 0)
+            sem_trust = res.get("sem_trust")
             effect = (
                 f"🕸️ 위키 시냅스 엮기 — 노트 {res['total_notes']}장 중 {f.get('pairs_examined')}쌍을 "
                 f"학습 임계값 {f.get('threshold')} 로 심사해 {res['added_pairs']}쌍 엮음"
+                + (
+                    f" · 💡 그중 {sem_pairs}쌍은 뜻으로 이음 (의미 신뢰도 {sem_trust})"
+                    if sem_pairs
+                    else f" · 💡 의미 신뢰도 {sem_trust}"
+                )
+                + (f" · 🕳️ 외톨이 노트 {gap_count}장" if gap_count else "")
             )
             metric = {
                 "threshold": f.get("threshold"),
                 "pairs_examined": f.get("pairs_examined"),
                 "pairs_approved": res["added_pairs"],
                 "total_notes": res["total_notes"],
+                "semantic_pairs": sem_pairs,
+                "sem_trust": sem_trust,
+                "gap_count": gap_count,
             }
             diary = (
                 f"⚔️ 혼자 {field['title']} 근육을 실전에 내보냈어요! 위키 서재 노트 {res['total_notes']}장을 전부 훑어 "
                 f"{f.get('pairs_examined')}쌍을 심사하고, 체육관에서 배운 임계값 {f.get('threshold')} 로 "
                 f"{res['added_pairs']}쌍을 진짜로 엮었어요. 연습 문제가 아니라 제 서재에서 한 일이에요!"
+                + (
+                    f" 그중 {sem_pairs}쌍은 단어가 하나도 안 겹치는데 뜻이 통해서 엮었어요!"
+                    if sem_pairs
+                    else ""
+                )
+                + (
+                    f" 그리고 뜻으로 보면 아직 누구와도 이어지지 않은 외톨이 노트가 {gap_count}장 있어요 — "
+                    f"거기가 제 지식의 구멍이에요."
+                    if gap_count
+                    else ""
+                )
             )
-            detail = f"임계값 {f.get('threshold')} · 심사 {f.get('pairs_examined')}쌍 · 승인 {res['added_pairs']}쌍"
+            detail = (
+                f"임계값 {f.get('threshold')} · 심사 {f.get('pairs_examined')}쌍 · 승인 {res['added_pairs']}쌍"
+                + (f" · 💡 의미로 {sem_pairs}쌍" if sem_pairs else "")
+                + (f" · 🕳️ 외톨이 {gap_count}장" if gap_count else "")
+            )
         elif pick == "recall":
             ability = "context"
             field = self.ability.field_profile(ability)

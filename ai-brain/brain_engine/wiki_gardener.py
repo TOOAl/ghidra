@@ -12,7 +12,7 @@ import sqlite3
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 # 💡 Stage J: the vault's own meaning space.  This module has no project
 # dependencies of its own, so importing it here is cycle-free.
@@ -125,6 +125,18 @@ SEED_NOTES: List[Dict[str, Any]] = [
         "links": ["외장하드 서식형 포터블 다마고치 두뇌 설계", "초소형 언어모델(SLM)과 4비트 양자화 원리"],
     },
 ]
+
+
+def org_lesson_tokens(note: Dict[str, Any], keywords: Iterable[str]) -> List[str]:
+    """The ONE token list both the weaving muscle and its lesson must see.
+
+    ⚠️ Stage K: the weaver passed `(tags ∪ body keywords)[:8]` while the lesson
+    passed `tags + body keywords[:8]`.  Two shelves that look alike are not the
+    same shelf: 4 pairs the lesson scored as correct merged in the field and the
+    muscle could never diagnose why, because the problem it re-studied was not
+    the problem it had just solved.
+    """
+    return list(note.get("tags") or []) + sorted(str(k).lower() for k in keywords if k)[:8]
 
 
 class WikiGardener:
@@ -616,19 +628,38 @@ class WikiGardener:
             kw_map[n["slug"]] = kws
 
         thr = 0.0
+        sem_w = 0.0
         org_view: Dict[str, Dict[str, Any]] = {}
         if field:
-            from brain_engine.core_ability_engine import field_org_threshold, real_org_note_view
+            from brain_engine.core_ability_engine import (
+                field_org_semantic_trust,
+                field_org_threshold,
+                real_org_note_view,
+            )
 
             thr = field_org_threshold(field)
+            # 💡 Stage K: the weaver now sees MEANING, and how much meaning counts
+            # is the muscle's own learned weight — not a new hardcoded rule.
+            sem_w = field_org_semantic_trust(field)
+            self.semantic.ensure_trained(notes)
             for n in notes:
                 # Same translation the experience lesson uses, so revision
                 # actually transfers to the weaving the muscle does here.
-                org_view[n["slug"]] = real_org_note_view(n["title"], n["category"], sorted(kw_map[n["slug"]]))
+                # ⚠️ Stage K: [:8] is part of that translation, not a detail —
+                # the lesson caps tokens at 8 and the weaver used to pass all 16,
+                # so the shelf the muscle was graded on was NOT the shelf it
+                # stood at: 4 pairs the lesson called correct merged in the field
+                # (Ghidra-headless × every skill cartridge) and the muscle could
+                # never see why.
+                org_view[n["slug"]] = real_org_note_view(
+                    n["title"], n["category"], org_lesson_tokens(n, kw_map[n["slug"]])
+                )
 
         added_pairs = 0
         muscle_pairs = 0
         muscle_sims: List[float] = []
+        sem_pairs = 0
+        sem_examples: List[Dict[str, Any]] = []
         for i in range(len(notes)):
             for j in range(i + 1, len(notes)):
                 a, b = notes[i], notes[j]
@@ -641,10 +672,27 @@ class WikiGardener:
                 if field:
                     from brain_engine.core_ability_engine import field_org_pair_sim
 
-                    sim = field_org_pair_sim(field, org_view[a["slug"]], org_view[b["slug"]])
+                    cs = self.semantic.pair_similarity(a, b)
+                    sim = field_org_pair_sim(field, org_view[a["slug"]], org_view[b["slug"]], sem=cs)
                     muscle_pairs += 1
                     if sim > thr:
                         muscle_sims.append(round(sim, 3))
+                    # Which evidence actually did it?  Subtract meaning back out:
+                    # if the pair only crosses the shelf WITH meaning, then two
+                    # memories that share no words were just connected — and the
+                    # user is told which words carried the bridge.
+                    if sim > thr and (sim - sem_w * cs) <= thr:
+                        sem_pairs += 1
+                        if len(sem_examples) < 6:
+                            sem_examples.append(
+                                {
+                                    "a": a["title"],
+                                    "b": b["title"],
+                                    "cos": round(cs, 3),
+                                    "keyword_overlap": overlap,
+                                    "bridges": self.semantic.pair_bridges(a, b, top_k=3),
+                                }
+                            )
                     should_link = sim > thr
                 else:
                     should_link = overlap + same_cat >= 1
@@ -662,6 +710,24 @@ class WikiGardener:
         self.rebuild_index()
         out: Dict[str, Any] = {"added_pairs": added_pairs, "total_notes": len(notes)}
         if field:
+            # 🕳️ Stage K: the vault's blind spots — notes whose strongest meaning
+            # neighbour is still weak.  Pointing at them is how a brain that
+            # cannot answer says so BEFORE it is asked.
+            try:
+                gaps = self.semantic.orphans(notes, cos_min=0.30, top_k=6)
+            except Exception:
+                gaps = []
+            out.update(
+                {
+                    "sem_trust": round(sem_w, 3),
+                    "semantic_pairs": sem_pairs,
+                    "semantic_examples": sem_examples,
+                    "muscle_pairs": muscle_pairs,
+                    "gaps": gaps,
+                    "gap_count": len(gaps),
+                }
+            )
+        if field:
             # 📓 Stage I: grade the muscle on the REAL vault — cluster these very
             # notes and compare against each note's own inferred category.
             try:
@@ -671,12 +737,24 @@ class WikiGardener:
                     {
                         "title": n["title"],
                         "category": n["category"],
-                        "tags": n["tags"],
-                        "keywords": sorted(kw_map[n["slug"]])[:8],
+                        # Tags are passed for TRUTH (the lesson grades which notes
+                        # belong together); keywords stay the shared FEATURE
+                        # translation.  org_lesson_tokens already includes the
+                        # tags, so the token SET the muscle sees is unchanged.
+                        "tags": list(n.get("tags") or []),
+                        "keywords": org_lesson_tokens(n, kw_map[n["slug"]]),
+                        # 💡 Stage K: summary rides along so the frozen meaning
+                        # cosines are built from what the note MEANS, not only
+                        # from its title words.
+                        "summary": n.get("summary", ""),
+                        "slug": n["slug"],
+                        # The vault's own links ride along: they are the second
+                        # opinion `_org_same_truth` refuses to overrule.
+                        "links": list(n.get("links") or []),
                     }
                     for n in notes
                 ]
-                prob = build_real_org_problem(real_notes)
+                prob = build_real_org_problem(real_notes, sem=self.semantic)
                 if prob:
                     grade = grade_real_org_problem(field, prob)
                     out["experience_case"] = {
@@ -686,7 +764,17 @@ class WikiGardener:
                         "note": (
                             f"실제 위키 {len(prob['notes'])}장 묶기 — 과잉병합 {grade['over']}쌍 / "
                             f"누락 {grade['under']}쌍 → 묶음 {grade['clusters']}개 (품질 {grade['quality_pct']}%)"
+                            + (
+                                f" · 💡 의미로 이은 쌍 {sem_pairs}개 (신뢰도 {sem_w})"
+                                f" · 🕳️ 아직 어떤 가중치로도 도달 못 하는 쌍 {grade.get('unreachable', 0)}개"
+                                if field
+                                else ""
+                            )
                         ),
+                        # Only claim the lesson is ABOUT meaning when meaning
+                        # actually decided a link — a label it did not earn would
+                        # teach the master to skim past the ones that did.
+                        **({"kind": "의미"} if sem_pairs else {}),
                         "prob": prob,
                         "metric": {
                             "over": grade["over"],
@@ -695,6 +783,14 @@ class WikiGardener:
                             "notes": len(prob["notes"]),
                             "total_pairs": grade["total_pairs"],
                             "quality_pct": grade["quality_pct"],
+                            # 🕳️ Stage K: how many misses NO weight could reach,
+                            # and the score over the pairs it could.  Without
+                            # this the muscle is graded on gaps that only new
+                            # memories can fill.
+                            "unreachable": grade.get("unreachable", 0),
+                            "reachable_quality_pct": grade.get("reachable_quality_pct", grade["quality_pct"]),
+                            "semantic_pairs": sem_pairs,
+                            "sem_trust": sem_w,
                         },
                     }
             except Exception:

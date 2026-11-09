@@ -51,6 +51,28 @@ SEM_TRUST_MAX = 1.5
 # one known word out of seven must stay honestly unanswerable.)
 SEM_MIN_COVERAGE_PCT = 30.0
 
+# 💡 Stage K — the ORGANIZING muscle gets its own trust in meaning.  Measured on
+# the real 12-note vault before choosing a number: pairs whose keywords do not
+# overlap AT ALL (skill cartridge ↔ XOR-vault autopsy) sit at meaning cosine
+# 0.43 while the muscle's own similarity says 0.05, so keyword Jaccard is
+# structurally blind to them.  Sweeping the weight showed 1.1 recovering 6 of the
+# 17 genuinely linked pairs with ZERO invented links, and 1.4 recovering 11 but
+# inventing 2 — so the newborn starts timid and the cap stays just past the point
+# where invention was still unmeasurable.
+ORG_SEM_PRIOR = 0.35
+ORG_SEM_MAX = 1.2
+# A missed pair counts as "meaning could have fixed this" only when the two notes
+# are at least this close in meaning.  Measured on the real vault: pairs in the
+# same drawer average cos 0.452 (median 0.374) while pairs in different drawers
+# average 0.117 (median 0.069), so 0.30 sits on the observed dividing line.
+ORG_SEM_HOPE = 0.30
+# How far below the shelf a keyword score may sit and still count as "one nudge
+# away".  A pair whose evidence is nowhere near the shelf cannot be fixed by ANY
+# setting of these valves — chasing those dragged `thr` from 0.55 down to 0.21 on
+# 16 real notes, which only bought new wrong merges.  The vault, not the muscle,
+# is what has to grow before those pairs become linkable.
+ORG_REACH_BAND = 0.15
+
 
 ABILITY_ORDER = ["reasoning", "context", "coding", "organizing"]
 
@@ -624,7 +646,12 @@ def _gen_organizing(rng: random.Random, n_notes: int, knob: Dict[str, Any]) -> D
 
 
 def _org_sim(
-    ni: Dict[str, Any], nj: Dict[str, Any], w: Dict[str, Any], tier: int, real: bool = False
+    ni: Dict[str, Any],
+    nj: Dict[str, Any],
+    w: Dict[str, Any],
+    tier: int,
+    real: bool = False,
+    sem: Optional[float] = None,
 ) -> float:
     t_i = set(ni["title"].split())
     t_j = set(nj["title"].split())
@@ -642,6 +669,12 @@ def _org_sim(
     cat_j = nj["cat"] if nj["cat"] in nj["title"] else ""
     cat_mt = 1.0 if (cat_i and cat_i == cat_j) else 0.0
     sim = w.get("w_title", 0.8) * title_ov + w.get("w_tag", 0.3) * tag_ov + w.get("w_cat", -0.2) * cat_mt
+    # 💡 Stage K: MEANING as a shelf feature.  Only on the real path and only
+    # when a frozen cosine came with the problem — invented gym puzzles have no
+    # meaning space behind them, and pretending otherwise would let the gym
+    # train a weight that the field can never reproduce.
+    if real and sem is not None:
+        sim += float(w.get("w_sem", ORG_SEM_PRIOR)) * float(sem)
     if tier >= 1:
         sub_i = ni["sub"] if str(ni["sub"]) in ni["title"] else ""
         sub_j = nj["sub"] if str(nj["sub"]) in nj["title"] else ""
@@ -652,6 +685,43 @@ def _org_sim(
         gate = (agree_i * agree_j) * w.get("w_agree", 0.0)
         sim += gate * tag_ov - w.get("w_agree", 0.0) * 0.5 * (1.0 - agree_i * agree_j) * tag_ov
     return sim
+
+
+def _org_same_truth(prob: Dict[str, Any], i: int, j: int) -> bool:
+    """Do notes i and j belong in the same drawer?  One answer, used everywhere.
+
+    Category + document kind is the gym's opinion.  On a REAL vault the brain
+    holds a second, older opinion of its own: the [[links]] it already wrote.  A
+    pair the vault has already connected was judged related by the brain itself,
+    so punishing the muscle for merging it teaches the muscle to contradict its
+    own wiki — measured on 14 real notes this is exactly what froze `w_sem`:
+    the strongest cross-drawer meaning pair (cos 0.61) is a pair the vault had
+    ALREADY linked, and every attempt to trust meaning enough to fix three real
+    misses (cos 0.55–0.71) was cancelled by that invented "over-merge".
+
+    Link COMPONENTS are far too loose to serve as truth (19 links collapse 14
+    notes into 2 blobs, calling 40 pairs mandatory), so only direct pairs count.
+
+    💡 Stage K: a SHARED TAG is the third opinion, and it is the one that survived
+    measurement.  Splitting the category label into topic words looked tempting
+    («역공학·보안» vs «Ghidra·역공학» are one shelf written twice) but on 12 real
+    notes it mandated 12 extra pairs of which 10 were nonsense — «스킬 카트리지»
+    glued to «성좌 담론» merely because both labels contain 양자화, at meaning
+    cosine 0.08.  Sharing an actual tag added exactly 2 pairs and both were the
+    genuine ones (the «ghidra» tag, cosine 0.35).  So truth is built only from
+    evidence the vault wrote itself: its links and its tags.
+    """
+    truth = prob.get("truth") or []
+    if i < len(truth) and j < len(truth) and truth[i] == truth[j]:
+        return True
+    key = f"{min(i, j)}-{max(i, j)}"
+    lp = prob.get("linked_pairs")
+    if lp and key in (lp if isinstance(lp, (set, frozenset)) else set(lp)):
+        return True
+    st = prob.get("shared_tag_pairs")
+    if st:
+        return key in (st if isinstance(st, (set, frozenset)) else set(st))
+    return False
 
 
 def _org_clusters(prob: Dict[str, Any], w: Dict[str, Any], tier: int) -> Tuple[List[int], bool]:
@@ -665,11 +735,24 @@ def _org_clusters(prob: Dict[str, Any], w: Dict[str, Any], tier: int) -> Tuple[L
             x = parent[x]
         return x
 
+    # Frozen meaning cosines for the SAME pair order used below (i ascending,
+    # j > i).  They are captured when the lesson is written, so revision re-solves
+    # the exact situation the muscle actually faced — never a re-guessed one.
+    real = bool(prob.get("real_mode"))
+    sems = prob.get("sem_pairs") if real else None
+    k = 0
     for i in range(n):
         for j in range(i + 1, n):
-            if _org_sim(notes[i], notes[j], w, tier, bool(prob.get("real_mode"))) > w.get("thr", 0.55):
+            cs = None
+            if sems and k < len(sems):
+                try:
+                    cs = float(sems[k])
+                except (TypeError, ValueError):
+                    cs = None
+            k += 1
+            if _org_sim(notes[i], notes[j], w, tier, real, cs) > w.get("thr", 0.55):
                 parent[find(i)] = find(j)
-    ok = all((find(i) == find(j)) == (prob["truth"][i] == prob["truth"][j]) for i in range(n) for j in range(i + 1, n))
+    ok = all((find(i) == find(j)) == _org_same_truth(prob, i, j) for i in range(n) for j in range(i + 1, n))
     return parent, ok
 
 
@@ -697,10 +780,10 @@ def _update_organizing(w: Dict[str, Any], prob: Dict[str, Any], chosen: str, ok:
         return x
 
     n_over = n_under = 0
-    notes, truth = prob["notes"], prob["truth"]
+    notes = prob["notes"]
     for i in range(len(notes)):
         for j in range(i + 1, len(notes)):
-            same_truth = truth[i] == truth[j]
+            same_truth = _org_same_truth(prob, i, j)
             same_cl = find(i) == find(j)
             if same_cl and not same_truth:
                 n_over += 1
@@ -708,25 +791,97 @@ def _update_organizing(w: Dict[str, Any], prob: Dict[str, Any], chosen: str, ok:
                 n_under += 1
     total_pairs = len(notes) * (len(notes) - 1) // 2
     if prob.get("real_mode") and total_pairs:
-        # Damped proportional control for REAL vaults.  The gym's fixed 0.075
-        # step is tuned for a 6-12 note puzzle; on a 20-note vault (190 pairs)
-        # one step flips 21 missing links into 8 wrong merges, so the shelf
-        # threshold oscillates forever instead of settling.  Scale the step by
-        # the measured confusion and freeze it when over/under balance out.
-        need_merge = (n_under - n_over) / float(total_pairs)   # >0 = merge more
+        # 💡 Stage K — CREDIT ASSIGNMENT on the real shelf.
+        #
+        # Four valves share one shelf: `thr` (how high), `w_tag`/`w_cat`/`w_title`
+        # (keyword evidence) and `w_sem` (meaning).  Until now every valve
+        # reacted to the TOTAL confusion, and they fought: a wrong merge caused
+        # by a runaway `w_title` was punished by cutting `w_sem`, while a missed
+        # pair that meaning could have fixed was "fixed" by raising `w_title`
+        # until every pair sharing the word 「역공학」 merged by itself.  Measured on
+        # 16 real notes: misses 23 -> 10 while over-merges exploded 0 -> 21 and
+        # `w_sem` was dragged 0.35 -> 1.2 -> 0.17 in a sawtooth.
+        #
+        # So each wrong pair is attributed to the evidence that actually carried
+        # it, and ONLY that valve moves.  Meaning is blamed only for pairs that
+        # crossed the shelf BECAUSE of meaning (keyword score below, total above),
+        # and it is trusted only where the keyword score cannot reach and the two
+        # notes are genuinely close in meaning (>= ORG_SEM_HOPE).
+        sems = prob.get("sem_pairs") or []
+        w_sem = float(w.get("w_sem", ORG_SEM_PRIOR))
+        thr_v = float(w.get("thr", 0.55))
+        # Over-merge blame is SPLIT, not assigned whole: on the real vault the
+        # stubborn wrong pairs («역공학 해부 도감» ↔ «Ghidra 헤드리스») sit at
+        # keyword score 0.385 with meaning cosine 0.34 — the shelf was already
+        # nearly reached and meaning delivered the last push.  Charging all of it
+        # to `w_sem` drove it 0.70 -> 0.07 in six rounds while the keyword valve
+        # went untouched, so each valve now pays in proportion to what it added.
+        kw_over = 0.0
+        sem_over = 0.0
+        kw_under = sem_hope = sem_hold = far = 0
+        k = 0
+        for i in range(len(notes)):
+            for j in range(i + 1, len(notes)):
+                cs = None
+                if sems and k < len(sems):
+                    try:
+                        cs = float(sems[k])
+                    except (TypeError, ValueError):
+                        cs = None
+                k += 1
+                base = _org_sim(notes[i], notes[j], w, tier, real=True)
+                sim = base + (w_sem * cs if cs is not None else 0.0)
+                same_t = _org_same_truth(prob, i, j)
+                same_c = find(i) == find(j)
+                if same_c and not same_t:
+                    if cs is not None and base <= thr_v < sim:
+                        added = sim - base
+                        share = (sim - thr_v) / added if added > 1e-9 else 1.0
+                        share = max(0.0, min(1.0, share))
+                        sem_over += share      # the decisive slice of the push
+                        kw_over += 1.0 - share  # the shelf was already this close
+                    else:
+                        kw_over += 1.0          # keywords invented this link alone
+                elif same_t and not same_c:
+                    # Only count a miss when SOME valve could actually fix it.
+                    # Meaning gets the pair if raising w_sem to its cap would
+                    # carry it over the shelf; keywords get it if the score is
+                    # already within one nudge.  Everything else is a gap in the
+                    # vault's own evidence, not a mistake to be chased.
+                    if cs is not None and cs >= ORG_SEM_HOPE and (base + ORG_SEM_MAX * cs) > thr_v:
+                        sem_hope += 1          # meaning could fix this miss
+                    elif base >= thr_v - ORG_REACH_BAND:
+                        kw_under += 1          # one nudge of the shelf would fix it
+                    else:
+                        far += 1               # honestly out of reach for now
+                elif same_t and same_c and cs is not None and base <= thr_v < sim:
+                    sem_hold += 1              # meaning is what holds this pair
+
+        # --- the meaning valve: reward and blame applied AT THE SAME TIME ---
+        # (`elif` used to mean that a single wrong merge silenced every reason to
+        # trust meaning, so the weight could only fall — it never found a level.)
+        if sem_over or sem_hope or sem_hold:
+            delta = (sem_hope * 0.6 + sem_hold * 0.3) - (sem_over * 1.2)
+            step_sem = max(-1.0, min(1.0, delta * 8.0 / total_pairs))
+            w["w_sem"] = round(max(0.0, min(ORG_SEM_MAX, w_sem + lr * 1.1 * step_sem)), 4)
+
+        # --- the keyword valves: the shelf height follows KEYWORD confusion ---
+        need_merge = (kw_under - kw_over) / float(total_pairs)   # >0 = merge more
         step = max(-lr * 0.3, min(lr * 0.3, 0.45 * need_merge))
         w["thr"] = round(max(0.12, min(1.15, float(w.get("thr", 0.55)) - step)), 4)
-        over_rate = n_over / float(total_pairs)
-        under_rate = n_under / float(total_pairs)
-        # Independent valves: the old code braked w_tag ONLY when over >= under,
-        # so a vault that both over- and under-merges could never shed its wrong
-        # links (8 stubborn over-merges survived every round).
-        if over_rate:
-            w["w_tag"] = max(-0.4, w.get("w_tag", 0.3) - lr * 0.5 * min(1.0, over_rate * 8.0))
-        if under_rate:
-            w["w_cat"] = min(1.2, w.get("w_cat", -0.2) + lr * min(1.0, under_rate * 8.0))
-            w["w_title"] = min(1.6, w.get("w_title", 0.8) + lr * 0.3 * min(1.0, under_rate * 8.0))
-        if tier >= 1 and under_rate > over_rate:
+        if kw_over:
+            rate = min(1.0, kw_over * 8.0 / total_pairs)
+            w["w_tag"] = max(-0.4, w.get("w_tag", 0.3) - lr * 0.5 * rate)
+            # The runaway was w_title, and nothing ever braked it: a pair whose
+            # titles share one long word («역공학 해부 도감») scores 0.57 alone,
+            # above the 0.55 shelf, before any other evidence is consulted.
+            w["w_title"] = round(max(0.0, float(w.get("w_title", 0.8)) - lr * 0.6 * rate), 4)
+            w["w_cat"] = round(max(-0.6, float(w.get("w_cat", -0.2)) - lr * 0.4 * rate), 4)
+        if kw_under and not kw_over:
+            rate = min(1.0, kw_under * 8.0 / total_pairs)
+            w["w_cat"] = min(1.2, w.get("w_cat", -0.2) + lr * rate)
+            w["w_title"] = min(1.6, w.get("w_title", 0.8) + lr * 0.3 * rate)
+        if tier >= 1 and kw_under > kw_over:
             w["w_sub"] = min(1.5, w.get("w_sub", 0.0) + lr * 0.6)
         return
 
@@ -1111,7 +1266,9 @@ def real_org_note_view(title: str, category: str, tokens: List[str]) -> Dict[str
     }
 
 
-def build_real_org_problem(notes: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+def build_real_org_problem(
+    notes: List[Dict[str, Any]], sem: Optional[Any] = None
+) -> Optional[Dict[str, Any]]:
     """Turn the REAL wiki vault into a clustering problem the gym can solve.
 
     `notes`: [{"title","category","tags","keywords"}].  Ground truth is each
@@ -1125,21 +1282,74 @@ def build_real_org_problem(notes: List[Dict[str, Any]]) -> Optional[Dict[str, An
     if len(cats) < 2:
         return None
     cat_idx = {c: i for i, c in enumerate(cats)}
+    kept = usable[:24]
     org_notes: List[Dict[str, Any]] = []
     truth: List[Tuple[int, str]] = []
-    for n in usable[:24]:
+    for n in kept:
         cat = str(n["category"])
         view = real_org_note_view(
             n["title"], cat, list(n.get("tags") or []) + list(n.get("keywords") or [])
         )
         org_notes.append(view)
         truth.append((cat_idx[cat], view["sub"]))
-    return {"notes": org_notes, "truth": truth, "real_mode": True, "categories": cats}
+    prob: Dict[str, Any] = {"notes": org_notes, "truth": truth, "real_mode": True, "categories": cats}
+    # The vault's OWN links, as index pairs — the second opinion described in
+    # `_org_same_truth`.  Stored as strings so a JSON round trip through the
+    # experience ledger cannot turn them into unhashable lists.
+    title_idx: Dict[str, int] = {}
+    for i, n in enumerate(kept):
+        title_idx.setdefault(str(n.get("title")), i)
+    linked: set = set()
+    for i, n in enumerate(kept):
+        for lk in n.get("links") or []:
+            j = title_idx.get(str(lk))
+            if j is not None and j != i:
+                linked.add(f"{min(i, j)}-{max(i, j)}")
+    if linked:
+        prob["linked_pairs"] = sorted(linked)
+    # Tags the notes declare themselves — the third and (measured) most precise
+    # source of "these two belong together".
+    tagsets = [{str(t).lower() for t in (n.get("tags") or []) if t} for n in kept]
+    tagged: set = set()
+    for i in range(len(kept)):
+        for j in range(i + 1, len(kept)):
+            if tagsets[i] and tagsets[j] and (tagsets[i] & tagsets[j]):
+                tagged.add(f"{i}-{j}")
+    if tagged:
+        prob["shared_tag_pairs"] = sorted(tagged)
+    if sem is not None:
+        # Freeze the meaning of every pair NOW, in the same order `_org_clusters`
+        # walks them, so the lesson and the field always see one reality.
+        try:
+            prob["sem_pairs"] = [
+                round(float(sem.pair_similarity(kept[i], kept[j])), 4)
+                for i in range(len(kept))
+                for j in range(i + 1, len(kept))
+            ]
+        except Exception:
+            prob.pop("sem_pairs", None)
+    return prob
 
 
-def field_org_pair_sim(field: Dict[str, Any], ni: Dict[str, Any], nj: Dict[str, Any]) -> float:
-    """Reuse the gym's own `_org_sim` on two REAL notes (same math, no fake path)."""
-    return _org_sim(ni, nj, field.get("weights") or {}, int(field.get("tier", 0)), real=True)
+def field_org_pair_sim(
+    field: Dict[str, Any], ni: Dict[str, Any], nj: Dict[str, Any], sem: Optional[float] = None
+) -> float:
+    """Reuse the gym's own `_org_sim` on two REAL notes (same math, no fake path).
+
+    💡 Stage K: `sem` is the pair's frozen meaning cosine.  The weaver passes it,
+    the lesson stores it, and the muscle's learned `w_sem` decides how much it
+    counts — one formula on both sides, so what it learns transfers.
+    """
+    return _org_sim(ni, nj, field.get("weights") or {}, int(field.get("tier", 0)), real=True, sem=sem)
+
+
+def field_org_semantic_trust(field: Optional[Dict[str, Any]]) -> float:
+    """How much the ORGANIZING muscle currently trusts meaning (learned, not set)."""
+    w = (field or {}).get("weights") or {}
+    try:
+        return float(w.get("w_sem", ORG_SEM_PRIOR))
+    except (TypeError, ValueError):
+        return ORG_SEM_PRIOR
 
 
 def grade_real_org_problem(field: Dict[str, Any], prob: Dict[str, Any]) -> Dict[str, Any]:
@@ -1159,11 +1369,11 @@ def grade_real_org_problem(field: Dict[str, Any], prob: Dict[str, Any]) -> Dict[
             x = parent[x]
         return x
 
-    notes, truth = prob["notes"], prob["truth"]
+    notes = prob["notes"]
     n_over = n_under = 0
     for i in range(len(notes)):
         for j in range(i + 1, len(notes)):
-            same_truth = truth[i] == truth[j]
+            same_truth = _org_same_truth(prob, i, j)
             same_cl = find(i) == find(j)
             if same_cl and not same_truth:
                 n_over += 1
@@ -1175,6 +1385,36 @@ def grade_real_org_problem(field: Dict[str, Any], prob: Dict[str, Any]) -> Dict[
     # drives learning, but a 190-pair vault hides real progress behind it — so
     # report the continuous quality too.
     quality = round(100.0 * (1.0 - (n_over + n_under) / total_pairs), 1) if total_pairs else 100.0
+    # 💡 Stage K: how many of those misses NO valve setting could reach — the
+    # vault simply has not written the evidence yet.  Reporting it keeps the
+    # muscle from being blamed (and from wrecking its own weights) over gaps that
+    # only new memories can fill.
+    unreachable = 0
+    if prob.get("real_mode"):
+        sems = prob.get("sem_pairs") or []
+        w_sem = float(w.get("w_sem", ORG_SEM_PRIOR))
+        thr_v = float(w.get("thr", 0.55))
+        k = 0
+        for i in range(len(notes)):
+            for j in range(i + 1, len(notes)):
+                cs = None
+                if sems and k < len(sems):
+                    try:
+                        cs = float(sems[k])
+                    except (TypeError, ValueError):
+                        cs = None
+                k += 1
+                if find(i) == find(j) or not _org_same_truth(prob, i, j):
+                    continue
+                base = _org_sim(notes[i], notes[j], w, tier, real=True)
+                best = base + (ORG_SEM_MAX * cs if cs is not None else 0.0)
+                if best <= thr_v and base < thr_v - ORG_REACH_BAND:
+                    unreachable += 1
+    # ⚠️ The reachable score must also REMOVE the unreachable misses from the
+    # numerator — dividing all misses by a shrunken denominator reported 30%
+    # where the muscle was actually right on 38 of 40 reachable pairs.
+    reach_total = max(1, total_pairs - unreachable)
+    reach_err = max(0, n_over + n_under - unreachable)
     return {
         "ok": ok,
         "over": n_over,
@@ -1182,6 +1422,8 @@ def grade_real_org_problem(field: Dict[str, Any], prob: Dict[str, Any]) -> Dict[
         "clusters": clusters,
         "total_pairs": total_pairs,
         "quality_pct": quality,
+        "unreachable": unreachable,
+        "reachable_quality_pct": round(100.0 * (1.0 - reach_err / reach_total), 1),
     }
 
 
@@ -1284,7 +1526,16 @@ class CoreAbilityEngine:
             }
         if ability == "coding":
             return {"matrix": [[0.0] * 4 for _ in range(4)], "multi": 0.0}
-        return {"w_title": 0.8, "w_tag": 0.3, "w_cat": -0.2, "thr": 0.55, "w_sub": 0.0, "w_agree": 0.0}
+        return {
+            "w_title": 0.8,
+            "w_tag": 0.3,
+            "w_cat": -0.2,
+            "thr": 0.55,
+            "w_sub": 0.0,
+            "w_agree": 0.0,
+            # 💡 Stage K: newborn trust in meaning — moved only by real weaving.
+            "w_sem": ORG_SEM_PRIOR,
+        }
 
     def _save(self, data: Optional[Dict[str, Any]] = None) -> None:
         if data is not None:
@@ -1709,6 +1960,13 @@ class CoreAbilityEngine:
         if q is not None:
             stats["quality_sum"] = float(stats["quality_sum"]) + float(q)
             stats["quality_n"] = int(stats["quality_n"]) + 1
+        # 🕳️ Stage K: also accumulate the score over pairs the muscle COULD
+        # reach.  On a real vault most misses are gaps in what has been written
+        # yet, and grading those as failures hides every real improvement.
+        rq = (case.get("metric") or {}).get("reachable_quality_pct")
+        if rq is not None:
+            stats["reach_sum"] = float(stats.get("reach_sum", 0.0)) + float(rq)
+            stats["reach_n"] = int(stats.get("reach_n", 0)) + 1
 
         log = self.state.setdefault("experience_log", [])
         log.append(
@@ -1803,10 +2061,17 @@ class CoreAbilityEngine:
             # 💡 Stage J: the context muscle's own trust in meaning is part of its
             # report card — it is learned from real recalls, never hardcoded.
             out["sem_trust"] = round(field_context_semantic_trust(self.field_profile(ability)), 3)
+        elif ability == "organizing":
+            # 💡 Stage K: same honesty for the weaver.
+            out["sem_trust"] = round(field_org_semantic_trust(self.field_profile(ability)), 3)
         qn = int(st.get("quality_n", 0))
         if qn:
             out["real_quality_pct"] = round(float(st.get("quality_sum", 0.0)) / qn, 1)
             out["verdict"] += f" · 🧹 실제 정리 품질 {out['real_quality_pct']}%"
+        rn = int(st.get("reach_n", 0))
+        if rn:
+            out["real_reachable_quality_pct"] = round(float(st.get("reach_sum", 0.0)) / rn, 1)
+            out["verdict"] += f" · 🎯 조절 가능 {out['real_reachable_quality_pct']}%"
         return out
 
     def experience_report(self) -> Dict[str, Any]:

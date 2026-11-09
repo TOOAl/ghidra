@@ -26,6 +26,7 @@ from brain_engine.hallucination import (  # noqa: E402
 )
 from brain_engine.host_probe import probe_host  # noqa: E402
 from brain_engine.quant_forge import CustomBrainForge, dissect_architecture  # noqa: E402
+from brain_engine.rl_gym import PortableRLGym  # noqa: E402
 from brain_engine.slm_bridge import PortableSLMBridge  # noqa: E402
 from brain_engine.tamagotchi import TamagotchiSoul  # noqa: E402
 from brain_engine.wiki_gardener import WikiGardener  # noqa: E402
@@ -39,6 +40,7 @@ class BrainState:
         self.soul = TamagotchiSoul(root / "state" / "soul.json")
         self.slm = PortableSLMBridge(root / "models")
         self.forge = CustomBrainForge(root / "models")
+        self.rl_gym = PortableRLGym(root / "state", root / "models")
         self.host_info = probe_host(root)
         self.soul.register_host(self.host_info)
 
@@ -47,11 +49,17 @@ class BrainState:
         notes = self.gardener.list_notes()
         graph = self.gardener.get_graph()
         forged = self.forge.list_forged_brains()
+        rl_snap = self.rl_gym.status_snapshot()
+        rl_trained = bool(rl_snap.get("benchmark", {}).get("trained", False))
         env_grade = self.host_info.get("environment", {}).get("grade", "optimal")
         recent_checks = self.soul.data.get("recent_hallucination_checks", [])
         recent_missing = self.soul.data.get("recent_missing_topics", [])
         hallucination = evaluate_brain_hallucination(
-            notes, forged, recent_checks, recent_missing_topics=recent_missing
+            notes,
+            forged,
+            recent_checks,
+            recent_missing_topics=recent_missing,
+            rl_trained=rl_trained,
         )
         return {
             "soul": self.soul.snapshot(graph["stats"], env_grade=env_grade),
@@ -59,11 +67,12 @@ class BrainState:
             "host": self.host_info,
             "engine": self.slm.detect_active_engine(),
             "forged_brains": forged,
+            "rl": rl_snap,
             "graph": graph,
             "roadmap": {
-                "stage_a": {"status": "active", "title": "A단계: 마크다운 위키 & 자체 양자화 주조"},
-                "stage_b": {"status": "next", "title": "B단계: CPU 강화학습 훈련소"},
-                "stage_c": {"status": "upcoming", "title": "C단계: Ghidra 12.3 역공학 해부실"},
+                "stage_a": {"status": "done", "title": "A단계: 마크다운 위키 & 자체 양자화 주조"},
+                "stage_b": {"status": "active", "title": "B단계: CPU 강화학습 & 다수 심판 합의"},
+                "stage_c": {"status": "next", "title": "C단계: Ghidra 12.3 역공학 해부실"},
             },
         }
 
@@ -123,6 +132,11 @@ def make_handler(state: BrainState):
                 qs = parse_qs(parsed.query)
                 bp_id = (qs.get("id") or ["custom-synapse-seed"])[0]
                 self._send_json(dissect_architecture(bp_id, state.root / "models"))
+                return
+            if route == "/api/rl/scenario":
+                qs = parse_qs(parsed.query)
+                sc_id = (qs.get("id") or ["sc_ambiguous_crypto"])[0]
+                self._send_json(state.rl_gym.evaluate_scenario(sc_id))
                 return
 
             rel = "index.html" if route in ("", "/") else route.lstrip("/")
@@ -210,6 +224,28 @@ def make_handler(state: BrainState):
                     cos_sim=record["cosine_similarity_pct"],
                 )
                 self._send_json({"forged": record, "status": state.full_status()})
+                return
+
+            if route == "/api/rl/train":
+                episodes = int(body.get("episodes") or 600)
+                snap = state.rl_gym.train_episodes(episodes=episodes)
+                bm = snap.get("benchmark", {})
+                state.soul.on_rl_train(
+                    episodes=episodes,
+                    judges_score=float(bm.get("good_judges_score", 0.0)),
+                    solo_score=float(bm.get("solo_top1_score", 0.0)),
+                )
+                self._send_json({"rl": snap, "status": state.full_status()})
+                return
+
+            if route == "/api/rl/coach":
+                scenario_id = str(body.get("scenario_id") or "sc_ambiguous_crypto")
+                action_id = int(body.get("action_id") or 3)
+                coached = state.rl_gym.coach_scenario(scenario_id, action_id)
+                sc_title = coached["updated_eval"]["scenario"]["title"]
+                conf = coached["updated_eval"]["council_confidence_pct"]
+                state.soul.on_rl_coach(sc_title, conf)
+                self._send_json({"coached": coached, "status": state.full_status()})
                 return
 
             if route == "/api/remedy":

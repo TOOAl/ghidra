@@ -202,6 +202,30 @@ class TamagotchiSoul:
         self._log_event(f"환각 처방 실행: {summary_msg}")
         self._save()
 
+    def on_rl_train(self, episodes: int, judges_score: float, solo_score: float) -> None:
+        self.data["xp"] = int(self.data.get("xp", 0)) + 35
+        self.data["mood"] = min(100, int(self.data.get("mood", 80)) + 10)
+        self.data["rl_episodes"] = int(self.data.get("rl_episodes", 0)) + episodes
+        self.data["rl_iq_bonus"] = min(40, int(self.data.get("rl_iq_bonus", 0)) + 5)
+        self.data["pose"] = "08_journey"
+        self.data["last_speech"] = (
+            f"으쌰! CPU만으로 {episodes}판 강화학습 완료! "
+            f"혼자 푼 1등 뇌({solo_score}점)보다 다수 심판 합의({judges_score}점)가 훨씬 똑똑해요! (+35 XP)"
+        )
+        self._log_event(f"CPU 강화학습 +{episodes}판 완료 (심판 합의 {judges_score}점)")
+        self._save()
+
+    def on_rl_coach(self, scenario_title: str, conf_pct: float) -> None:
+        self.data["xp"] = int(self.data.get("xp", 0)) + 25
+        self.data["mood"] = min(100, int(self.data.get("mood", 82)) + 10)
+        self.data["rl_iq_bonus"] = min(40, int(self.data.get("rl_iq_bonus", 0)) + 3)
+        self.data["pose"] = "07_eureka"
+        self.data["last_speech"] = (
+            f"유레카! 주인님의 코칭 덕분에 5개 꼬마 뉴런이 모두 깨달았어요! 확신도가 {conf_pct}%로 껑충 뛰었어요! (+25 XP)"
+        )
+        self._log_event(f"주인님 직접 코칭 반영 ({scenario_title[:18]}… → 확신 {conf_pct}%)")
+        self._save()
+
     def on_forge_brain(self, bits: int, saved_pct: float, cos_sim: float) -> None:
         self.data["xp"] = int(self.data.get("xp", 0)) + 30
         self.data["mood"] = min(100, int(self.data.get("mood", 80)) + 12)

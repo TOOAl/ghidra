@@ -1,24 +1,28 @@
 {
   "name": "시냅스몽",
   "born_at": "2026-11-09T08:37:11Z",
-  "xp": 84,
-  "satiety": 72,
+  "xp": 119,
+  "satiety": 66,
   "mood": 100,
-  "pose": "04_brainstorm",
+  "pose": "08_journey",
   "last_fed_ts": 1794213431.4215264,
   "last_interaction_ts": 1794215423.576385,
   "memories_eaten": 4,
   "questions_answered": 1,
   "brains_forged": 1,
-  "rl_episodes": 0,
+  "rl_episodes": 600,
   "binaries_analyzed": 0,
-  "rl_iq_bonus": 4,
+  "rl_iq_bonus": 9,
   "re_skill": 0,
   "hosts_visited": [
     "e2b.local (Linux-x86_64-2c)"
   ],
-  "last_speech": "흠냐... 위키 기억에 없는 내용이라 지어내지 않고 솔직하게 환각 방어막을 켰어요! 관련 지식을 먹여주실래요?",
+  "last_speech": "으쌰! CPU만으로 600판 강화학습 완료! 혼자 푼 1등 뇌(18.3점)보다 다수 심판 합의(80.7점)가 훨씬 똑똑해요! (+35 XP)",
   "recent_events": [
+    {
+      "time": "2026-11-09T09:32:28Z",
+      "text": "CPU 강화학습 +600판 완료 (심판 합의 80.7점)"
+    },
     {
       "time": "2026-11-09T08:37:20Z",
       "text": "자체 INT4 두뇌 주조 성공 (정밀도 99.77%, 압축 -84.4%)"

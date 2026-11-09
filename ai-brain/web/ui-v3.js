@@ -26,6 +26,8 @@ const SNACK_SAMPLES = {
 let graphState = { nodes: [], edges: [], selectedId: null, dragNode: null };
 let selectedBits = 4;
 let selectedDim = 64;
+let selectedRlEpisodes = 600;
+let selectedScenarioId = "sc_ambiguous_crypto";
 let lastRiskPct = 10;
 
 function switchTab(tabId) {
@@ -77,7 +79,7 @@ function setPetPose(poseKey) {
 
 function renderStatus(data) {
   if (!data || !data.soul) return;
-  const { soul, hallucination, host, forged_brains, graph } = data;
+  const { soul, hallucination, host, forged_brains, rl, graph } = data;
 
   document.getElementById("petStageBadge").textContent =
     `Lv.${soul.level} ${soul.stage_emoji} ${soul.stage_title}`;
@@ -137,17 +139,19 @@ function renderStatus(data) {
 
   // KPI Dock
   const brains = forged_brains || [];
+  const rlEp = (rl && rl.total_episodes) || soul.rl_episodes || 0;
   document.getElementById("kpiIq").textContent = soul.iq;
   document.getElementById("kpiNotes").textContent = soul.notes_count;
-  document.getElementById("kpiEdges").textContent = soul.edges_count;
+  document.getElementById("kpiRl").textContent = rlEp.toLocaleString();
   document.getElementById("kpiForged").textContent = brains.length;
 
   document.getElementById("engineStatusPill").textContent =
     brains.length > 0
-      ? `✦ 자체 주조 두뇌 ${brains.length}개 보유 (${brains[0].filename})`
+      ? `✦ 주조 두뇌 ${brains.length}개 · 강화학습 ${rlEp.toLocaleString()}판`
       : "● 위키 기억망 + 자체 양자화 주조소 대기 중";
 
   renderForgedList(brains);
+  if (rl) renderRlStatus(rl);
   if (graph) syncGraphData(graph);
 }
 
@@ -253,6 +257,18 @@ async function executePrescription(rx) {
     return;
   }
 
+  if (rx.action_kind === "instant_rl_train") {
+    const res = await apiPost("api/rl/train", rx.payload);
+    if (res.status) {
+      pulsePortrait();
+      renderStatus(res.status);
+      loadRlScenario(selectedScenarioId);
+      const after = res.status.hallucination.risk_pct;
+      fb.innerHTML = `🎉 <strong>처방 완료!</strong> 5인 심판 뉴런 강화학습 완료! 단독 착각 방어력이 켜져 환각 위험도가 <strong>${before}% → ${after}%</strong>로 감소했어요!`;
+    }
+    return;
+  }
+
   if (rx.action_kind === "instant_seed_feed") {
     const res = await apiPost("api/feed", rx.payload);
     if (res.status) {
@@ -262,6 +278,142 @@ async function executePrescription(rx) {
       fb.innerHTML = `🎉 <strong>처방 완료!</strong> <code>[[${escapeHtml(res.digested.title)}]]</code> 노트를 보강하고 시냅스를 연결했어요! 환각 위험도 <strong>${before}% → ${after}%</strong>`;
     }
   }
+}
+
+function renderRlStatus(rl) {
+  const benchBox = document.getElementById("rlBenchBox");
+  const bm = rl.benchmark || {};
+  if (!bm.trained) {
+    benchBox.className = "rl-bench-box";
+    benchBox.innerHTML = `
+      <strong>미공개 실전 함정 문제 60판 비교 대기 중</strong><br/>
+      위 <strong>「CPU로 5인 꼬마 뉴런 강화학습 가동하기」</strong> 버튼을 누르면
+      <code>1등 독단</code> vs <code>단순 다수결</code> vs <code>다수 심판 합의(Good Judges)</code> 성적을 실시간 대결합니다!
+    `;
+  } else {
+    benchBox.className = "rl-bench-box trained";
+    benchBox.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+        <strong style="color:#eef2ff">🏆 미공개 실전 함정 60판 성적표 (${bm.elapsed_ms} ms 소요)</strong>
+        <span class="rec-tag">INT8 정책(${escapeHtml(bm.policy_file || "rl_council_int8.sbrain")}) 저장됨</span>
+      </div>
+      <div class="bench-row">
+        <span class="bench-label">1등 독단 (암기 우등생 혼자)</span>
+        <div class="v-bar"><div class="v-fill halluc-high" style="width:${Math.min(100, bm.solo_top1_score)}%"></div></div>
+        <strong class="bench-score" style="color:#fda4af">${bm.solo_top1_score}점</strong>
+      </div>
+      <div class="bench-row">
+        <span class="bench-label">단순 다수결 (평범한 투표)</span>
+        <div class="v-bar"><div class="v-fill mood" style="width:${Math.min(100, bm.majority_vote_score)}%"></div></div>
+        <strong class="bench-score" style="color:#fcd34d">${bm.majority_vote_score}점</strong>
+      </div>
+      <div class="bench-row">
+        <span class="bench-label win">👑 다수 심판 합의 (채택!)</span>
+        <div class="v-bar"><div class="v-fill satiety" style="width:${Math.min(100, bm.good_judges_score)}%"></div></div>
+        <strong class="bench-score" style="color:#6ee7b7">${bm.good_judges_score}점</strong>
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:#94a3b8">
+        • 훈련 1등(<code>${escapeHtml(bm.top1_agent_name)}</code>) 혼자 풀면 쉬운 힌트만 외우다 함정에 빠지지만,
+        <strong>다수가 심판으로 오답을 걸러내고 검증된 전문가가 결정</strong>하면 <strong>+${bm.gain_vs_solo}점</strong>(다수결 대비 +${bm.gain_vs_majority}점) 압승합니다!
+      </div>
+    `;
+  }
+
+  const roster = document.getElementById("rlAgentRoster");
+  roster.innerHTML = (rl.agents || [])
+    .map(
+      (a) => `
+      <div class="rl-agent-row">
+        <div>
+          <span class="rank-tag">#${a.rank}위</span>
+          <strong>${a.emoji} ${escapeHtml(a.name)}</strong>
+        </div>
+        <span style="font-size:11.5px;color:#cbd5e1;font-variant-numeric:tabular-nums">
+          훈련 숙련도 <strong>${a.train_score}점</strong>
+        </span>
+      </div>`
+    )
+    .join("");
+}
+
+async function loadRlScenario(scId) {
+  selectedScenarioId = scId || selectedScenarioId;
+  const data = await apiGet(`api/rl/scenario?id=${encodeURIComponent(selectedScenarioId)}`);
+  if (!data || !data.scenario) return;
+  renderRlScenarioEval(data);
+}
+
+function renderRlScenarioEval(data) {
+  const sc = data.scenario;
+  const view = document.getElementById("rlScenarioView");
+  const conf = data.council_confidence_pct;
+  const askCoach = data.needs_human_coach;
+
+  const bannerHtml = askCoach
+    ? `<div class="coach-banner ask">
+         <strong>🙋 확신도 ${conf}% (&lt; 75% 기준 미달!) — 주인님 코칭 요청</strong><br/>
+         뉴런들의 의견이 갈려 억지로 찍지 않고 멈췄어요! 아래 선택지 중 올바른 행동의 <strong>「주인님 코칭」</strong> 버튼을 눌러 가르쳐 주세요.
+       </div>`
+    : `<div class="coach-banner confident">
+         <strong>👑 다수 심판 합의 결정: [${escapeHtml(data.judges_choice.code)}. ${escapeHtml(data.judges_choice.label)}] (확신도 ${conf}%)</strong><br/>
+         <span style="font-size:11px;color:#cbd5e1">비교 — 1등 독단: ${escapeHtml(data.solo_choice.code)}(${escapeHtml(data.solo_choice.short)}) · 단순 다수결: ${escapeHtml(data.majority_choice.code)}(${escapeHtml(data.majority_choice.short)})</span>
+       </div>`;
+
+  const ballotsHtml = (data.ballots || [])
+    .map(
+      (b) =>
+        `<span class="ballot-chip">${b.emoji} #${b.rank}위 → <strong>${escapeHtml(b.vote_code)}</strong> (${b.confidence_pct}%)</span>`
+    )
+    .join("");
+
+  const optsHtml = (data.option_scores || [])
+    .map((o) => {
+      const isPicked = o.id === data.judges_choice.id;
+      return `
+        <div class="opt-card ${isPicked ? "picked" : ""}">
+          <div class="opt-top">
+            <strong>${escapeHtml(o.text)}</strong>
+            <span style="white-space:nowrap;font-weight:700;color:${isPicked ? "#6ee7b7" : "#94a3b8"}">
+              ${o.vote_count}표 · ${o.prob_pct}%
+            </span>
+          </div>
+          <div class="opt-actions-row">
+            <div class="v-bar">
+              <div class="v-fill ${isPicked ? "satiety" : "xp"}" style="width:${Math.min(100, o.prob_pct)}%"></div>
+            </div>
+            <button type="button" class="coach-btn" data-coach-act="${o.id}">
+              👨‍🏫 이 답으로 코칭
+            </button>
+          </div>
+        </div>`;
+    })
+    .join("");
+
+  view.innerHTML = `
+    <div class="sc-box">
+      <strong style="font-size:13px;color:#eef2ff">${escapeHtml(sc.title)}</strong>
+      <p class="sc-sit">${escapeHtml(sc.situation)}</p>
+    </div>
+    ${bannerHtml}
+    <div class="ballot-strip">${ballotsHtml}</div>
+    <div class="opt-list">${optsHtml}</div>
+  `;
+
+  view.querySelectorAll(".coach-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const actId = parseInt(btn.dataset.coachAct, 10);
+      setPetPose("03_swirl");
+      const res = await apiPost("api/rl/coach", {
+        scenario_id: sc.id,
+        action_id: actId,
+      });
+      if (res.coached) {
+        pulsePortrait();
+        renderRlScenarioEval(res.coached.updated_eval);
+        if (res.status) renderStatus(res.status);
+      }
+    });
+  });
 }
 
 function renderForgedList(items) {
@@ -717,6 +869,36 @@ function setupInteractions() {
       fb.innerHTML = "🔄 최근 함정 질문 경보 기록을 초기화하고 환각 방어막 영점을 재조정했습니다.";
     }
   });
+
+  // Stage B: CPU RL Gym Controls
+  document.querySelectorAll("#rlEpGroup .dim-pill").forEach((pill) => {
+    pill.addEventListener("click", () => {
+      document.querySelectorAll("#rlEpGroup .dim-pill").forEach((p) => p.classList.remove("active"));
+      pill.classList.add("active");
+      selectedRlEpisodes = parseInt(pill.dataset.ep, 10);
+    });
+  });
+
+  document.getElementById("btnRlTrain").addEventListener("click", async () => {
+    const benchBox = document.getElementById("rlBenchBox");
+    setPetPose("03_swirl");
+    benchBox.innerHTML = `CPU에서 5인 꼬마 뉴런이 ${selectedRlEpisodes.toLocaleString()}판 실전 시뮬레이션을 달리는 중...`;
+    const res = await apiPost("api/rl/train", { episodes: selectedRlEpisodes });
+    if (res.status) {
+      pulsePortrait();
+      renderStatus(res.status);
+      loadRlScenario(selectedScenarioId);
+    }
+  });
+
+  document.querySelectorAll("#rlScenarioChips .preset-chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      document.querySelectorAll("#rlScenarioChips .preset-chip").forEach((c) => c.classList.remove("active"));
+      chip.classList.add("active");
+      setPetPose("02_curious");
+      loadRlScenario(chip.dataset.sc);
+    });
+  });
 }
 
 async function init() {
@@ -731,6 +913,7 @@ async function init() {
   const [freshStatus] = await Promise.all([
     apiGet("api/status"),
     loadAnatomy("custom-synapse-seed"),
+    loadRlScenario(selectedScenarioId),
   ]);
   renderStatus(freshStatus);
 }

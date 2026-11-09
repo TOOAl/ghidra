@@ -100,6 +100,7 @@ def evaluate_brain_hallucination(
     forged_brains: List[Dict[str, Any]],
     recent_checks: List[int] | None = None,
     recent_missing_topics: List[str] | None = None,
+    rl_trained: bool = False,
 ) -> Dict[str, Any]:
     """Compute overall hallucination risk, 4-factor diagnostic breakdown, and live prescriptions."""
     notes_cnt = len(notes)
@@ -137,7 +138,8 @@ def evaluate_brain_hallucination(
 
     density_penalty = max(1.5, 17.0 - min(15.5, notes_cnt * 2.0))
     unlinked_penalty = (100 - strong_link_pct) * 0.12 if notes_cnt > 0 else 22.0
-    structural_risk = round(quant_penalty + density_penalty + unlinked_penalty)
+    rl_bonus = 2.0 if rl_trained else 0.0
+    structural_risk = max(3, round(quant_penalty + density_penalty + unlinked_penalty - rl_bonus))
 
     checks = [int(x) for x in (recent_checks or []) if isinstance(x, (int, float))]
     if checks:
@@ -289,6 +291,21 @@ def evaluate_brain_hallucination(
                 "action_kind": "instant_relink",
                 "action_label": "🔗 시냅스 교차검증 자동 연결",
                 "payload": {},
+            }
+        )
+
+    if not rl_trained:
+        prescriptions.append(
+            {
+                "id": "train_rl_judges",
+                "priority": "recommended",
+                "badge": "합의 처방 · 예상 -2%p",
+                "title": "B단계 다수 심판 합의(5인 뉴런) CPU 강화학습 가동",
+                "why": "단일 두뇌 혼자 판단하면 암기 패턴 착각(오버피팅)에 빠지기 쉽습니다.",
+                "how": "5개 꼬마 뉴런을 CPU에서 훈련해 서로 거부권 심판을 서게 하면 단독 오판이 차단됩니다.",
+                "action_kind": "instant_rl_train",
+                "action_label": "🏋️ 5인 심판 뉴런 600판 즉시 훈련",
+                "payload": {"episodes": 600},
             }
         )
 

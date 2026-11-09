@@ -12,6 +12,7 @@ models/
 # Local SQLite search cache (rebuilt automatically from vault/*.md on any PC)
 state/*.db
 state/*.db-journal
+state/rl_council.json
 state/*.db-wal
 
 __pycache__/

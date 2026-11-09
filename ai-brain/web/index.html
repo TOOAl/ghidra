@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>시냅스몽 · 나만의 양자화 AI 두뇌 연구소</title>
-  <link rel="stylesheet" href="ui-v3.css?v=3.4" />
+  <link rel="stylesheet" href="ui-v3.css?v=4.0" />
   <!--__INITIAL_STATE__-->
 </head>
 <body>
@@ -17,14 +17,14 @@
           <h1>시냅스몽 AI 두뇌 연구소</h1>
           <span class="live-chip"><span class="live-dot"></span>외장하드 포터블 서식지</span>
         </div>
-        <p class="brand-sub">데이터센터 없이 자라나는 마크다운 시냅스 위키 &amp; 독자 양자화 두뇌(.sbrain) 주조소</p>
+        <p class="brand-sub">데이터센터 없이 자라나는 마크다운 위키 · 독자 양자화(.sbrain) · CPU 강화학습 심판단</p>
       </div>
     </div>
 
     <div class="stage-track" aria-label="통합 구축 단계">
-      <div class="stage-pill current"><strong>A단계</strong> 위키 기억 &amp; 자체 양자화</div>
+      <div class="stage-pill done"><strong>✔ A단계</strong> 위키 &amp; 자체 양자화</div>
       <span class="stage-arrow">›</span>
-      <div class="stage-pill"><strong>B단계</strong> CPU 강화학습 체육관</div>
+      <div class="stage-pill current"><strong>B단계</strong> CPU 강화학습 체육관</div>
       <span class="stage-arrow">›</span>
       <div class="stage-pill"><strong>C단계</strong> Ghidra 역공학 해부실</div>
     </div>
@@ -147,8 +147,8 @@
           <span>위키 노트</span>
         </div>
         <div class="kpi-cell">
-          <strong id="kpiEdges">5</strong>
-          <span>시냅스 연결</span>
+          <strong id="kpiRl">0</strong>
+          <span>강화학습 판</span>
         </div>
         <div class="kpi-cell">
           <strong id="kpiForged">0</strong>
@@ -161,11 +161,12 @@
     <section class="lab-console">
       <div class="console-topbar">
         <nav class="seg-tabs" role="tablist">
-          <button class="seg-tab active" data-tab="tab-graph" type="button">🕸️ 시냅스 지식망</button>
+          <button class="seg-tab" data-tab="tab-graph" type="button">🕸️ 지식망</button>
           <button class="seg-tab" data-tab="tab-feed" type="button">🌱 지식 먹이기</button>
-          <button class="seg-tab" data-tab="tab-forge" type="button">⚒️ 양자화 주조소</button>
+          <button class="seg-tab" data-tab="tab-forge" type="button">⚒️ 양자화 주조</button>
+          <button class="seg-tab active" data-tab="tab-rl" type="button">🏋️ 강화학습 체육관</button>
           <button class="seg-tab" data-tab="tab-clinic" type="button">🩺 환각 처방실</button>
-          <button class="seg-tab" data-tab="tab-chat" type="button">💬 시냅스몽 대화</button>
+          <button class="seg-tab" data-tab="tab-chat" type="button">💬 대화하기</button>
         </nav>
         <div class="engine-indicator" id="engineStatusPill">
           위키 기억망 + 자체 양자화 엔진 가동 중
@@ -173,7 +174,7 @@
       </div>
 
       <!-- [탭 1] 시냅스 지식망 -->
-      <div class="tab-pane active" id="tab-graph">
+      <div class="tab-pane" id="tab-graph">
         <div class="pane-grid graph-layout">
           <div class="card">
             <div class="card-head">
@@ -344,6 +345,65 @@
         </div>
       </div>
 
+      <!-- [탭 3.2] B단계: CPU 강화학습 체육관 & 다수 심판 합의 판단기 -->
+      <div class="tab-pane active" id="tab-rl">
+        <div class="pane-grid rl-layout">
+          <!-- 좌측: CPU 강화학습 훈련소 & 3대 전략 비교 -->
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <span class="step-kicker">STAGE B · CPU REINFORCEMENT GYM</span>
+                <h3>CPU 강화학습 &amp; 다수 심판 합의 실험</h3>
+                <p>데이터센터 GPU 없이 내 컴퓨터 CPU만으로 5개 꼬마 뉴런을 훈련하고, 가중치 병합 없이 <strong>‘다수 심판 거부권 + 최고 전문가 결정(Good Judges)’</strong>으로 연결합니다.</p>
+              </div>
+            </div>
+
+            <div class="rl-controls">
+              <span class="opt-title">1회 훈련 판수 선택 (순수 CPU 시뮬레이터)</span>
+              <div class="dim-pills" id="rlEpGroup">
+                <button class="dim-pill" data-ep="300" type="button">300판 · 워밍업</button>
+                <button class="dim-pill active" data-ep="600" type="button">600판 · 표준 훈련</button>
+                <button class="dim-pill" data-ep="1200" type="button">1,200판 · 집중 특훈</button>
+              </div>
+              <button class="primary-btn full" id="btnRlTrain" type="button">
+                🏋️ CPU로 5인 꼬마 뉴런 강화학습 가동하기
+              </button>
+            </div>
+
+            <div class="rl-bench-box" id="rlBenchBox">
+              아직 강화학습 전입니다. 위 버튼을 눌러 0.3초 만에 600판 훈련과 미공개 실전 비교 실험을 실행해 보세요!
+            </div>
+
+            <div class="rl-roster-wrap">
+              <div class="vb-head">5인 꼬마 뉴런단 훈련 랭킹 (각자 다른 성향·예산으로 학습)</div>
+              <div class="rl-roster" id="rlAgentRoster"></div>
+            </div>
+          </div>
+
+          <!-- 우측: 선택지 확률 채점 & 주인님 코칭석 -->
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <span class="step-kicker">OPTION SCORING &amp; HUMAN-IN-THE-LOOP</span>
+                <h3>실전 선택지 채점기 &amp; 주인님 코칭석</h3>
+                <p>자유 수다 대신 행동 선택지(A~D) 확률을 채점하며, <strong>확신도 75% 미만이면 억지로 찍지 않고 주인님께 코칭을 요청</strong>합니다.</p>
+              </div>
+            </div>
+
+            <div class="chip-row" id="rlScenarioChips">
+              <button class="preset-chip active" data-sc="sc_ambiguous_crypto" type="button">🤔 낯선 암호 루프 (코칭 추천)</button>
+              <button class="preset-chip" data-sc="sc_low_ram_laptop" type="button">💻 0.9GB 노트북</button>
+              <button class="preset-chip" data-sc="sc_ungrounded_trap" type="button">🛑 미공개 취약점 질문</button>
+              <button class="preset-chip" data-sc="sc_verified_wiki" type="button">📚 검증된 위키 질문</button>
+            </div>
+
+            <div id="rlScenarioView" class="rl-scenario-view">
+              시나리오를 불러오는 중...
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- [탭 3.5] 환각 원인 진단 & 저감 처방실 -->
       <div class="tab-pane" id="tab-clinic">
         <div class="pane-grid clinic-layout">
@@ -423,6 +483,6 @@
     </section>
   </main>
 
-  <script src="ui-v3.js?v=3.4"></script>
+  <script src="ui-v3.js?v=4.0"></script>
 </body>
 </html>

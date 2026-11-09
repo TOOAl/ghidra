@@ -20,6 +20,7 @@ from urllib.parse import parse_qs, urlparse
 BRAIN_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(BRAIN_ROOT))
 
+from brain_engine.genius_pantheon import GeniusPantheon  # noqa: E402
 from brain_engine.hallucination import (  # noqa: E402
     audit_chat_grounding,
     evaluate_brain_hallucination,
@@ -41,6 +42,7 @@ class BrainState:
         self.slm = PortableSLMBridge(root / "models")
         self.forge = CustomBrainForge(root / "models")
         self.rl_gym = PortableRLGym(root / "state", root / "models")
+        self.pantheon = GeniusPantheon(root / "state", root / "models")
         self.host_info = probe_host(root)
         self.soul.register_host(self.host_info)
 
@@ -68,6 +70,7 @@ class BrainState:
             "engine": self.slm.detect_active_engine(),
             "forged_brains": forged,
             "rl": rl_snap,
+            "pantheon": self.pantheon.snapshot(),
             "graph": graph,
             "roadmap": {
                 "stage_a": {"status": "done", "title": "A단계: 마크다운 위키 & 자체 양자화 주조"},
@@ -224,6 +227,27 @@ def make_handler(state: BrainState):
                     cos_sim=record["cosine_similarity_pct"],
                 )
                 self._send_json({"forged": record, "status": state.full_status()})
+                return
+
+            if route == "/api/pantheon/distill":
+                genius_ids = body.get("genius_ids") or []
+                if not isinstance(genius_ids, list):
+                    genius_ids = []
+                res = state.pantheon.distill_into_neurons(
+                    [str(x) for x in genius_ids], state.rl_gym
+                )
+                # Also crystallize the Genius Synergy into our Markdown Wiki Graph!
+                digested = state.gardener.digest_raw_memory(
+                    res["wiki_note_body"], custom_title=res["wiki_note_title"]
+                )
+                state.soul.on_genius_mentorship(res["mentors"], res["after_score"])
+                self._send_json(
+                    {
+                        "distilled": res,
+                        "digested_note": digested,
+                        "status": state.full_status(),
+                    }
+                )
                 return
 
             if route == "/api/rl/train":

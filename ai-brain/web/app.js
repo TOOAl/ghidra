@@ -24,6 +24,13 @@ const SNACK_SAMPLES = {
 };
 
 let graphState = { nodes: [], edges: [], selectedId: null, dragNode: null };
+let pantheonState = {
+  geniuses: [],
+  edges: [],
+  selectedIds: ["turing", "feynman", "shannon"],
+  focusedId: "turing",
+  pulseTick: 0,
+};
 let selectedBits = 4;
 let selectedDim = 64;
 let selectedRlEpisodes = 600;
@@ -79,7 +86,7 @@ function setPetPose(poseKey) {
 
 function renderStatus(data) {
   if (!data || !data.soul) return;
-  const { soul, hallucination, host, forged_brains, rl, graph } = data;
+  const { soul, hallucination, host, forged_brains, rl, pantheon, graph } = data;
 
   document.getElementById("petStageBadge").textContent =
     `Lv.${soul.level} ${soul.stage_emoji} ${soul.stage_title}`;
@@ -152,7 +159,214 @@ function renderStatus(data) {
 
   renderForgedList(brains);
   if (rl) renderRlStatus(rl);
+  if (pantheon) syncPantheon(pantheon);
   if (graph) syncGraphData(graph);
+}
+
+function syncPantheon(p) {
+  const w = 700;
+  const h = 420;
+  const cx = w / 2;
+  const cy = h / 2;
+  const rx = 215;
+  const ry = 142;
+
+  pantheonState.edges = p.edges || [];
+  if (!pantheonState.geniuses.length && p.active_ids && p.active_ids.length) {
+    pantheonState.selectedIds = [...p.active_ids];
+  }
+
+  pantheonState.geniuses = (p.geniuses || []).map((g, idx, arr) => {
+    const angle = -Math.PI / 2 + (idx / Math.max(1, arr.length)) * Math.PI * 2;
+    return {
+      ...g,
+      x: cx + Math.cos(angle) * rx,
+      y: cy + Math.sin(angle) * ry,
+    };
+  });
+
+  renderGeniusPanel();
+}
+
+function renderGeniusPanel() {
+  const gs = pantheonState.geniuses;
+  if (!gs.length) return;
+  const focused = gs.find((g) => g.id === pantheonState.focusedId) || gs[0];
+  const selSet = new Set(pantheonState.selectedIds);
+
+  document.getElementById("geniusDetailBox").innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <strong style="font-size:14.5px;color:#ffffff">${focused.emoji} ${escapeHtml(focused.name)} <span style="font-size:11.5px;color:#94a3b8;font-weight:500">(${escapeHtml(focused.en_name)})</span></strong>
+      <span class="tag-pill" style="border-color:${focused.color};color:#ffffff">${escapeHtml(focused.field)}</span>
+    </div>
+    <div style="margin-top:8px;color:#e2e8f0"><strong>• 천재의 핵심 강점:</strong> ${escapeHtml(focused.strength)}</div>
+    <div style="margin-top:5px;color:#fde68a"><strong>• 양자화 사고 공식:</strong> <code>${escapeHtml(focused.formula)}</code></div>
+    <div style="margin-top:5px;color:#a7f3d0"><strong>• 꼬마 뉴런 성장 효과:</strong> ${escapeHtml(focused.helps_neurons)}</div>
+  `;
+
+  const chipsEl = document.getElementById("activeMentorChips");
+  chipsEl.innerHTML = gs
+    .map((g) => {
+      const on = selSet.has(g.id);
+      return `<button type="button" class="preset-chip ${on ? "active" : ""}" data-toggle-g="${g.id}">
+        ${on ? "✦ " : ""}${g.emoji} ${escapeHtml(g.name)}
+      </button>`;
+    })
+    .join("");
+
+  chipsEl.querySelectorAll("[data-toggle-g]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      toggleGeniusSelection(btn.dataset.toggleG);
+    });
+  });
+
+  const activeSyns = pantheonState.edges.filter(
+    (e) => selSet.has(e.source) && selSet.has(e.target)
+  );
+  const synBox = document.getElementById("activeSynergyBox");
+  if (activeSyns.length > 0) {
+    synBox.innerHTML = `
+      <strong>🌟 발동 중인 황금 시너지 시냅스 (${activeSyns.length}개 연결됨!)</strong><br/>
+      ${activeSyns.map((s) => `• ${escapeHtml(s.label)}`).join("<br/>")}
+    `;
+  } else {
+    synBox.innerHTML = `서로 연결된 천재 2명 이상을 함께 선택하면 분야 간 <strong>황금 시너지 시냅스</strong> 보너스가 발동합니다!`;
+  }
+}
+
+function toggleGeniusSelection(gid) {
+  pantheonState.focusedId = gid;
+  const idx = pantheonState.selectedIds.indexOf(gid);
+  if (idx >= 0) {
+    if (pantheonState.selectedIds.length > 1) {
+      pantheonState.selectedIds.splice(idx, 1);
+    }
+  } else {
+    pantheonState.selectedIds.push(gid);
+  }
+  renderGeniusPanel();
+}
+
+function setupGeniusCanvas() {
+  const canvas = document.getElementById("geniusCanvas");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+
+  canvas.addEventListener("mousedown", (evt) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = ((evt.clientX - rect.left) / rect.width) * canvas.width;
+    const my = ((evt.clientY - rect.top) / rect.height) * canvas.height;
+    for (const g of pantheonState.geniuses) {
+      if (Math.hypot(mx - g.x, my - g.y) <= 28) {
+        toggleGeniusSelection(g.id);
+        break;
+      }
+    }
+  });
+
+  function drawGeniusLoop() {
+    pantheonState.pulseTick += 0.04;
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    const gs = pantheonState.geniuses;
+    const byId = Object.fromEntries(gs.map((g) => [g.id, g]));
+    const selSet = new Set(pantheonState.selectedIds);
+
+    // Central baby-neuron core emblem!
+    const cx = w / 2;
+    const cy = h / 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 24 + Math.sin(pantheonState.pulseTick) * 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(124, 111, 246, 0.2)";
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = "rgba(165, 180, 252, 0.55)";
+    ctx.stroke();
+    ctx.fillStyle = "#e0e7ff";
+    ctx.font = "bold 11.5px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("5인 꼬마 뉴런", cx, cy + 4);
+
+    // Mentor -> Baby Neuron energy beams for selected geniuses
+    gs.forEach((g) => {
+      if (!selSet.has(g.id)) return;
+      ctx.beginPath();
+      ctx.setLineDash([5, 5]);
+      ctx.moveTo(g.x, g.y);
+      ctx.lineTo(cx, cy);
+      ctx.strokeStyle = "rgba(124, 111, 246, 0.42)";
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+      ctx.setLineDash([]);
+    });
+
+    // Inter-Genius Synergy Constellation Edges
+    pantheonState.edges.forEach((e) => {
+      const a = byId[e.source];
+      const b = byId[e.target];
+      if (!a || !b) return;
+      const bothOn = selSet.has(a.id) && selSet.has(b.id);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.strokeStyle = bothOn ? "rgba(245, 185, 66, 0.88)" : "rgba(148, 163, 184, 0.18)";
+      ctx.lineWidth = bothOn ? 2.6 : 1.2;
+      if (bothOn) {
+        ctx.shadowColor = "#f5b942";
+        ctx.shadowBlur = 10;
+      }
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      if (bothOn) {
+        const mx = (a.x + b.x) / 2;
+        const my = (a.y + b.y) / 2;
+        ctx.fillStyle = "#fde68a";
+        ctx.font = "bold 10.5px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(e.label, mx, my - 5);
+      }
+    });
+
+    // Genius Stars
+    gs.forEach((g) => {
+      const isSel = selSet.has(g.id);
+      const isFocus = g.id === pantheonState.focusedId;
+
+      if (isSel) {
+        ctx.beginPath();
+        ctx.arc(g.x, g.y, 25 + Math.sin(pantheonState.pulseTick * 1.3) * 2, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(245, 185, 66, 0.16)";
+        ctx.fill();
+      }
+
+      ctx.beginPath();
+      ctx.arc(g.x, g.y, isSel ? 17 : 13, 0, Math.PI * 2);
+      ctx.fillStyle = isSel ? g.color : "#334155";
+      ctx.shadowColor = g.color;
+      ctx.shadowBlur = isSel ? 18 : 4;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      ctx.lineWidth = isFocus ? 3 : 1.8;
+      ctx.strokeStyle = isFocus ? "#ffffff" : isSel ? "#fde68a" : "#64748b";
+      ctx.stroke();
+
+      ctx.fillStyle = isSel ? "#ffffff" : "#94a3b8";
+      ctx.font = isSel ? "bold 12.5px sans-serif" : "11.5px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(`${g.emoji} ${g.name}`, g.x, g.y + 32);
+      ctx.fillStyle = isSel ? "#cbd5e1" : "#64748b";
+      ctx.font = "10.5px sans-serif";
+      ctx.fillText(g.field, g.x, g.y + 46);
+    });
+
+    requestAnimationFrame(drawGeniusLoop);
+  }
+
+  requestAnimationFrame(drawGeniusLoop);
 }
 
 function renderClinic(h) {
@@ -899,10 +1113,54 @@ function setupInteractions() {
       loadRlScenario(chip.dataset.sc);
     });
   });
+
+  // Dual Constellation Switcher (Genius Mentors <-> Wiki Memories)
+  document.getElementById("btnModeGenius").addEventListener("click", () => {
+    document.getElementById("btnModeGenius").classList.add("active");
+    document.getElementById("btnModeWiki").classList.remove("active");
+    document.getElementById("viewGeniusConstellation").classList.remove("hidden");
+    document.getElementById("viewWikiConstellation").classList.add("hidden");
+    document.getElementById("constellationHint").textContent =
+      "천재 별을 클릭해 연합을 꾸리면 시너지 시냅스가 빛나며 꼬마 뉴런에게 사고법을 전수합니다!";
+  });
+
+  document.getElementById("btnModeWiki").addEventListener("click", () => {
+    document.getElementById("btnModeWiki").classList.add("active");
+    document.getElementById("btnModeGenius").classList.remove("active");
+    document.getElementById("viewWikiConstellation").classList.remove("hidden");
+    document.getElementById("viewGeniusConstellation").classList.add("hidden");
+    document.getElementById("constellationHint").textContent =
+      "내 마크다운 위키 노트들과 전수받은 천재 비급서가 양방향 시냅스로 연결된 기억 별자리입니다.";
+  });
+
+  // Distill Selected Quantized Geniuses into our 5 Baby Neurons!
+  document.getElementById("btnDistillGenius").addEventListener("click", async () => {
+    const fb = document.getElementById("distillFeedback");
+    fb.classList.remove("hidden");
+    fb.textContent = "천재 스승단의 사고 공식을 4비트 양자화(.sbrain)로 주조해 5인 꼬마 뉴런에 전수 중...";
+    setPetPose("03_swirl");
+
+    const res = await apiPost("api/pantheon/distill", {
+      genius_ids: pantheonState.selectedIds,
+    });
+    if (res.distilled) {
+      const d = res.distilled;
+      pulsePortrait();
+      renderStatus(res.status);
+      loadRlScenario(selectedScenarioId);
+      fb.innerHTML = `
+        🌟 <strong>천재 멘토 전수 완료!</strong> (<code>${escapeHtml(d.sbrain_file)}</code> · ${d.sbrain_kb} KB · 정밀도 ${d.cosine_similarity_pct}%)<br/>
+        • 참여 스승: <strong>${d.mentors.map(escapeHtml).join(" × ")}</strong><br/>
+        • 5인 꼬마 뉴런 심판단 실전 점수: <strong>${d.before_score}점 → ${d.after_score}점</strong> (${d.gain_pts >= 0 ? "+" : ""}${d.gain_pts}점 변화!)<br/>
+        • 마크다운 위키 기억망에도 비급서 카드로 영구 연결되었습니다!
+      `;
+    }
+  });
 }
 
 async function init() {
   setupGraphSimulation();
+  setupGeniusCanvas();
   setupInteractions();
 
   // Instant 0ms render from server-injected initial state (never stuck on "측정 중...")

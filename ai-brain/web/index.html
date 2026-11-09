@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>시냅스몽 · 나만의 양자화 AI 두뇌 연구소</title>
-  <link rel="stylesheet" href="ui-v3.css?v=4.0" />
+  <link rel="stylesheet" href="ui-v3.css?v=4.1" />
   <!--__INITIAL_STATE__-->
 </head>
 <body>
@@ -161,10 +161,10 @@
     <section class="lab-console">
       <div class="console-topbar">
         <nav class="seg-tabs" role="tablist">
-          <button class="seg-tab" data-tab="tab-graph" type="button">🕸️ 지식망</button>
+          <button class="seg-tab active" data-tab="tab-graph" type="button">🌟 천재·시냅스 성좌</button>
           <button class="seg-tab" data-tab="tab-feed" type="button">🌱 지식 먹이기</button>
           <button class="seg-tab" data-tab="tab-forge" type="button">⚒️ 양자화 주조</button>
-          <button class="seg-tab active" data-tab="tab-rl" type="button">🏋️ 강화학습 체육관</button>
+          <button class="seg-tab" data-tab="tab-rl" type="button">🏋️ 강화학습 체육관</button>
           <button class="seg-tab" data-tab="tab-clinic" type="button">🩺 환각 처방실</button>
           <button class="seg-tab" data-tab="tab-chat" type="button">💬 대화하기</button>
         </nav>
@@ -173,9 +173,54 @@
         </div>
       </div>
 
-      <!-- [탭 1] 시냅스 지식망 -->
-      <div class="tab-pane" id="tab-graph">
-        <div class="pane-grid graph-layout">
+      <!-- [탭 1] 이중 성좌 천문대: 인류 천재 멘토 성좌도 ⇄ 내 위키 기억 성좌도 -->
+      <div class="tab-pane active" id="tab-graph">
+        <div class="constellation-mode-bar">
+          <div class="cm-pills">
+            <button class="cm-btn active" id="btnModeGenius" type="button">🌟 인류 천재 멘토 성좌도 (스승단)</button>
+            <button class="cm-btn" id="btnModeWiki" type="button">📘 내 마크다운 기억 성좌도 (기억망)</button>
+          </div>
+          <span class="cm-hint" id="constellationHint">천재 별을 클릭해 연합을 꾸리면 시너지 시냅스가 빛나며 꼬마 뉴런에게 사고법을 전수합니다!</span>
+        </div>
+
+        <!-- 모드 A: 인류 천재 양자화 멘토 성좌도 -->
+        <div class="pane-grid graph-layout" id="viewGeniusConstellation">
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <h3>양자화 천재 멘토 성좌도 (6대 분야 시너지 그물망)</h3>
+                <p>별을 클릭해 멘토단에 포함/해제해 보세요. 연결된 두 천재가 함께 선택되면 <strong>황금 시너지 시냅스</strong>가 켜집니다!</p>
+              </div>
+            </div>
+            <div class="canvas-wrap">
+              <canvas id="geniusCanvas" width="700" height="420"></canvas>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <span class="step-kicker">MENTOR DISTILLATION</span>
+                <h3 id="geniusTitle">선택한 천재 멘토단 &amp; 꼬마 뉴런 전수</h3>
+              </div>
+            </div>
+
+            <div id="geniusDetailBox" class="genius-detail-box"></div>
+
+            <div class="mentor-team-box">
+              <div class="vb-head">현재 결성된 천재 스승 연합 (클릭해 조합 변경 가능)</div>
+              <div id="activeMentorChips" class="chip-row" style="margin-bottom:8px"></div>
+              <div id="activeSynergyBox" class="synergy-callout"></div>
+              <button class="primary-btn full" id="btnDistillGenius" type="button">
+                ⚡ 천재 사고법 양자화(.sbrain) 주조 &amp; 5인 꼬마 뉴런에 전수하기
+              </button>
+              <div id="distillFeedback" class="clinic-feedback hidden" style="margin-top:10px;margin-bottom:0"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 모드 B: 실시간 마크다운 위키 기억 성좌도 -->
+        <div class="pane-grid graph-layout hidden" id="viewWikiConstellation">
           <div class="card">
             <div class="card-head">
               <div>
@@ -190,7 +235,7 @@
               </div>
             </div>
             <div class="canvas-wrap">
-              <canvas id="graphCanvas" width="700" height="470"></canvas>
+              <canvas id="graphCanvas" width="700" height="440"></canvas>
             </div>
           </div>
 
@@ -346,7 +391,7 @@
       </div>
 
       <!-- [탭 3.2] B단계: CPU 강화학습 체육관 & 다수 심판 합의 판단기 -->
-      <div class="tab-pane active" id="tab-rl">
+      <div class="tab-pane" id="tab-rl">
         <div class="pane-grid rl-layout">
           <!-- 좌측: CPU 강화학습 훈련소 & 3대 전략 비교 -->
           <div class="card">
@@ -483,6 +528,6 @@
     </section>
   </main>
 
-  <script src="ui-v3.js?v=4.0"></script>
+  <script src="ui-v3.js?v=4.1"></script>
 </body>
 </html>

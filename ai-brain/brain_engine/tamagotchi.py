@@ -226,6 +226,20 @@ class TamagotchiSoul:
         self._log_event(f"주인님 직접 코칭 반영 ({scenario_title[:18]}… → 확신 {conf_pct}%)")
         self._save()
 
+    def on_genius_mentorship(self, mentors: List[str], after_score: float) -> None:
+        self.data["xp"] = int(self.data.get("xp", 0)) + 30
+        self.data["mood"] = min(100, int(self.data.get("mood", 85)) + 10)
+        self.data["satiety"] = min(100, int(self.data.get("satiety", 70)) + 12)
+        self.data["rl_iq_bonus"] = min(50, int(self.data.get("rl_iq_bonus", 0)) + 4)
+        self.data["pose"] = "06_star"
+        joined = " · ".join(mentors[:3]) + (f" 외 {len(mentors) - 3}명" if len(mentors) > 3 else "")
+        self.data["last_speech"] = (
+            f"별자리 공명 완료! [{joined}] 양자화 천재 스승님들의 사고 공식을 꼬마 뉴런들에게 전수해 "
+            f"실전 점수가 {after_score}점이 되었어요! (+30 XP)"
+        )
+        self._log_event(f"천재 성좌 멘토 전수: {joined} (심판단 {after_score}점)")
+        self._save()
+
     def on_forge_brain(self, bits: int, saved_pct: float, cos_sim: float) -> None:
         self.data["xp"] = int(self.data.get("xp", 0)) + 30
         self.data["mood"] = min(100, int(self.data.get("mood", 80)) + 12)

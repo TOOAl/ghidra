@@ -13,6 +13,8 @@ models/
 state/*.db
 state/*.db-journal
 state/rl_council.json
+state/genius_pantheon.json
+vault/00_Raw/*.md
 state/*.db-wal
 
 __pycache__/

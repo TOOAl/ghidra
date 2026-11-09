@@ -1823,10 +1823,41 @@ function renderEvoXrayAndBlueprint(bundle) {
   setEvoStepper(2, 3);
 }
 
+/* ---- 💻 Stage H: the CODING muscle's live opinion inside the 4th-stage audit ---- */
+function renderMuscleOpinion(mus) {
+  if (!mus) return "";
+  const truth = mus.truth_classes || [];
+  const bars = (mus.suspects || [])
+    .map((x) => {
+      const pct = Math.round((x.confidence || 0) * 100);
+      const isTruth = truth.includes(x.cls);
+      return `
+      <div class="mu-bar-row ${isTruth ? "hit" : ""}">
+        <span class="mu-cls">${escapeHtml(x.cls)}</span>
+        <span class="mu-track"><span class="mu-fill" style="width:${pct}%"></span></span>
+        <span class="mu-pct">${pct}%</span>
+        ${isTruth ? '<span class="mu-truth">✔ 실제 결함</span>' : ""}
+      </div>`;
+    })
+    .join("");
+  const state_cls = mus.untrained ? "untrained" : mus.top1_hit ? "hit" : "miss";
+  const train = mus.untrained
+    ? `<button class="ghost-btn accent mu-train" type="button">🏋️ 코딩 근육 딱 1번 훈련하고 다시 감사하기! (🍼 → 🎯 로 변해요)</button>`
+    : `<button class="ghost-btn mu-train" type="button">🏋️ 코딩 근육 더 훈련하고 다시 감사하기</button>`;
+  return `
+    <div class="muscle-opinion ${state_cls}">
+      <div class="mo-head">💻 코딩 근육 <b>Lv${mus.level}</b> (티어 ${(mus.tier || 0) + 1}) 의 실전 의견 — 버그 지문 ${mus.lit_fingerprints}개 점등</div>
+      <div class="mo-verdict">${escapeHtml(mus.verdict || "")}</div>
+      ${bars ? `<div class="mo-bars">${bars}</div>` : `<div class="mo-bars-empty">행렬이 영점이라 순위를 매길 근거가 아직 없어요 — 정직하게 "모름"이라고 대답하는 중!</div>`}
+      ${train}
+    </div>`;
+}
+
 function renderEvoAudit(diag) {
   const box = document.getElementById("evoAuditBox");
+  const muscleHtml = renderMuscleOpinion(diag.muscle);
   if (diag.clean) {
-    box.innerHTML = `<strong style="color:#6ee7b7">✅ [기관③ 돋보기 &amp; 기관⑤ 복어독 스캐너] 결함 0건 · 위험 명령 0건 깨끗합니다!</strong>`;
+    box.innerHTML = `${muscleHtml}<strong style="color:#6ee7b7">✅ [기관③ 돋보기 &amp; 기관⑤ 복어독 스캐너] 결함 0건 · 위험 명령 0건 깨끗합니다!</strong>`;
     return;
   }
   const cards = (diag.findings || [])
@@ -1846,6 +1877,7 @@ function renderEvoAudit(diag) {
 
   box.innerHTML = `
     <strong style="color:#fda4af">🔍 4단계 [기관③ 원인 역추적 돋보기 &amp; 기관⑤ 복어독 제거기] 총 ${(diag.findings || []).length}건 적발!</strong>
+    ${muscleHtml}
     ${cards}
   `;
 }
@@ -1956,6 +1988,11 @@ function setupEvoForgeInteractions() {
     const res = await apiPost("api/evo/audit", { specimen_id: activeEvoSpecimenId, code });
     if (res.audit && res.audit.diagnosis) {
       renderEvoAudit(res.audit.diagnosis);
+      const mus = res.audit.diagnosis.muscle;
+      if (mus) {
+        showEvoToast({ kind: "field", beat: "💻", diary: `코딩 근육 Lv${mus.level} 실전 의견 — ${mus.verdict || ""}` });
+      }
+      if (res.field_report) renderField(res.field_report);
       if (res.audit.diagnosis.sandbox) {
         renderEvoSandbox(res.audit.diagnosis.sandbox, "4단계 사전 대조");
       } else if (res.audit.diagnosis.findings.some((f) => f.severity === "toxin")) {
@@ -1989,6 +2026,22 @@ function setupEvoForgeInteractions() {
         setEvoStepper(4, 5);
       }
     }
+  }
+
+  const auditBoxEl = document.getElementById("evoAuditBox");
+  if (auditBoxEl) {
+    auditBoxEl.addEventListener("click", async (evt) => {
+      const t = evt.target;
+      const btn = t && t.closest ? t.closest(".mu-train") : null;
+      if (!btn) return;
+      btn.disabled = true;
+      const label = btn.textContent;
+      btn.textContent = "🏋️ 체육관에서 훈련 중...";
+      await trainAbility("coding", "train");
+      await doAudit();
+      btn.disabled = false;
+      btn.textContent = label;
+    });
   }
 
   document.getElementById("btnEvoAudit").addEventListener("click", doAudit);
@@ -2258,7 +2311,9 @@ function renderHeartbeat(hb) {
 function showEvoToast(entry) {
   const toast = document.getElementById("evoToast");
   if (!toast || !entry) return;
-  const head = entry.kind === "vaccine" ? "🛡️ 예방접종 훈련 완료!" : entry.kind === "stumble" ? "💤 으앙... 살짝 넘어졌어요" : `💓 ${entry.beat}번째 박동! 새 진화 완료!`;
+  const head = entry.kind === "field"
+    ? `⚔️ 근육 실전 투입! ${entry.beat || ""}`.trim()
+    : entry.kind === "vaccine" ? "🛡️ 예방접종 훈련 완료!" : entry.kind === "stumble" ? "💤 으앙... 살짝 넘어졌어요" : `💓 ${entry.beat}번째 박동! 새 진화 완료!`;
   toast.innerHTML = `<strong>${escapeHeartHtml(head)}</strong><br>${escapeHeartHtml(entry.diary)}`;
   toast.classList.remove("hidden");
   if (HEART_TOAST_TIMER) clearTimeout(HEART_TOAST_TIMER);
@@ -2567,7 +2622,7 @@ function setupHeartbeat() {
   setInterval(pollHeartbeat, 5000);
 }
 
-const CURRENT_UI_VERSION = "6.5";
+const CURRENT_UI_VERSION = "6.6";
 
 async function init() {
   setupGraphSimulation();

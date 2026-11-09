@@ -3349,3 +3349,88 @@ code {
 
 .journal-entry.kind-field { border-left-color: #fb923c; background: rgba(67, 20, 7, 0.32); }
 .journal-entry.kind-field .je-beat { background: linear-gradient(135deg, #fed7aa, #fb923c); }
+
+/* ---------------------------------------------------------------------------
+   💻 Stage H — the coding muscle's opinion banner inside the 4th-stage audit
+--------------------------------------------------------------------------- */
+.muscle-opinion {
+  margin: 8px 0 10px;
+  border-radius: 12px;
+  padding: 9px 11px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.muscle-opinion.untrained {
+  border-color: rgba(148, 163, 184, 0.42);
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.75), rgba(15, 23, 42, 0.6));
+}
+
+.muscle-opinion.hit {
+  border-color: rgba(52, 211, 153, 0.55);
+  background: linear-gradient(135deg, rgba(6, 78, 59, 0.55), rgba(15, 23, 42, 0.6));
+}
+
+.muscle-opinion.miss {
+  border-color: rgba(251, 146, 60, 0.5);
+  background: linear-gradient(135deg, rgba(67, 20, 7, 0.5), rgba(15, 23, 42, 0.6));
+}
+
+.mo-head { font-size: 11.8px; font-weight: 800; color: #e2e8f0; }
+.mo-head b { color: #fcd34d; font-size: 12.6px; }
+
+.mo-verdict {
+  margin-top: 4px;
+  font-size: 11.6px;
+  line-height: 1.55;
+  color: #f1f5f9;
+}
+
+.muscle-opinion.hit .mo-verdict { color: #a7f3d0; }
+.muscle-opinion.miss .mo-verdict { color: #fed7aa; }
+.muscle-opinion.untrained .mo-verdict { color: #cbd5e1; }
+
+.mo-bars { margin-top: 7px; display: flex; flex-direction: column; gap: 4px; }
+
+.mu-bar-row {
+  display: grid;
+  grid-template-columns: 108px 1fr 40px auto;
+  gap: 7px;
+  align-items: center;
+  font-size: 10.8px;
+}
+
+.mu-cls { color: #bae6fd; font-weight: 700; font-family: ui-monospace, monospace; }
+
+.mu-track {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.2);
+  overflow: hidden;
+}
+
+.mu-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #38bdf8, #818cf8);
+}
+
+.mu-bar-row.hit .mu-fill { background: linear-gradient(90deg, #34d399, #a3e635); }
+.mu-pct { color: #e2e8f0; font-weight: 800; text-align: right; }
+
+.mu-truth {
+  color: #6ee7b7;
+  font-weight: 800;
+  font-size: 10.2px;
+  white-space: nowrap;
+}
+
+.mo-bars-empty {
+  margin-top: 6px;
+  font-size: 10.8px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.mu-train { margin-top: 8px; font-size: 11.2px; }

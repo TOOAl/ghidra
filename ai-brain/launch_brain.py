@@ -79,7 +79,7 @@ class BrainState:
             rl_trained=rl_trained,
         )
         return {
-            "ui_version": "6.5",
+            "ui_version": "6.6",
             "soul": self.soul.snapshot(graph["stats"], env_grade=env_grade),
             "hallucination": hallucination,
             "host": self.host_info,
@@ -505,7 +505,7 @@ def make_handler(state: BrainState):
                             "lit_fingerprints": cm.get("lit_fingerprints"),
                         },
                     )
-                self._send_json({"audit": audit})
+                self._send_json({"audit": audit, "field_report": state.abilities.field_report()})
                 return
 
             if route == "/api/evo/repair":

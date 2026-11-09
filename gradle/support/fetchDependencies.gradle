@@ -489,9 +489,19 @@ deps.each {
 	}
 	File file = new File(DOWNLOADS_DIR, it.name)
 	if (OFFLINE || !it.sha256.equals(generateHash(file))) {
-		download(it.url, file)
-		if (!OFFLINE) {
-			assert(it.sha256.equals(generateHash(file)));
+		try {
+			download(it.url, file)
+			if (!OFFLINE) {
+				def actualHash = generateHash(file)
+				if (!it.sha256.equals(actualHash)) {
+					println "::error::SHA-256 mismatch for ${it.name}: expected ${it.sha256}, got ${actualHash} (size=${file.length()})"
+					assert(it.sha256.equals(actualHash))
+				}
+			}
+		}
+		catch (Throwable t) {
+			println "::error::Failed dependency ${it.name} (${it.url}): ${t}"
+			throw t
 		}
 	}
 }
@@ -657,7 +667,6 @@ def establishConnection(url, retries) {
 			URLConnection conn = new URL(resolvedUrl).openConnection();
 			conn.setConnectTimeout(30000);
 			conn.setReadTimeout(120000);
-			conn.setRequestProperty("User-Agent", "ghidra-fetchDependencies");
 			def stream = new BufferedInputStream(conn.getInputStream());
 			def size = conn.getContentLengthLong();
 			if (size == -1) {

@@ -595,6 +595,10 @@ def download(url, file) {
  * @return the InputStream for the URL, and the size of the download in bytes as a string
  */
 def resolveGitHubReleaseAssetUrl(String url) {
+	def rawMatch = java.util.regex.Pattern.compile('^https://github\\.com/([^/]+)/([^/]+)/raw/(.+)$').matcher(url)
+	if (rawMatch.matches()) {
+		return "https://raw.githubusercontent.com/${rawMatch.group(1)}/${rawMatch.group(2)}/${rawMatch.group(3)}".toString()
+	}
 	def m = java.util.regex.Pattern.compile('^https://github\\.com/([^/]+)/([^/]+)/releases/download/([^/]+)/([^/?#]+)$').matcher(url)
 	if (!m.matches()) {
 		return url
@@ -676,6 +680,9 @@ def establishConnection(url, retries) {
 		}
 		catch (Exception e) {
 			println "   Connection error! " + e
+			if (i == retries - 1) {
+				println "::error::Connection error on final attempt for ${url}: ${e}"
+			}
 		}
 	}
 	return [null, "???"]

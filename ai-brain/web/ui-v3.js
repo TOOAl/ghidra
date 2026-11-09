@@ -1439,6 +1439,7 @@ function setupInteractions() {
     document.getElementById("addGeniusLens").value = d.lens || "";
     document.getElementById("addGeniusCredo").value = d.credo || "";
   }
+  window.__runScout = runScoutAnalysis;
 
   document.getElementById("btnScoutGenius").addEventListener("click", () => runScoutAnalysis());
   document.getElementById("scoutQueryInput").addEventListener("keydown", (evt) => {
@@ -1596,6 +1597,8 @@ function setupInteractions() {
   });
 }
 
+const CURRENT_UI_VERSION = "4.5";
+
 async function init() {
   setupGraphSimulation();
   setupGeniusCanvas();
@@ -1612,6 +1615,21 @@ async function init() {
     loadRlScenario(selectedScenarioId),
   ]);
   renderStatus(freshStatus);
+  if (window.__runScout) {
+    window.__runScout("이성계");
+  }
+
+  // Auto-refresh preview tab whenever backend serves a newer UI version
+  setInterval(async () => {
+    try {
+      const st = await apiGet("api/status");
+      if (st && st.ui_version && st.ui_version !== CURRENT_UI_VERSION) {
+        window.location.reload();
+      }
+    } catch (_) {
+      // ignore transient network blips
+    }
+  }, 6000);
 }
 
 init();

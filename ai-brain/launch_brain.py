@@ -65,6 +65,7 @@ class BrainState:
             rl_trained=rl_trained,
         )
         return {
+            "ui_version": "4.5",
             "soul": self.soul.snapshot(graph["stats"], env_grade=env_grade),
             "hallucination": hallucination,
             "host": self.host_info,

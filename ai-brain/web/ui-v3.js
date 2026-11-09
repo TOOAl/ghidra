@@ -2073,13 +2073,138 @@ function setupEvoForgeInteractions() {
   });
 }
 
-const CURRENT_UI_VERSION = "5.1";
+
+/* ===========================================================================
+   Stage D — Self-Evolving Heartbeat 💓 controller & Evolution Journal feed
+=========================================================================== */
+let HEART_PREV_BEATS = null;
+let HEART_TOAST_TIMER = null;
+
+function escapeHeartHtml(txt) {
+  return String(txt == null ? "" : txt)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function renderHeartJournal(hb) {
+  const list = document.getElementById("evoJournalList");
+  if (!list) return;
+  const entries = hb.journal || [];
+  if (!entries.length) {
+    list.innerHTML = '<div class="journal-empty">아직 일지가 비어 있어요. [⚡ 지금 바로 한 박동!] 을 누르거나 잠시 기다리면, 두뇌가 혼자 꿈꾸며 배운 이야기가 여기에 쌓입니다! 💤</div>';
+    return;
+  }
+  list.innerHTML = entries.map((e) => {
+    const kind = e.kind === "vaccine" ? "kind-vaccine" : e.kind === "stumble" ? "kind-stumble" : "kind-evolve";
+    const kindLabel = e.kind === "vaccine" ? "🛡️ 예방접종" : e.kind === "stumble" ? "💤 깜빡" : "🌱 진화";
+    const chips = [
+      `<span class="je-chip">${kindLabel}</span>`,
+      `<span class="je-chip">🔍 결함 ${escapeHeartHtml(e.defects_found)}건</span>`,
+      e.toxins_found ? `<span class="je-chip">🐡 독 ${escapeHeartHtml(e.toxins_found)}건</span>` : "",
+      `<span class="je-chip">🧪 ${escapeHeartHtml(e.pass_before)}% → ${escapeHeartHtml(e.pass_after)}%</span>`,
+      `<span class="je-chip">⏱ ${escapeHeartHtml(e.ms)}ms</span>`,
+    ].join("");
+    return (
+      `<div class="journal-entry ${kind}">` +
+      `<div class="je-head"><span class="je-beat">박동 #${escapeHeartHtml(e.beat)}</span>` +
+      `<span class="je-title">${escapeHeartHtml(e.title)}</span>` +
+      `<span class="je-time">${escapeHeartHtml(e.ts)}</span></div>` +
+      `<p class="je-diary">${escapeHeartHtml(e.diary)}</p>` +
+      `<div class="je-chips">${chips}</div></div>`
+    );
+  }).join("");
+}
+
+function renderHeartbeat(hb) {
+  const lamp = document.getElementById("heartLamp");
+  const line = document.getElementById("heartStatusLine");
+  const toggle = document.getElementById("btnHeartToggle");
+  if (!lamp || !line || !toggle) return;
+  lamp.classList.toggle("paused", !!hb.paused);
+  toggle.textContent = hb.paused ? "▶️ 꿈에서 깨우기" : "😴 잠시 재우기";
+  if (hb.paused) {
+    line.textContent = "😴 심장이 잠시 낮잠 자는 중이에요. [▶️ 꿈에서 깨우기] 를 누르면 다시 혼자 꿈꾸며 진화합니다!";
+  } else if (hb.running) {
+    line.textContent =
+      `💓 ${hb.beats_total}번째 박동까지 완료! 다음 박동까지 ${hb.next_beat_in_sec}초 · ` +
+      `꿈 스킬 ${hb.dream_installed}/${hb.pool_size} 장착 · ${hb.interval_sec}초마다 혼자 공부해요`;
+  } else {
+    line.textContent = "💌 심장박동 신호를 연결하는 중...";
+  }
+  renderHeartJournal(hb);
+}
+
+function showEvoToast(entry) {
+  const toast = document.getElementById("evoToast");
+  if (!toast || !entry) return;
+  const head = entry.kind === "vaccine" ? "🛡️ 예방접종 훈련 완료!" : entry.kind === "stumble" ? "💤 으앙... 살짝 넘어졌어요" : `💓 ${entry.beat}번째 박동! 새 진화 완료!`;
+  toast.innerHTML = `<strong>${escapeHeartHtml(head)}</strong><br>${escapeHeartHtml(entry.diary)}`;
+  toast.classList.remove("hidden");
+  if (HEART_TOAST_TIMER) clearTimeout(HEART_TOAST_TIMER);
+  HEART_TOAST_TIMER = setTimeout(() => toast.classList.add("hidden"), 7000);
+}
+
+async function pollHeartbeat() {
+  try {
+    const res = await fetch("/api/evo/heartbeat");
+    if (!res.ok) return;
+    const hb = await res.json();
+    renderHeartbeat(hb);
+    if (HEART_PREV_BEATS !== null && hb.beats_total > HEART_PREV_BEATS && hb.last_entry) {
+      showEvoToast(hb.last_entry);
+    }
+    HEART_PREV_BEATS = hb.beats_total;
+  } catch (err) {
+    /* heartbeat API unreachable: keep silent */
+  }
+}
+
+function setupHeartbeat() {
+  const toggle = document.getElementById("btnHeartToggle");
+  const now = document.getElementById("btnHeartNow");
+  if (toggle) {
+    toggle.addEventListener("click", async () => {
+      try {
+        const res = await fetch("/api/evo/heartbeat/toggle", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+        const data = await res.json();
+        if (data.heartbeat) {
+          renderHeartbeat(data.heartbeat);
+          HEART_PREV_BEATS = data.heartbeat.beats_total;
+        }
+      } catch (err) { /* ignore */ }
+    });
+  }
+  if (now) {
+    now.addEventListener("click", async () => {
+      now.disabled = true;
+      const oldLabel = now.textContent;
+      now.textContent = "💭 꿈꾸는 중...";
+      try {
+        const res = await fetch("/api/evo/heartbeat/beat", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+        const data = await res.json();
+        if (data.entry) showEvoToast(data.entry);
+        if (data.heartbeat) {
+          renderHeartbeat(data.heartbeat);
+          HEART_PREV_BEATS = data.heartbeat.beats_total;
+        }
+        if (data.status && typeof renderStatus === "function") renderStatus(data.status);
+      } catch (err) { /* ignore */ }
+      now.disabled = false;
+      now.textContent = oldLabel;
+    });
+  }
+  pollHeartbeat();
+  setInterval(pollHeartbeat, 5000);
+}
+
+const CURRENT_UI_VERSION = "6.0";
 
 async function init() {
   setupGraphSimulation();
   setupGeniusCanvas();
   setupInteractions();
   setupEvoForgeInteractions();
+  setupHeartbeat();
 
   // Instant 0ms render from server-injected initial state (never stuck on "측정 중...")
   if (window.__INITIAL_STATUS__) {

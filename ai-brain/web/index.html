@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>시냅스몽 · 나만의 양자화 AI 두뇌 연구소</title>
-  <link rel="stylesheet" href="ui-v3.css?v=5.1" />
+  <link rel="stylesheet" href="ui-v3.css?v=6.0" />
   <!--__INITIAL_STATE__-->
 </head>
 <body>
@@ -379,6 +379,23 @@
             </div>
           </div>
 
+          <!-- 💓 D단계: 자가 진화 심장박동 & 주인님 부재중 진화 일지 -->
+          <div class="card evo-heart-card" id="evoHeartPanel">
+            <div class="evo-heart-head">
+              <div class="heart-lamp" id="heartLamp" title="두뇌 심장박동 상태등"><span class="heart-core">💓</span></div>
+              <div class="evo-heart-titles">
+                <span class="step-kicker">STAGE D · SELF-EVOLVING HEARTBEAT</span>
+                <h3>💓 자가 진화 심장박동 — 주인님 없는 사이의 진화 일지</h3>
+                <p class="heart-status-line" id="heartStatusLine">💌 심장박동 신호를 연결하는 중...</p>
+              </div>
+              <div class="evo-heart-actions">
+                <button class="ghost-btn" id="btnHeartToggle" type="button">😴 잠시 재우기</button>
+                <button class="primary-btn" id="btnHeartNow" type="button">⚡ 지금 바로 한 박동!</button>
+              </div>
+            </div>
+            <div class="evo-journal-list" id="evoJournalList"></div>
+          </div>
+
           <div class="pane-grid evo-grid">
             <!-- 좌측: 1단계 역공학 해부실 + 2단계 핵심 원리 설계도 번역기 -->
             <div class="card">
@@ -751,6 +768,9 @@
     </section>
   </main>
 
+  <!-- 💓 자가 진화 심장박동 새 박동 알림 토스트 -->
+  <div class="evo-toast hidden" id="evoToast" role="status"></div>
+
   <!-- 🖼️ 4대 핵심 능력 × 5대 필수 기관 × 6단계 자가 진화 공방 조화 설계도 이미지 모달 -->
   <div class="evo-modal-backdrop hidden" id="evoHarmonyModal" style="display:none" role="dialog" aria-modal="true" aria-labelledby="evoModalTitle">
     <div class="evo-modal-dialog">
@@ -823,6 +843,6 @@
     </div>
   </div>
 
-  <script src="ui-v3.js?v=5.1"></script>
+  <script src="ui-v3.js?v=6.0"></script>
 </body>
 </html>

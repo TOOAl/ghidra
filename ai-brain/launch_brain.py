@@ -20,6 +20,7 @@ from urllib.parse import parse_qs, urlparse
 BRAIN_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(BRAIN_ROOT))
 
+from brain_engine.evolution_heartbeat import EvolutionHeartbeat  # noqa: E402
 from brain_engine.genius_pantheon import GeniusPantheon  # noqa: E402
 from brain_engine.genius_scout import analyze_candidate_genius  # noqa: E402
 from brain_engine.hallucination import (  # noqa: E402
@@ -46,6 +47,13 @@ class BrainState:
         self.rl_gym = PortableRLGym(root / "state", root / "models")
         self.pantheon = GeniusPantheon(root / "state", root / "models")
         self.evo_forge = SelfEvolvingForge(root)
+        self.heartbeat = EvolutionHeartbeat(
+            self.evo_forge,
+            self.soul,
+            self.gardener,
+            self.rl_gym,
+            interval_sec=int(__import__('os').environ.get('HEARTBEAT_INTERVAL_SEC', '120')),
+        )
         self.host_info = probe_host(root)
         self.soul.register_host(self.host_info)
 
@@ -67,7 +75,7 @@ class BrainState:
             rl_trained=rl_trained,
         )
         return {
-            "ui_version": "5.1",
+            "ui_version": "6.0",
             "soul": self.soul.snapshot(graph["stats"], env_grade=env_grade),
             "hallucination": hallucination,
             "host": self.host_info,
@@ -123,6 +131,9 @@ def make_handler(state: BrainState):
 
             if route == "/api/status":
                 self._send_json(state.full_status())
+                return
+            if route == "/api/evo/heartbeat":
+                self._send_json(state.heartbeat.status())
                 return
             if route == "/api/notes":
                 self._send_json({"notes": state.gardener.list_notes()})
@@ -472,6 +483,16 @@ def make_handler(state: BrainState):
                 self._send_json({"ran": ran})
                 return
 
+            if route == "/api/evo/heartbeat/toggle":
+                paused = state.heartbeat.toggle_paused()
+                self._send_json({"paused": paused, "heartbeat": state.heartbeat.status()})
+                return
+
+            if route == "/api/evo/heartbeat/beat":
+                entry = state.heartbeat.beat_once(trigger="manual")
+                self._send_json({"entry": entry, "heartbeat": state.heartbeat.status(), "status": state.full_status()})
+                return
+
             if route == "/api/poke":
                 state.soul.poke()
                 self._send_json({"status": state.full_status()})
@@ -508,9 +529,12 @@ def main() -> None:
     print(f" 💻 Host Sensor  : {state.host_info['cpu_cores']} cores | Free RAM {state.host_info['ram_available_gb']} GB")
     print(f" 🌡️ Workspace    : {env['label']} ({env['score']}/100)")
     print("============================================================", flush=True)
+    state.heartbeat.start()
+    print(f" 💓 Heartbeat    : every {state.heartbeat.interval_sec}s (dream quests: {state.heartbeat.status()['pool_size']})")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
+        state.heartbeat.stop()
         server.server_close()
 
 

@@ -167,6 +167,10 @@ def _high_entropy_blob(seed_label: str, length: int = 256) -> bytes:
 # ---------------------------------------------------------------------------
 # Specimen Catalog (Ground-Truth Twin Vectors + Initial Buggy Port + Repair)
 # ---------------------------------------------------------------------------
+# Dream quests registered at runtime by the Evolution Heartbeat (Stage D).
+# Kept separate from SPECIMEN_CATALOG so the UI specimen chips stay tidy.
+DREAM_QUEST_CATALOG: Dict[str, Dict[str, Any]] = {}
+
 SPECIMEN_CATALOG: Dict[str, Dict[str, Any]] = {
     "xor_rot_vault": {
         "id": "xor_rot_vault",
@@ -1191,7 +1195,11 @@ class SelfEvolvingForge:
             custom = self.state.get("custom_spec", {}).get("custom_upload")
             if custom:
                 return custom
-        return SPECIMEN_CATALOG.get(specimen_id) or SPECIMEN_CATALOG["xor_rot_vault"]
+        return (
+            SPECIMEN_CATALOG.get(specimen_id)
+            or DREAM_QUEST_CATALOG.get(specimen_id)
+            or SPECIMEN_CATALOG["xor_rot_vault"]
+        )
 
     # ------------------------------------------------------------------
     # Stage 4: Diagnose Bugs & Pufferfish Toxins

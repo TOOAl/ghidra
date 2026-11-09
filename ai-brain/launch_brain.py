@@ -229,25 +229,40 @@ def make_handler(state: BrainState):
                 self._send_json({"forged": record, "status": state.full_status()})
                 return
 
-            if route == "/api/pantheon/distill":
-                genius_ids = body.get("genius_ids") or []
-                if not isinstance(genius_ids, list):
-                    genius_ids = []
-                res = state.pantheon.distill_into_neurons(
-                    [str(x) for x in genius_ids], state.rl_gym
+            if route in ("/api/pantheon/debate", "/api/pantheon/distill"):
+                cids = body.get("constellation_ids") or body.get("genius_ids") or []
+                if not isinstance(cids, list):
+                    cids = []
+                topic = str(body.get("topic") or "").strip()
+                res = state.pantheon.convene_debate(
+                    [str(x) for x in cids], topic, state.rl_gym
                 )
-                # Also crystallize the Genius Synergy into our Markdown Wiki Graph!
                 digested = state.gardener.digest_raw_memory(
                     res["wiki_note_body"], custom_title=res["wiki_note_title"]
                 )
-                state.soul.on_genius_mentorship(res["mentors"], res["after_score"])
+                state.soul.on_genius_mentorship(
+                    res["mentors"], res["after_score"], res["constellations"]
+                )
                 self._send_json(
                     {
+                        "debate": res,
                         "distilled": res,
                         "digested_note": digested,
                         "status": state.full_status(),
                     }
                 )
+                return
+
+            if route == "/api/pantheon/add":
+                added = state.pantheon.add_genius_or_constellation(
+                    target_constellation_id=str(body.get("target_constellation_id") or ""),
+                    new_constellation_name=str(body.get("new_constellation_name") or ""),
+                    genius_name=str(body.get("genius_name") or ""),
+                    lens=str(body.get("lens") or ""),
+                    credo=str(body.get("credo") or ""),
+                    emoji=str(body.get("emoji") or "🌟"),
+                )
+                self._send_json({"added": added, "status": state.full_status()})
                 return
 
             if route == "/api/rl/train":

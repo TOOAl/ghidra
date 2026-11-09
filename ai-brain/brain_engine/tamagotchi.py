@@ -206,7 +206,7 @@ class TamagotchiSoul:
         self.data["xp"] = int(self.data.get("xp", 0)) + 35
         self.data["mood"] = min(100, int(self.data.get("mood", 80)) + 10)
         self.data["rl_episodes"] = int(self.data.get("rl_episodes", 0)) + episodes
-        self.data["rl_iq_bonus"] = min(40, int(self.data.get("rl_iq_bonus", 0)) + 5)
+        self.data["rl_iq_bonus"] = int(self.data.get("rl_iq_bonus", 0)) + 5
         self.data["pose"] = "08_journey"
         self.data["last_speech"] = (
             f"으쌰! CPU만으로 {episodes}판 강화학습 완료! "
@@ -218,7 +218,7 @@ class TamagotchiSoul:
     def on_rl_coach(self, scenario_title: str, conf_pct: float) -> None:
         self.data["xp"] = int(self.data.get("xp", 0)) + 25
         self.data["mood"] = min(100, int(self.data.get("mood", 82)) + 10)
-        self.data["rl_iq_bonus"] = min(40, int(self.data.get("rl_iq_bonus", 0)) + 3)
+        self.data["rl_iq_bonus"] = int(self.data.get("rl_iq_bonus", 0)) + 3
         self.data["pose"] = "07_eureka"
         self.data["last_speech"] = (
             f"유레카! 주인님의 코칭 덕분에 5개 꼬마 뉴런이 모두 깨달았어요! 확신도가 {conf_pct}%로 껑충 뛰었어요! (+25 XP)"
@@ -226,18 +226,22 @@ class TamagotchiSoul:
         self._log_event(f"주인님 직접 코칭 반영 ({scenario_title[:18]}… → 확신 {conf_pct}%)")
         self._save()
 
-    def on_genius_mentorship(self, mentors: List[str], after_score: float) -> None:
-        self.data["xp"] = int(self.data.get("xp", 0)) + 30
+    def on_genius_mentorship(self, mentors: List[str], after_score: float, const_names: List[str] | None = None) -> None:
+        self.data["xp"] = int(self.data.get("xp", 0)) + 35
         self.data["mood"] = min(100, int(self.data.get("mood", 85)) + 10)
         self.data["satiety"] = min(100, int(self.data.get("satiety", 70)) + 12)
-        self.data["rl_iq_bonus"] = min(50, int(self.data.get("rl_iq_bonus", 0)) + 4)
+        self.data["rl_iq_bonus"] = int(self.data.get("rl_iq_bonus", 0)) + 5
         self.data["pose"] = "06_star"
-        joined = " · ".join(mentors[:3]) + (f" 외 {len(mentors) - 3}명" if len(mentors) > 3 else "")
-        self.data["last_speech"] = (
-            f"별자리 공명 완료! [{joined}] 양자화 천재 스승님들의 사고 공식을 꼬마 뉴런들에게 전수해 "
-            f"실전 점수가 {after_score}점이 되었어요! (+30 XP)"
+        label = (
+            " × ".join(const_names)
+            if const_names
+            else (" · ".join(mentors[:3]) + (f" 외 {len(mentors) - 3}명" if len(mentors) > 3 else ""))
         )
-        self._log_event(f"천재 성좌 멘토 전수: {joined} (심판단 {after_score}점)")
+        self.data["last_speech"] = (
+            f"성좌 담론 합의 완료! [{label}] 안의 천재 스승님들이 의견을 주고받아 도출한 비법을 전수받아 "
+            f"꼬마 뉴런 실전 점수가 {after_score}점이 되었어요! (+35 XP · 무한 성장)"
+        )
+        self._log_event(f"영역 성좌 천재 담론 전수: {label} (심판단 {after_score}점)")
         self._save()
 
     def on_forge_brain(self, bits: int, saved_pct: float, cos_sim: float) -> None:
@@ -280,6 +284,20 @@ class TamagotchiSoul:
                 current_stage = st
                 next_stage = STAGES[idx + 1] if idx + 1 < len(STAGES) else None
 
+        # Open-ended Limitless Ascension beyond Lv.5 (600 XP): +250 XP per transcendent level!
+        if xp >= 600:
+            extra_lv = (xp - 600) // 250 + 1
+            lv_num = 5 + extra_lv
+            current_stage = {
+                "level": lv_num,
+                "key": f"cosmic_{lv_num}",
+                "title": f"무한 성좌 초월 지성 · {extra_lv}차 각성",
+                "emoji": "🌌",
+            }
+            next_xp_val = 600 + extra_lv * 250
+        else:
+            next_xp_val = next_stage["min_xp"] if next_stage else 600
+
         notes_cnt = graph_stats.get("notes", 0)
         edges_cnt = graph_stats.get("edges", 0)
         iq = 55 + notes_cnt * 3 + edges_cnt * 2 + int(self.data.get("rl_iq_bonus", 0))
@@ -306,7 +324,7 @@ class TamagotchiSoul:
             "stage_title": current_stage["title"],
             "stage_emoji": current_stage["emoji"],
             "xp": xp,
-            "next_xp": next_stage["min_xp"] if next_stage else xp,
+            "next_xp": next_xp_val,
             "satiety": satiety,
             "mood": mood,
             "pose": pose,

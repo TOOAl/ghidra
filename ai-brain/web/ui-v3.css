@@ -1816,4 +1816,122 @@ code {
   margin-bottom: 10px;
 }
 
+.expand-box {
+  margin-top: 10px;
+  background: var(--bg-well);
+  border: 1px dashed rgba(129, 140, 248, 0.4);
+  border-radius: 11px;
+  padding: 9px 12px;
+  font-size: 12px;
+}
+
+.expand-box summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: #c7d2fe;
+  user-select: none;
+}
+
+.expand-body {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.expand-row {
+  display: flex;
+  gap: 7px;
+}
+
+.agora-topic-box {
+  padding: 12px 13px;
+  background: var(--bg-well);
+  border: 1px solid rgba(124, 111, 246, 0.35);
+  border-radius: 12px;
+  margin-bottom: 10px;
+}
+
+.genius-roster-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.genius-member-row {
+  padding: 7px 9px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 8px;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.debate-feed-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 310px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.debate-bubble {
+  padding: 9px 11px;
+  background: rgba(15, 23, 42, 0.72);
+  border-left: 3px solid #818cf8;
+  border-radius: 9px;
+  font-size: 12px;
+  line-height: 1.52;
+  color: #e2e8f0;
+}
+
+.debate-bubble-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 11.5px;
+}
+
+.debate-phase-pill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(124, 111, 246, 0.22);
+  color: #e0e7ff;
+}
+
+.debate-consensus-card {
+  padding: 10px 12px;
+  background: linear-gradient(135deg, rgba(245, 185, 66, 0.14), rgba(16, 185, 129, 0.12));
+  border: 1px solid rgba(245, 185, 66, 0.45);
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #fef3c7;
+}
+
+.secondary-btn {
+  appearance: none;
+  background: rgba(99, 102, 241, 0.2);
+  color: #e0e7ff;
+  border: 1px solid rgba(129, 140, 248, 0.5);
+  border-radius: 9px;
+  padding: 8px 12px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.secondary-btn:hover {
+  background: rgba(99, 102, 241, 0.34);
+  border-color: #a5b4fc;
+}
+
 

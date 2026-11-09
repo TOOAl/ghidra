@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>시냅스몽 · 나만의 양자화 AI 두뇌 연구소</title>
-  <link rel="stylesheet" href="ui-v3.css?v=4.1" />
+  <link rel="stylesheet" href="ui-v3.css?v=4.2" />
   <!--__INITIAL_STATE__-->
 </head>
 <body>
@@ -125,14 +125,14 @@
             <span class="tile-sub">독립 서식지 확보</span>
           </div>
           <div class="env-tile">
-            <span class="tile-k">주조 가능 등급</span>
-            <strong class="tile-v accent-text" id="envTierText">INT4 2.0B급</strong>
-            <span class="tile-sub">자체 두뇌 설계 한계</span>
+            <span class="tile-k">두뇌 확장 구조</span>
+            <strong class="tile-v accent-text" id="envTierText">∞ 무제한 확장</strong>
+            <span class="tile-sub" id="envTierSub">성좌 모듈 스왑 · 한계 없음</span>
           </div>
         </div>
 
         <p class="env-note" id="envComment">
-          연결된 컴퓨터의 메모리와 연산 여유를 실시간 점검하고 있어요.
+          외장하드 성좌 모듈 스왑으로 메모리 한계 없이 끝없이 성장하는 무한 확장 구조예요!
         </p>
       </section>
 
@@ -152,7 +152,7 @@
         </div>
         <div class="kpi-cell">
           <strong id="kpiForged">0</strong>
-          <span>주조한 뇌</span>
+          <span>주조 모듈</span>
         </div>
       </div>
     </aside>
@@ -169,53 +169,84 @@
           <button class="seg-tab" data-tab="tab-chat" type="button">💬 대화하기</button>
         </nav>
         <div class="engine-indicator" id="engineStatusPill">
-          위키 기억망 + 자체 양자화 엔진 가동 중
+          위키 기억망 + 무한 모듈 성좌 엔진 가동 중
         </div>
       </div>
 
-      <!-- [탭 1] 이중 성좌 천문대: 인류 천재 멘토 성좌도 ⇄ 내 위키 기억 성좌도 -->
+      <!-- [탭 1] 이중 성좌 천문대: 영역별 인류 천재 성좌도 ⇄ 내 위키 기억 성좌도 -->
       <div class="tab-pane active" id="tab-graph">
         <div class="constellation-mode-bar">
           <div class="cm-pills">
-            <button class="cm-btn active" id="btnModeGenius" type="button">🌟 인류 천재 멘토 성좌도 (스승단)</button>
-            <button class="cm-btn" id="btnModeWiki" type="button">📘 내 마크다운 기억 성좌도 (기억망)</button>
+            <button class="cm-btn active" id="btnModeGenius" type="button">🌌 영역별 천재 성좌 &amp; 원탁 담론</button>
+            <button class="cm-btn" id="btnModeWiki" type="button">📘 내 마크다운 기억 성좌도</button>
           </div>
-          <span class="cm-hint" id="constellationHint">천재 별을 클릭해 연합을 꾸리면 시너지 시냅스가 빛나며 꼬마 뉴런에게 사고법을 전수합니다!</span>
+          <span class="cm-hint" id="constellationHint">영역별 성좌 안에 모인 천재들이 서로 의견을 주고받으며 한계 없는 지혜를 꼬마 뉴런에 전수합니다!</span>
         </div>
 
-        <!-- 모드 A: 인류 천재 양자화 멘토 성좌도 -->
+        <!-- 모드 A: 영역별 인류 천재 성좌 & 실시간 담론장 -->
         <div class="pane-grid graph-layout" id="viewGeniusConstellation">
           <div class="card">
             <div class="card-head">
               <div>
-                <h3>양자화 천재 멘토 성좌도 (6대 분야 시너지 그물망)</h3>
-                <p>별을 클릭해 멘토단에 포함/해제해 보세요. 연결된 두 천재가 함께 선택되면 <strong>황금 시너지 시냅스</strong>가 켜집니다!</p>
+                <h3>영역별 천재 성좌도 (성좌 내 집단 지성 &amp; 성좌 간 공명)</h3>
+                <p>각 <strong>영역 성좌(빛나는 성운 구역)</strong> 안에 여러 천재 별들이 모여 있습니다! 성좌 구역이나 아래 칩을 클릭해 담론에 참여할 성좌들을 선택해 보세요.</p>
               </div>
             </div>
             <div class="canvas-wrap">
-              <canvas id="geniusCanvas" width="700" height="420"></canvas>
+              <canvas id="geniusCanvas" width="700" height="430"></canvas>
             </div>
+
+            <div class="mentor-team-box" style="margin-top:10px">
+              <div class="vb-head">담론에 소집된 영역 성좌 (클릭해 영역 추가·해제 가능)</div>
+              <div id="activeMentorChips" class="chip-row" style="margin-bottom:8px"></div>
+              <div id="activeSynergyBox" class="synergy-callout" style="margin-bottom:0"></div>
+            </div>
+
+            <details class="expand-box">
+              <summary>➕ 새 영역 성좌 / 새 천재 무한 영입하기 (설계 한계 없음 ∞)</summary>
+              <div class="expand-body">
+                <div class="expand-row">
+                  <select id="addTargetConst" class="input-field" style="flex:1.2"></select>
+                  <input type="text" id="addNewConstName" class="input-field hidden" style="flex:1.2" placeholder="새 영역 성좌 이름 (예: 생명·진화 성좌)" />
+                </div>
+                <div class="expand-row">
+                  <input type="text" id="addGeniusEmoji" class="input-field" style="max-width:68px;text-align:center" value="🌟" placeholder="이모지" />
+                  <input type="text" id="addGeniusName" class="input-field" style="flex:1" placeholder="영입할 천재 이름 (예: 이순신, 찰스 다윈)" />
+                  <input type="text" id="addGeniusLens" class="input-field" style="flex:1.2" placeholder="핵심 관점 (예: 위기돌파 · 지형 전략)" />
+                </div>
+                <input type="text" id="addGeniusCredo" class="input-field" placeholder="이 천재가 성좌 토론에서 주장할 핵심 철학 한 줄을 적어주세요!" />
+                <button class="secondary-btn full" id="btnAddGenius" type="button" style="margin-top:6px">
+                  ✦ 성좌에 영구 합류시키기 (즉시 토론 참여 가능)
+                </button>
+              </div>
+            </details>
           </div>
 
           <div class="card">
             <div class="card-head">
               <div>
-                <span class="step-kicker">MENTOR DISTILLATION</span>
-                <h3 id="geniusTitle">선택한 천재 멘토단 &amp; 꼬마 뉴런 전수</h3>
+                <span class="step-kicker">CONSTELLATION AGORA · 천재 원탁 담론장</span>
+                <h3 id="geniusTitle">영역 성좌 속 천재들의 의견 교환 &amp; 전수</h3>
               </div>
             </div>
 
             <div id="geniusDetailBox" class="genius-detail-box"></div>
 
-            <div class="mentor-team-box">
-              <div class="vb-head">현재 결성된 천재 스승 연합 (클릭해 조합 변경 가능)</div>
-              <div id="activeMentorChips" class="chip-row" style="margin-bottom:8px"></div>
-              <div id="activeSynergyBox" class="synergy-callout"></div>
-              <button class="primary-btn full" id="btnDistillGenius" type="button">
-                ⚡ 천재 사고법 양자화(.sbrain) 주조 &amp; 5인 꼬마 뉴런에 전수하기
+            <div class="agora-topic-box">
+              <div class="vb-head">💬 천재들에게 던질 토론 주제 (직접 입력하거나 추천 주제 클릭)</div>
+              <div class="chip-row" id="debatePresetChips" style="margin-bottom:7px">
+                <button type="button" class="preset-chip active" data-topic="외장하드 두뇌가 메모리 한계 없이 무한히 커지려면 어떻게 해야 할까?">∞ 무한 확장 두뇌 설계</button>
+                <button type="button" class="preset-chip" data-topic="정체불명의 암호화된 실행파일을 실수 없이 역공학으로 해부하려면?">🔐 수상한 실행파일 해부</button>
+                <button type="button" class="preset-chip" data-topic="모르는 질문 앞에서 절대 아는 척(환각)하지 않고 진실만 말하려면?">🔬 환각 0% 무결성 방어</button>
+              </div>
+              <input type="text" id="debateTopicInput" class="input-field" value="외장하드 두뇌가 메모리 한계 없이 무한히 커지려면 어떻게 해야 할까?" placeholder="천재 성좌들이 함께 토론할 주제를 자유롭게 적어주세요!" />
+              <button class="primary-btn full" id="btnDistillGenius" type="button" style="margin-top:8px">
+                🗣️ 선택 성좌 천재들 의견 주고받기(담론 시작) &amp; 꼬마 뉴런 전수
               </button>
-              <div id="distillFeedback" class="clinic-feedback hidden" style="margin-top:10px;margin-bottom:0"></div>
             </div>
+
+            <div id="debateFeedBox" class="debate-feed-box"></div>
+            <div id="distillFeedback" class="clinic-feedback hidden" style="margin-top:8px;margin-bottom:0"></div>
           </div>
         </div>
 
@@ -528,6 +559,6 @@
     </section>
   </main>
 
-  <script src="ui-v3.js?v=4.1"></script>
+  <script src="ui-v3.js?v=4.2"></script>
 </body>
 </html>

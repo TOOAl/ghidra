@@ -171,27 +171,30 @@ def _evaluate_environment(
     if avail_ram >= 2.5 and drive_free_gb >= 2.0:
         grade = "optimal"
         label = "쾌적 · 연구 최적"
+        hot_slot = "핫슬롯 2.0B"
         note = (
-            f"호흡할 여유 메모리({avail_ram}GB)가 넉넉해요! "
-            f"우리만의 4비트·8비트 양자화 두뇌를 빚고 공부하기에 아주 쾌적합니다."
+            f"한 덩어리에 갇히지 않고 외장하드 성좌 모듈(.sbrain)을 필요할 때마다 소환하는 '무한 확장 두뇌' 구조예요! "
+            f"현재 PC 여유 메모리({avail_ram}GB)를 동시 작업창({hot_slot})으로 쓰며 한계 없이 성장합니다."
         )
-        max_custom_tier = "INT4 2.0B급 / INT8 1.2B급 두뇌까지 직접 주조·실행 가능"
+        max_custom_tier = "∞ 무제한 확장"
     elif avail_ram >= 1.2:
         grade = "balanced"
-        label = "보통 · 경량 적합"
+        label = "보통 · 경량 쾌속"
+        hot_slot = "핫슬롯 0.8B"
         note = (
-            f"여유 메모리({avail_ram}GB)가 적당해요. "
-            f"초경량 4비트(INT4) 압축 모드로 작업하면 버벅임 없이 돌아갑니다."
+            f"외장하드 성좌 모듈 스왑 덕분에 메모리({avail_ram}GB)와 상관없이 두뇌 전체 크기는 무한 확장돼요! "
+            f"한 번에 {hot_slot} 단위로 가볍게 불러와 쾌속 구동합니다."
         )
-        max_custom_tier = "INT4 0.8B급 이하 초경량 두뇌 권장"
+        max_custom_tier = "∞ 무제한 확장"
     else:
         grade = "tight"
-        label = "협소 · 초절전 필요"
+        label = "절전 · 스왑 구동"
+        hot_slot = "마이크로 슬롯"
         note = (
-            f"현재 컴퓨터 여유 메모리({avail_ram}GB)가 좁아요! "
-            f"무거운 프로그램을 닫거나 200MB급 초압축 INT4 시냅스 모드를 사용하세요."
+            f"현재 PC 여유 메모리({avail_ram}GB)는 좁지만 걱정 마세요! "
+            f"외장하드 모듈 스왑으로 필요한 성좌만 마이크로 슬롯에 소환해 한계 없이 작동합니다."
         )
-        max_custom_tier = "초압축 INT4 마이크로 두뇌 전용"
+        max_custom_tier = "∞ 무제한 확장"
 
     return {
         "score": score,
@@ -200,6 +203,7 @@ def _evaluate_environment(
         "ram_free_pct": ram_free_pct,
         "note": note,
         "max_custom_tier": max_custom_tier,
+        "hot_slot_sub": f"성좌 모듈 스왑 ({hot_slot})",
     }
 
 

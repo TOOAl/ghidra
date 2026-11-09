@@ -1381,11 +1381,15 @@ function setupInteractions() {
   };
 
   function openEvoHarmonyModal() {
-    document.getElementById("evoHarmonyModal").classList.remove("hidden");
+    const modal = document.getElementById("evoHarmonyModal");
+    modal.classList.remove("hidden");
+    modal.style.display = "flex";
     setPetPose("06_star");
   }
   function closeEvoHarmonyModal() {
-    document.getElementById("evoHarmonyModal").classList.add("hidden");
+    const modal = document.getElementById("evoHarmonyModal");
+    modal.classList.add("hidden");
+    modal.style.display = "none";
   }
 
   document.getElementById("btnOpenEvoImage").addEventListener("click", openEvoHarmonyModal);
@@ -2069,7 +2073,7 @@ function setupEvoForgeInteractions() {
   });
 }
 
-const CURRENT_UI_VERSION = "5.0";
+const CURRENT_UI_VERSION = "5.1";
 
 async function init() {
   setupGraphSimulation();

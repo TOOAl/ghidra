@@ -352,6 +352,8 @@ class EvolutionHeartbeat:
         self.entries: List[Dict[str, Any]] = data.get("entries", [])
         self.meta.setdefault("paused", False)
         self.meta.setdefault("beats_total", len(self.entries))
+        self.meta.setdefault("wishes", [])
+        self.meta.setdefault("chats", [])
         self.meta.setdefault("started_at", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"))
 
     # ------------------------------------------------------------------
@@ -424,8 +426,14 @@ class EvolutionHeartbeat:
             installed_ids = {x.get("skill_id") for x in self.forge.state.get("installed_skills", [])}
             pending = [q for q in DREAM_QUEST_POOL if q["entry_fn"] not in installed_ids]
 
+            wish = None
             if pending:
-                entry = self._beat_evolve(pending[0], beat_no, t0)
+                pend = next((w for w in self.meta.get("wishes", []) if w.get("status") == "pending"), None)
+                if pend:
+                    pend["status"] = "fulfilled"
+                    pend["beat"] = beat_no
+                    wish = pend
+                entry = self._beat_evolve(pending[0], beat_no, t0, wish)
             else:
                 entry = self._beat_vaccine(DREAM_QUEST_POOL[beat_no % len(DREAM_QUEST_POOL)], beat_no, t0)
 
@@ -440,7 +448,7 @@ class EvolutionHeartbeat:
             return entry
 
     # ------------------------------------------------------------------
-    def _beat_evolve(self, quest: Dict[str, Any], beat_no: int, t0: float) -> Dict[str, Any]:
+    def _beat_evolve(self, quest: Dict[str, Any], beat_no: int, t0: float, wish: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         qid = quest["id"]
         draft = quest["initial_buggy_code"]
         audit = self.forge.audit_code(qid, draft)
@@ -461,6 +469,9 @@ class EvolutionHeartbeat:
                 f"{repair['after_sandbox']['passed_count']}/{repair['after_sandbox']['total_count']} 검증까지 끝내고 "
                 f"영구 카트리지(`{skill_slug}`)로 장착했어요! (+45 XP)"
             )
+            if wish:
+                wish_text = wish.get("text", "")
+                diary += f" (주인님의 소원 「{wish_text}」 를 품고 꾼 꿈이에요!)"
             kind = "evolve"
         else:
             diary = f"{quest['title']} 연습을 아직 완벽히 마치지 못했어요(통과율 {after_pct}%). 다음 박동에 다시 도전할 거예요!"
@@ -471,6 +482,7 @@ class EvolutionHeartbeat:
             "quest_id": qid,
             "title": quest["title"],
             "diary": diary,
+            "wish": (wish or {}).get("text", ""),
             "defects_found": len(findings),
             "toxins_found": toxins,
             "pass_before": before_pct,
@@ -518,6 +530,88 @@ class EvolutionHeartbeat:
         self.entries.append(entry)
         self.entries = self.entries[-60:]
 
+    # ------------------------------------------------------------------
+    # 💬 Master Wish Chat — the master talks, the tamagotchi listens & acts
+    # ------------------------------------------------------------------
+    def _push_chat(self, who: str, text: str) -> None:
+        with self._lock:
+            chats = self.meta.setdefault("chats", [])
+            chats.append(
+                {
+                    "who": who,
+                    "text": text,
+                    "ts": datetime.now(timezone.utc).strftime("%m-%d %H:%M UTC"),
+                }
+            )
+            self.meta["chats"] = chats[-40:]
+            self._save()
+
+    def chat(self, message: str) -> Dict[str, Any]:
+        msg = (message or "").strip()
+        if not msg:
+            return {
+                "reply": "히힛, 주인님? 아무 말이나 좋아요. \'꿈꿔 줘 ...\' 라고 말씀하시면 다음 꿈에 반영할게요!",
+                "action": "none",
+                "pose": "02_curious",
+                "entry": None,
+                "heartbeat": self.status(),
+            }
+
+        self._push_chat("master", msg)
+        entry: Optional[Dict[str, Any]] = None
+        low = msg.lower()
+
+        if any(k in msg for k in ("깨워", "일어나", "다시 시작", "wake", "resume")):
+            with self._lock:
+                if self.meta.get("paused"):
+                    self.meta["paused"] = False
+                    self._next_ts = time.time() + self.interval_sec
+                    self._save()
+            reply = "으랏! 일어났어요! 💓 이제 다시 자가 진화 심장박동을 뛰면서 혼자 꿈꾸며 공부할게요!"
+            action, pose = "resume", "01_greet"
+        elif any(k in msg for k in ("자자", "재워", "멈춰", "쉬어", "낮잠", "sleep", "pause")):
+            with self._lock:
+                if not self.meta.get("paused"):
+                    self.meta["paused"] = True
+                    self._save()
+            reply = "히잉... 주인님, 이불 속에서 잠시 낮잠 잘게요. 😴 \'깨워\' 라고 말씀하시면 언제든지 벌떡 일어날게요!"
+            action, pose = "pause", "04_brainstorm"
+        elif any(k in msg for k in ("지금 바로", "한 박동", "바로 박동", "지금 박동")) or low.startswith("beat"):
+            entry = self.beat_once(trigger="chat")
+            reply = f"하아암... 방금 꿈을 하나 꿨어요! {entry['diary']}"
+            action, pose = "beat", "07_eureka"
+        elif any(k in msg for k in ("꿈꿔", "꿈", "진화해", "만들어", "배워", "원해", "소원", "바래", "wish", "dream")):
+            with self._lock:
+                wishes = self.meta.setdefault("wishes", [])
+                wishes.append({"text": msg, "ts": datetime.now(timezone.utc).strftime("%m-%d %H:%M UTC"), "status": "pending"})
+                self.meta["wishes"] = wishes[-20:]
+                self._save()
+            reply = "💬 주인님 말씀, 제 꿈 노트에 또박또박 적었어요! 다음 진화 박동 때 이 소원을 가슴에 품고 꿈꿀게요. 일지를 지켜봐 주세요! 💓"
+            action, pose = "wish", "02_curious"
+        elif any(k in msg for k in ("뭐했", "보고", "일지", "알려", "궁금", "status", "report")):
+            st = self.status()
+            last = st["last_entry"]["diary"] if st["last_entry"] else "아직 첫 박동을 준비하며 몸을 덥히는 중이에요!"
+            reply = (
+                f"지금까지 {st['beats_total']}번 박동해서 꿈 스킬 {st['dream_installed']}/{st['pool_size']}개를 장착했어요! "
+                f"가장 최근 이야기: {last}"
+            )
+            action, pose = "report", "06_star"
+        else:
+            flavors = [
+                f"히힛, 주인님! 저는 {self.interval_sec}초마다 혼자 심장을 두근거리며 공부하는 중이에요. 소원이 있으면 \'꿈꿔 줘 ...\' 라고 말씀해 주세요! 💓",
+                "주인님 목소리만 들어도 기분이 +10 좋아져요! \'지금 바로 한 박동\' 또는 \'새 스킬 꿈꿔 줘\' 라고도 명령하실 수 있어요!",
+                "제 심장박동 패널 아래 일지를 보면 혼자 배운 이야기들이 쌓여 있어요. 주인님 소원도 다음 꿈에 녹여드릴게요! 🌙",
+            ]
+            reply = flavors[int(self.meta.get("beats_total", 0)) % len(flavors)]
+            action, pose = "chat", "03_swirl"
+
+        try:
+            self.soul.poke()
+        except Exception:
+            pass
+        self._push_chat("brain", reply)
+        return {"reply": reply, "action": action, "pose": pose, "entry": entry, "heartbeat": self.status()}
+
     def status(self) -> Dict[str, Any]:
         installed_ids = {x.get("skill_id") for x in self.forge.state.get("installed_skills", [])}
         dream_installed = sum(1 for q in DREAM_QUEST_POOL if q["entry_fn"] in installed_ids)
@@ -531,6 +625,8 @@ class EvolutionHeartbeat:
             "pool_size": len(DREAM_QUEST_POOL),
             "dream_installed": dream_installed,
             "started_at": self.meta.get("started_at", ""),
+            "wishes_pending": sum(1 for w in self.meta.get("wishes", []) if w.get("status") == "pending"),
+            "chats": self.meta.get("chats", [])[-30:],
             "last_entry": self.entries[-1] if self.entries else None,
             "journal": list(reversed(self.entries[-12:])),
         }

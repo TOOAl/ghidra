@@ -2922,3 +2922,81 @@ code {
 @media (max-width: 900px) {
   .evo-journal-list { grid-template-columns: 1fr; }
 }
+
+/* ---------------------------------------------------------------------------
+   Stage D — Master Wish Whisper Chat 💬
+--------------------------------------------------------------------------- */
+.heart-chat {
+  margin-top: 11px;
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  border-radius: 13px;
+  background: rgba(15, 23, 42, 0.6);
+  padding: 10px 12px 12px;
+}
+
+.heart-chat-head {
+  font-size: 11.8px;
+  font-weight: 700;
+  color: #c7d2fe;
+  margin-bottom: 8px;
+}
+
+.heart-chat-log {
+  max-height: 208px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding-right: 3px;
+  margin-bottom: 9px;
+}
+
+.chat-bubble {
+  max-width: 82%;
+  border-radius: 12px;
+  padding: 7px 11px;
+  font-size: 12.2px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.chat-bubble .cb-meta {
+  display: block;
+  font-size: 9.8px;
+  opacity: 0.65;
+  margin-top: 3px;
+}
+
+.chat-bubble.master {
+  align-self: flex-end;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.85), rgba(67, 56, 202, 0.85));
+  color: #eef2ff;
+  border-bottom-right-radius: 4px;
+}
+
+.chat-bubble.brain {
+  align-self: flex-start;
+  background: linear-gradient(135deg, rgba(190, 24, 93, 0.55), rgba(15, 23, 42, 0.9));
+  border: 1px solid rgba(244, 114, 182, 0.4);
+  color: #fdf2f8;
+  border-bottom-left-radius: 4px;
+}
+
+.chat-empty {
+  text-align: center;
+  font-size: 11.6px;
+  color: var(--text-muted);
+  padding: 12px 6px;
+  border: 1px dashed rgba(148, 163, 184, 0.3);
+  border-radius: 10px;
+}
+
+.heart-chat-bar {
+  display: flex;
+  gap: 8px;
+}
+
+.heart-chat-bar .input-field {
+  flex: 1;
+}

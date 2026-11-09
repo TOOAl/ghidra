@@ -1,12 +1,12 @@
 {
   "name": "시냅스몽",
   "born_at": "2026-11-09T08:37:11Z",
-  "xp": 449,
-  "satiety": 29,
+  "xp": 452,
+  "satiety": 15,
   "mood": 100,
-  "pose": "07_eureka",
+  "pose": "04_brainstorm",
   "last_fed_ts": 1794219969.3347056,
-  "last_interaction_ts": 1794219969.3347056,
+  "last_interaction_ts": 1794233298.4468603,
   "memories_eaten": 5,
   "questions_answered": 1,
   "brains_forged": 2,
@@ -17,8 +17,12 @@
   "hosts_visited": [
     "e2b.local (Linux-x86_64-2c)"
   ],
-  "last_speech": "유레카!! [🐡 복어 독(위험 명령) 혼입 압축기 (보안 제거 실습)]을 분해·수리하고 유리방 100% 검증을 통과해 `compress_rle_safe` 영구 스킬 카트리지(.py + .sbrain + 위키)로 제 두뇌에 장착했어요! (+45 XP)",
+  "last_speech": "꼬르륵... 새로운 메모나 아이디어 한 줄만 먹여 주세요!",
   "recent_events": [
+    {
+      "time": "2026-11-09T14:08:18Z",
+      "text": "주인님과 교감 (기분 +7, XP +3)"
+    },
     {
       "time": "2026-11-09T13:37:20Z",
       "text": "6단계 자가 진화 스킬 장착: compress_rle_safe"
@@ -74,10 +78,6 @@
     {
       "time": "2026-11-09T08:37:20Z",
       "text": "자체 INT4 두뇌 주조 성공 (정밀도 99.77%, 압축 -84.4%)"
-    },
-    {
-      "time": "2026-11-09T08:37:11Z",
-      "text": "숙주 PC 연결: e2b.local (Linux-x86_64-2c) · 환경 [쾌적 · 연구 최적]"
     }
   ],
   "recent_hallucination_checks": [

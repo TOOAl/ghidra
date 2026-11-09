@@ -2150,6 +2150,10 @@ async function pollHeartbeat() {
     if (!res.ok) return;
     const hb = await res.json();
     renderHeartbeat(hb);
+    if ((hb.chats || []).length !== HEART_CHAT_COUNT) {
+      renderHeartChat(hb);
+      HEART_CHAT_COUNT = (hb.chats || []).length;
+    }
     if (HEART_PREV_BEATS !== null && hb.beats_total > HEART_PREV_BEATS && hb.last_entry) {
       showEvoToast(hb.last_entry);
     }
@@ -2157,6 +2161,62 @@ async function pollHeartbeat() {
   } catch (err) {
     /* heartbeat API unreachable: keep silent */
   }
+}
+
+
+let HEART_CHAT_COUNT = -1;
+
+function renderHeartChat(hb) {
+  const log = document.getElementById("heartChatLog");
+  if (!log) return;
+  const chats = hb.chats || [];
+  if (!chats.length) {
+    log.innerHTML = '<div class="chat-empty">아직 비어 있는 속삭임 창이에요. 두뇌에게 첫 소원을 말씀해 보세요! 🌙</div>';
+    return;
+  }
+  log.innerHTML = chats.map((c) => {
+    const who = c.who === "master" ? "master" : "brain";
+    const name = who === "master" ? "👑 주인님" : "💓 시냅스몽";
+    return (
+      `<div class="chat-bubble ${who}"><strong>${name}</strong> ${escapeHeartHtml(c.text)}` +
+      `<span class="cb-meta">${escapeHeartHtml(c.ts)}</span></div>`
+    );
+  }).join("");
+  log.scrollTop = log.scrollHeight;
+}
+
+async function sendHeartChat() {
+  const input = document.getElementById("heartChatInput");
+  const btn = document.getElementById("btnHeartChat");
+  if (!input || !btn) return;
+  const msg = input.value.trim();
+  if (!msg) return;
+  btn.disabled = true;
+  try {
+    const res = await fetch("/api/evo/heartbeat/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: msg }),
+    });
+    const data = await res.json();
+    input.value = "";
+    if (data.heartbeat) {
+      renderHeartbeat(data.heartbeat);
+      renderHeartChat(data.heartbeat);
+      HEART_CHAT_COUNT = (data.heartbeat.chats || []).length;
+      HEART_PREV_BEATS = data.heartbeat.beats_total;
+    }
+    if (data.pose && typeof setPetPose === "function") setPetPose(data.pose);
+    if (data.entry) showEvoToast(data.entry);
+    if (data.entry) {
+      try {
+        const st = await fetch("/api/status");
+        if (st.ok && typeof renderStatus === "function") renderStatus(await st.json());
+      } catch (err2) { /* ignore */ }
+    }
+  } catch (err) { /* ignore */ }
+  btn.disabled = false;
+  input.focus();
 }
 
 function setupHeartbeat() {
@@ -2193,11 +2253,22 @@ function setupHeartbeat() {
       now.textContent = oldLabel;
     });
   }
+  const chatBtn = document.getElementById("btnHeartChat");
+  const chatInput = document.getElementById("heartChatInput");
+  if (chatBtn) chatBtn.addEventListener("click", sendHeartChat);
+  if (chatInput) {
+    chatInput.addEventListener("keydown", (evt) => {
+      if (evt.key === "Enter") {
+        evt.preventDefault();
+        sendHeartChat();
+      }
+    });
+  }
   pollHeartbeat();
   setInterval(pollHeartbeat, 5000);
 }
 
-const CURRENT_UI_VERSION = "6.0";
+const CURRENT_UI_VERSION = "6.1";
 
 async function init() {
   setupGraphSimulation();

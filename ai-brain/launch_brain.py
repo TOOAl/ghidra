@@ -75,7 +75,7 @@ class BrainState:
             rl_trained=rl_trained,
         )
         return {
-            "ui_version": "6.0",
+            "ui_version": "6.1",
             "soul": self.soul.snapshot(graph["stats"], env_grade=env_grade),
             "hallucination": hallucination,
             "host": self.host_info,
@@ -486,6 +486,12 @@ def make_handler(state: BrainState):
             if route == "/api/evo/heartbeat/toggle":
                 paused = state.heartbeat.toggle_paused()
                 self._send_json({"paused": paused, "heartbeat": state.heartbeat.status()})
+                return
+
+            if route == "/api/evo/heartbeat/chat":
+                message = str(body.get("message") or "")
+                talked = state.heartbeat.chat(message)
+                self._send_json(talked)
                 return
 
             if route == "/api/evo/heartbeat/beat":

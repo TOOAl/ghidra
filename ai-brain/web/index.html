@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>시냅스몽 · 나만의 양자화 AI 두뇌 연구소</title>
-  <link rel="stylesheet" href="ui-v3.css?v=6.0" />
+  <link rel="stylesheet" href="ui-v3.css?v=6.1" />
   <!--__INITIAL_STATE__-->
 </head>
 <body>
@@ -394,6 +394,14 @@
               </div>
             </div>
             <div class="evo-journal-list" id="evoJournalList"></div>
+            <div class="heart-chat">
+              <div class="heart-chat-head">💬 주인님 소원 속삭임 창 — 두뇌에게 원하는 것을 말씀해 보세요! (예: "온도 평균 스킬 꿈꿔 줘", "지금 바로 한 박동", "잠깐 재워")</div>
+              <div class="heart-chat-log" id="heartChatLog"></div>
+              <div class="heart-chat-bar">
+                <input type="text" id="heartChatInput" class="input-field" placeholder="두뇌에게 바라는 것을 속삭이고 Enter (예: 온도 평균 스킬 꿈꿔 줘)" />
+                <button class="primary-btn" id="btnHeartChat" type="button">💬 속삭이기</button>
+              </div>
+            </div>
           </div>
 
           <div class="pane-grid evo-grid">
@@ -843,6 +851,6 @@
     </div>
   </div>
 
-  <script src="ui-v3.js?v=6.0"></script>
+  <script src="ui-v3.js?v=6.1"></script>
 </body>
 </html>

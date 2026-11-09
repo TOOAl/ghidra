@@ -3134,3 +3134,9 @@ code {
   .evo-gym-body { grid-template-columns: 1fr; }
   .gym-cards { grid-template-columns: 1fr; }
 }
+
+.journal-entry.kind-breakthrough { border-left-color: #fbbf24; background: rgba(69, 26, 3, 0.35); }
+.journal-entry.kind-breakthrough .je-beat { background: linear-gradient(135deg, #fde68a, #f59e0b); }
+.journal-entry.kind-research { border-left-color: #38bdf8; background: rgba(8, 47, 73, 0.35); }
+.journal-entry.kind-research .je-beat { background: linear-gradient(135deg, #bae6fd, #38bdf8); }
+.gc-break-btn { border-color: rgba(251, 191, 36, 0.6); color: #fde68a; }

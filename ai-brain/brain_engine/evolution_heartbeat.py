@@ -498,13 +498,34 @@ class EvolutionHeartbeat:
             "ms": round((time.perf_counter() - t0) * 1000.0, 2),
         }
 
+    def _write_research_note(self, res: Dict[str, Any]) -> None:
+        try:
+            if self.gardener is not None and hasattr(self.gardener, "digest_raw_memory"):
+                self.gardener.digest_raw_memory(res.get("note_body", ""), custom_title=res.get("note_title", "열린 연구 과제"))
+        except Exception:
+            pass
+
     def _beat_train(self, ability: str, beat_no: int, t0: float) -> Dict[str, Any]:
         if self.ability is None:
             return self._beat_vaccine(DREAM_QUEST_POOL[beat_no % len(DREAM_QUEST_POOL)], beat_no, t0)
+        info = self.ability.snapshot()
+        ab = next((x for x in info["abilities"] if x["id"] == ability), None)
+        if ab is not None and ab["at_cap"]:
+            # The cap is a wall to study, NOT a full stop: run limit-break research!
+            res = self.ability.breakthrough_session(ability)
+            if res["kind"] == "research":
+                self._write_research_note(res)
+            elif res.get("success"):
+                try:
+                    self.soul.on_ability_level_up(res["title"], res["cap_after"])
+                except Exception:
+                    pass
+            entry = dict(res)
+            entry["quest_id"] = f"break_{ability}"
+            return entry
         res = self.ability.train_session(ability, rounds=6)
-        meta = ABILITY_TRAIN_META.get(ability, {})
-        unit = meta.get("unit", "단계")
-        title = meta.get("title", ability)
+        unit = ABILITY_TRAIN_META.get(ability, {}).get("unit", "단계")
+        title = res["title"]
         if res["leveled_up"]:
             diary = (
                 f"🏋️ 오늘 혼자 {title} 근육을 키웠어요! {res['difficulty']}{unit} 난이도 연습 {res['correct']}/{res['rounds']} + "
@@ -515,6 +536,11 @@ class EvolutionHeartbeat:
                 self.soul.on_ability_level_up(title, res["level_after"])
             except Exception:
                 pass
+        elif res["at_cap"]:
+            diary = (
+                f" {title} 이(가) 현재 한계 Lv {res['level_after']}/{res['cap']} 에 닿았어요! "
+                f"다음 박동에서는 이 벽을 넘는 돌파 연구를 시작할게요. 끝이 아니라 시작이에요!"
+            )
         else:
             diary = (
                 f"🏋️ {title} 연습: {res['difficulty']}{unit} 난이도 {res['correct']}/{res['rounds']}, "
@@ -532,6 +558,8 @@ class EvolutionHeartbeat:
             "exam": f"{res['exam_correct']}/{res['exam_total']}",
             "level_before": res["level_before"],
             "level_after": res["level_after"],
+            "tier": res.get("tier", 0),
+            "cap": res.get("cap"),
             "defects_found": 0,
             "toxins_found": 0,
             "pass_before": res["level_before"],

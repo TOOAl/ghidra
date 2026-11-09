@@ -2095,9 +2095,23 @@ function renderHeartJournal(hb) {
     return;
   }
   list.innerHTML = entries.map((e) => {
-    const kind = e.kind === "vaccine" ? "kind-vaccine" : e.kind === "stumble" ? "kind-stumble" : e.kind === "train" ? "kind-train" : "kind-evolve";
-    const kindLabel = e.kind === "vaccine" ? "🛡️ 예방접종" : e.kind === "stumble" ? "💤 깜빡" : e.kind === "train" ? "🏋️ 자율훈련" : "🌱 진화";
-    const chips = e.kind === "train"
+    const kind = e.kind === "vaccine" ? "kind-vaccine" : e.kind === "stumble" ? "kind-stumble" : e.kind === "train" ? "kind-train" : e.kind === "breakthrough" ? "kind-breakthrough" : e.kind === "research" ? "kind-research" : "kind-evolve";
+    const kindLabel = e.kind === "vaccine" ? "🛡️ 예방접종" : e.kind === "stumble" ? "💤 깜빡" : e.kind === "train" ? "🏋️ 자율훈련" : e.kind === "breakthrough" ? "🚀 한계돌파" : e.kind === "research" ? "🔭 열린연구" : "🌱 진화";
+    const chips = e.kind === "breakthrough"
+      ? [
+          `<span class="je-chip">${kindLabel}</span>`,
+          `<span class="je-chip">🚧 벽 ${escapeHeartHtml(e.wall)}</span>`,
+          `<span class="je-chip">🧪 검증 ${escapeHeartHtml(e.confirm)}</span>`,
+          `<span class="je-chip">${e.success ? "✅ 가설 채택" : "❌ 가설 기각"}</span>`,
+          `<span class="je-chip">📐 상한 Lv ${escapeHeartHtml(e.cap_before)} → ${escapeHeartHtml(e.cap_after)}</span>`,
+        ].join("")
+      : e.kind === "research"
+      ? [
+          `<span class="je-chip">${kindLabel}</span>`,
+          `<span class="je-chip">🏁 최종 한계 Lv ${escapeHeartHtml(e.cap)}</span>`,
+          `<span class="je-chip">📔 위키 연구 노트 심음</span>`,
+        ].join("")
+      : e.kind === "train"
       ? [
           `<span class="je-chip">${kindLabel}</span>`,
           `<span class="je-chip">🎯 난이도 ${escapeHeartHtml(e.difficulty)}</span>`,
@@ -2202,7 +2216,7 @@ function renderGym(snap) {
     const [x, y] = pt(i, 1);
     return `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="rgba(148,163,184,0.28)" stroke-width="1"/>`;
   }).join("");
-  const values = abs.map((a) => a.level / Math.max(1, caps[a.id] || 12));
+  const values = abs.map((a) => a.level / Math.max(1, a.cap || caps[a.id] || 12));
   const poly = values.map((v, i) => pt(i, v).map((n) => n.toFixed(1)).join(",")).join(" ");
   const labels = abs.map((a, i) => {
     const [x, y] = pt(i, 1.24);
@@ -2218,34 +2232,43 @@ function renderGym(snap) {
     labels;
 
   cards.innerHTML = abs.map((a) => {
-    const cap = caps[a.id] || 12;
+    const cap = a.cap || caps[a.id] || 12;
     const pct = Math.round((a.level / cap) * 100);
     const ls = a.last_session;
     const last = ls
-      ? `마지막 훈련: ${ls.difficulty}난이도 ${ls.correct}/${ls.rounds} · 숨은시험 ${ls.exam} · Lv ${ls.level_before}→${ls.level_after}`
+      ? `마지막: ${ls.difficulty}난이도 ${ls.correct}/${ls.rounds} · 숨은시험 ${ls.exam} · Lv ${ls.level_before}→${ls.level_after}`
       : "아직 훈련 기록이 없어요. [🏋️ 훈련] 으로 첫 땀을 흘려보세요!";
+    const btnLabel = a.at_cap ? (a.max_tier ? "🔭 열린 연구 노트" : "🚀 한계 돌파 시도!") : "🏋️ 훈련";
+    const btnCls = a.at_cap ? "ghost-btn gc-train gc-break-btn" : "ghost-btn gc-train";
+    const mode = a.at_cap ? "break" : "train";
     return (
       `<div class="gym-card"><div class="gc-head"><span class="gc-title">${escapeHeartHtml(a.title)}</span>` +
-      `<span class="gc-level">Lv ${a.level} / ${cap}</span></div>` +
+      `<span class="gc-level">Lv ${a.level} / ${cap} · T${a.tier + 1}/${a.tier_count}</span></div>` +
       `<div class="gc-bar"><div class="gc-fill" style="width:${pct}%"></div></div>` +
       `<div class="gc-desc">${escapeHeartHtml(a.desc)}</div>` +
-      `<div class="gc-last">${escapeHeartHtml(last)} · XP ${a.xp}</div>` +
-      `<button class="ghost-btn gc-train" type="button" data-ability="${escapeHeartHtml(a.id)}">🏋️ 훈련</button></div>`
+      `<div class="gc-last">${escapeHeartHtml(last)} · XP ${a.xp} · 🚀 돌파 ${a.breakthroughs}회</div>` +
+      (a.at_cap && !a.max_tier ? `<div class="gc-last" style="color:#fde68a">💭 다음 가설: ${escapeHeartHtml(a.next_idea)}</div>` : "") +
+      `<button class="${btnCls}" type="button" data-ability="${escapeHeartHtml(a.id)}" data-mode="${mode}">${btnLabel}</button></div>`
     );
   }).join("");
 
   if (line) {
     const sorted = [...abs].sort((x, y) => x.level - y.level);
     const totalXp = abs.reduce((acc, a) => acc + a.xp, 0);
+    const bts = abs.reduce((acc, a) => acc + (a.breakthroughs || 0), 0);
+    const atCap = abs.filter((a) => a.at_cap);
     line.textContent =
-      `💪 합산 경험치 ${totalXp} XP · 최강 근육 ${sorted[sorted.length - 1].title}(Lv ${sorted[sorted.length - 1].level}) · ` +
-      `가장 애쓰는 근육 ${sorted[0].title}(Lv ${sorted[0].level}) — 심장박동이 4박마다 알아서 훈련해요!`;
+      `💪 합산 XP ${totalXp} · 🚀 한계돌파 ${bts}회 · 최강 ${sorted[sorted.length - 1].title}(Lv ${sorted[sorted.length - 1].level}/${sorted[sorted.length - 1].cap}) · ` +
+      (atCap.length
+        ? `한계 도달 ${atCap.map((a) => a.title).join(", ")} — 끝이 아니라 돌파 연구 시작!`
+        : `가장 애쓰는 근육 ${sorted[0].title}(Lv ${sorted[0].level}/${sorted[0].cap}) — 심장박동이 알아서 훈련해요!`);
   }
 }
 
-async function trainAbility(abilityId) {
+async function trainAbility(abilityId, mode) {
   try {
-    const res = await fetch("/api/evo/abilities/train", {
+    const url = mode === "break" ? "/api/evo/abilities/breakthrough" : "/api/evo/abilities/train";
+    const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ability: abilityId || "" }),
@@ -2253,7 +2276,17 @@ async function trainAbility(abilityId) {
     const data = await res.json();
     if (data.session) {
       const sRow = data.session;
-      if (sRow.leveled_up) {
+      if (sRow.kind === "breakthrough") {
+        showEvoToast({
+          kind: "breakthrough",
+          beat: "🚀",
+          diary: sRow.success
+            ? `${sRow.title} 한계 돌파 성공! 상한 Lv ${sRow.cap_before} → Lv ${sRow.cap_after} 확장!`
+            : `${sRow.title} 돌파 가설 기각(검증 ${sRow.confirm}) — 롤백하고 재도전 예약!`,
+        });
+      } else if (sRow.kind === "research") {
+        showEvoToast({ kind: "research", beat: "🔭", diary: sRow.diary });
+      } else if (sRow.leveled_up) {
         showEvoToast({
           kind: "train",
           beat: "🏋️",
@@ -2277,17 +2310,17 @@ function setupGym() {
         if (res.ok) {
           const snap = await res.json();
           const sorted = [...(snap.abilities || [])].sort((x, y) => x.level - y.level);
-          weakest = sorted.length ? sorted[0].id : "";
+          weakest = sorted.length ? { id: sorted[0].id, mode: sorted[0].at_cap ? "break" : "train" } : "";
         }
       } catch (err) { /* ignore */ }
-      trainAbility(weakest);
+      trainAbility(weakest.id || weakest, weakest.mode || "train");
     });
   }
   const cards = document.getElementById("gymCards");
   if (cards) {
     cards.addEventListener("click", (evt) => {
       const btn = evt.target.closest(".gc-train");
-      if (btn && btn.dataset.ability) trainAbility(btn.dataset.ability);
+      if (btn && btn.dataset.ability) trainAbility(btn.dataset.ability, btn.dataset.mode || "train");
     });
   }
 }
@@ -2396,7 +2429,7 @@ function setupHeartbeat() {
   setInterval(pollHeartbeat, 5000);
 }
 
-const CURRENT_UI_VERSION = "6.2";
+const CURRENT_UI_VERSION = "6.3";
 
 async function init() {
   setupGraphSimulation();

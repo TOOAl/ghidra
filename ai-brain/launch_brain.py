@@ -79,7 +79,7 @@ class BrainState:
             rl_trained=rl_trained,
         )
         return {
-            "ui_version": "6.2",
+            "ui_version": "6.3",
             "soul": self.soul.snapshot(graph["stats"], env_grade=env_grade),
             "hallucination": hallucination,
             "host": self.host_info,
@@ -504,6 +504,23 @@ def make_handler(state: BrainState):
                 session = state.abilities.train_session(ability, rounds=6)
                 if session["leveled_up"]:
                     state.soul.on_ability_level_up(session["title"], session["level_after"])
+                self._send_json({"session": session, "abilities": state.abilities.snapshot(), "status": state.full_status()})
+                return
+
+            if route == "/api/evo/abilities/breakthrough":
+                ability = str(body.get("ability") or "").strip()
+                if ability not in ("reasoning", "context", "coding", "organizing"):
+                    snap = state.abilities.snapshot()
+                    at_caps = [x for x in snap["abilities"] if x["at_cap"]]
+                    ability = (at_caps or snap["abilities"])[0]["id"]
+                session = state.abilities.breakthrough_session(ability)
+                if session["kind"] == "research":
+                    try:
+                        state.gardener.digest_raw_memory(session.get("note_body", ""), custom_title=session.get("note_title", "열린 연구 과제"))
+                    except Exception:
+                        pass
+                elif session.get("success"):
+                    state.soul.on_ability_level_up(session["title"], session["cap_after"])
                 self._send_json({"session": session, "abilities": state.abilities.snapshot(), "status": state.full_status()})
                 return
 

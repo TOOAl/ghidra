@@ -21,6 +21,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from brain_engine.core_ability_engine import ABILITY_META as ABILITY_TRAIN_META
+from brain_engine.core_ability_engine import ABILITY_ORDER
 from brain_engine.self_evolving_forge import DREAM_QUEST_CATALOG
 
 # ---------------------------------------------------------------------------
@@ -331,11 +333,13 @@ class EvolutionHeartbeat:
         gardener: Any,
         rl_gym: Any = None,
         interval_sec: int = 120,
+        ability: Any = None,
     ) -> None:
         self.forge = forge
         self.soul = soul
         self.gardener = gardener
         self.rl_gym = rl_gym
+        self.ability = ability
         self.interval_sec = max(20, int(interval_sec))
         self.journal_path: Path = forge.root / "state" / "evolution_journal.json"
 
@@ -425,17 +429,20 @@ class EvolutionHeartbeat:
             beat_no = int(self.meta.get("beats_total", 0)) + 1
             installed_ids = {x.get("skill_id") for x in self.forge.state.get("installed_skills", [])}
             pending = [q for q in DREAM_QUEST_POOL if q["entry_fn"] not in installed_ids]
+            wish_pending = any(w.get("status") == "pending" for w in self.meta.get("wishes", []))
 
             wish = None
-            if pending:
-                pend = next((w for w in self.meta.get("wishes", []) if w.get("status") == "pending"), None)
-                if pend:
+            if pending and (wish_pending or beat_no % 4 == 0):
+                if wish_pending:
+                    pend = next((w for w in self.meta.get("wishes", []) if w.get("status") == "pending"), None)
                     pend["status"] = "fulfilled"
                     pend["beat"] = beat_no
                     wish = pend
                 entry = self._beat_evolve(pending[0], beat_no, t0, wish)
-            else:
+            elif not pending and beat_no % 4 == 0:
                 entry = self._beat_vaccine(DREAM_QUEST_POOL[beat_no % len(DREAM_QUEST_POOL)], beat_no, t0)
+            else:
+                entry = self._beat_train(ABILITY_ORDER[beat_no % len(ABILITY_ORDER)], beat_no, t0)
 
             entry["beat"] = beat_no
             entry["ts"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
@@ -489,6 +496,48 @@ class EvolutionHeartbeat:
             "pass_after": after_pct,
             "skill_slug": skill_slug,
             "ms": round((time.perf_counter() - t0) * 1000.0, 2),
+        }
+
+    def _beat_train(self, ability: str, beat_no: int, t0: float) -> Dict[str, Any]:
+        if self.ability is None:
+            return self._beat_vaccine(DREAM_QUEST_POOL[beat_no % len(DREAM_QUEST_POOL)], beat_no, t0)
+        res = self.ability.train_session(ability, rounds=6)
+        meta = ABILITY_TRAIN_META.get(ability, {})
+        unit = meta.get("unit", "단계")
+        title = meta.get("title", ability)
+        if res["leveled_up"]:
+            diary = (
+                f"🏋️ 오늘 혼자 {title} 근육을 키웠어요! {res['difficulty']}{unit} 난이도 연습 {res['correct']}/{res['rounds']} + "
+                f"숨은 시험 {res['exam_correct']}/{res['exam_total']} 합격 → 레벨 {res['level_before']} → {res['level_after']}! "
+                f"배운 가중치는 INT4 캡슐 `{res['capsule']}` 로 냉동 보존했어요!"
+            )
+            try:
+                self.soul.on_ability_level_up(title, res["level_after"])
+            except Exception:
+                pass
+        else:
+            diary = (
+                f"🏋️ {title} 연습: {res['difficulty']}{unit} 난이도 {res['correct']}/{res['rounds']}, "
+                f"숨은 시험 {res['exam_correct']}/{res['exam_total']} — 레벨업은 아깝게 실패! 하지만 가중치는 벌써 조금 똑똑해졌어요."
+            )
+        return {
+            "kind": "train",
+            "quest_id": f"ability_{ability}",
+            "title": title,
+            "diary": diary,
+            "ability": ability,
+            "difficulty": res["difficulty"],
+            "correct": res["correct"],
+            "rounds": res["rounds"],
+            "exam": f"{res['exam_correct']}/{res['exam_total']}",
+            "level_before": res["level_before"],
+            "level_after": res["level_after"],
+            "defects_found": 0,
+            "toxins_found": 0,
+            "pass_before": res["level_before"],
+            "pass_after": res["level_after"],
+            "skill_slug": res.get("capsule", ""),
+            "ms": res["ms"],
         }
 
     def _beat_vaccine(self, quest: Dict[str, Any], beat_no: int, t0: float) -> Dict[str, Any]:

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>시냅스몽 · 나만의 양자화 AI 두뇌 연구소</title>
-  <link rel="stylesheet" href="ui-v3.css?v=6.1" />
+  <link rel="stylesheet" href="ui-v3.css?v=6.2" />
   <!--__INITIAL_STATE__-->
 </head>
 <body>
@@ -401,6 +401,25 @@
                 <input type="text" id="heartChatInput" class="input-field" placeholder="두뇌에게 바라는 것을 속삭이고 Enter (예: 온도 평균 스킬 꿈꿔 줘)" />
                 <button class="primary-btn" id="btnHeartChat" type="button">💬 속삭이기</button>
               </div>
+            </div>
+          </div>
+
+          <!-- 🏋️ E단계: 핵심 능력 성장 체육관 -->
+          <div class="card evo-gym-card" id="evoGymPanel">
+            <div class="evo-gym-head">
+              <div>
+                <span class="step-kicker">STAGE E · CORE ABILITY GROWTH GYM</span>
+                <h3>🏋️ 핵심 능력 성장 체육관 — 스킬 개수가 아닌 4대 근육!</h3>
+                <p class="gym-status-line" id="gymStatusLine">🏋️ 근육 상태를 계측하는 중...</p>
+              </div>
+              <button class="primary-btn" id="btnGymTrainAny" type="button">🏋️ 가장 약한 근육 지금 자율 훈련!</button>
+            </div>
+            <div class="evo-gym-body">
+              <div class="gym-radar-wrap">
+                <svg id="gymRadar" viewBox="0 0 220 220" class="gym-radar" role="img" aria-label="4대 핵심 능력 레이더 차트"></svg>
+                <div class="gym-radar-note">4대 근육 레이더 — 바깥 고리일수록 강력! (자가 진화 훈련마다 실시간 변형)</div>
+              </div>
+              <div class="gym-cards" id="gymCards"></div>
             </div>
           </div>
 
@@ -851,6 +870,6 @@
     </div>
   </div>
 
-  <script src="ui-v3.js?v=6.1"></script>
+  <script src="ui-v3.js?v=6.2"></script>
 </body>
 </html>

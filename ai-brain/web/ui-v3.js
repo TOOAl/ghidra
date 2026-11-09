@@ -2095,15 +2095,23 @@ function renderHeartJournal(hb) {
     return;
   }
   list.innerHTML = entries.map((e) => {
-    const kind = e.kind === "vaccine" ? "kind-vaccine" : e.kind === "stumble" ? "kind-stumble" : "kind-evolve";
-    const kindLabel = e.kind === "vaccine" ? "🛡️ 예방접종" : e.kind === "stumble" ? "💤 깜빡" : "🌱 진화";
-    const chips = [
-      `<span class="je-chip">${kindLabel}</span>`,
-      `<span class="je-chip">🔍 결함 ${escapeHeartHtml(e.defects_found)}건</span>`,
-      e.toxins_found ? `<span class="je-chip">🐡 독 ${escapeHeartHtml(e.toxins_found)}건</span>` : "",
-      `<span class="je-chip">🧪 ${escapeHeartHtml(e.pass_before)}% → ${escapeHeartHtml(e.pass_after)}%</span>`,
-      `<span class="je-chip">⏱ ${escapeHeartHtml(e.ms)}ms</span>`,
-    ].join("");
+    const kind = e.kind === "vaccine" ? "kind-vaccine" : e.kind === "stumble" ? "kind-stumble" : e.kind === "train" ? "kind-train" : "kind-evolve";
+    const kindLabel = e.kind === "vaccine" ? "🛡️ 예방접종" : e.kind === "stumble" ? "💤 깜빡" : e.kind === "train" ? "🏋️ 자율훈련" : "🌱 진화";
+    const chips = e.kind === "train"
+      ? [
+          `<span class="je-chip">${kindLabel}</span>`,
+          `<span class="je-chip">🎯 난이도 ${escapeHeartHtml(e.difficulty)}</span>`,
+          `<span class="je-chip">✅ ${escapeHeartHtml(e.correct)}/${escapeHeartHtml(e.rounds)}</span>`,
+          `<span class="je-chip">📝 숨은시험 ${escapeHeartHtml(e.exam)}</span>`,
+          `<span class="je-chip">📈 Lv ${escapeHeartHtml(e.level_before)} → ${escapeHeartHtml(e.level_after)}</span>`,
+        ].join("")
+      : [
+          `<span class="je-chip">${kindLabel}</span>`,
+          `<span class="je-chip">🔍 결함 ${escapeHeartHtml(e.defects_found)}건</span>`,
+          e.toxins_found ? `<span class="je-chip">🐡 독 ${escapeHeartHtml(e.toxins_found)}건</span>` : "",
+          `<span class="je-chip">🧪 ${escapeHeartHtml(e.pass_before)}% → ${escapeHeartHtml(e.pass_after)}%</span>`,
+          `<span class="je-chip">⏱ ${escapeHeartHtml(e.ms)}ms</span>`,
+        ].join("");
     return (
       `<div class="journal-entry ${kind}">` +
       `<div class="je-head"><span class="je-beat">박동 #${escapeHeartHtml(e.beat)}</span>` +
@@ -2150,6 +2158,10 @@ async function pollHeartbeat() {
     if (!res.ok) return;
     const hb = await res.json();
     renderHeartbeat(hb);
+    try {
+      const ares = await fetch("/api/evo/abilities");
+      if (ares.ok) renderGym(await ares.json());
+    } catch (errA) { /* ignore */ }
     if ((hb.chats || []).length !== HEART_CHAT_COUNT) {
       renderHeartChat(hb);
       HEART_CHAT_COUNT = (hb.chats || []).length;
@@ -2163,6 +2175,122 @@ async function pollHeartbeat() {
   }
 }
 
+
+
+/* ===========================================================================
+   Stage E — Core Ability Growth Gym 🏋️ controller (radar + cards + training)
+=========================================================================== */
+function renderGym(snap) {
+  const svg = document.getElementById("gymRadar");
+  const cards = document.getElementById("gymCards");
+  const line = document.getElementById("gymStatusLine");
+  if (!svg || !cards) return;
+  const abs = snap.abilities || [];
+  const caps = snap.caps || {};
+  const cx = 110, cy = 110, R = 78;
+  const angles = [-90, 0, 90, 180].map((d) => (d * Math.PI) / 180);
+  const pt = (i, ratio) => {
+    const r = R * Math.max(0.06, Math.min(1, ratio));
+    return [cx + r * Math.cos(angles[i]), cy + r * Math.sin(angles[i])];
+  };
+  let grid = "";
+  [0.25, 0.5, 0.75, 1.0].forEach((ring) => {
+    const poly = angles.map((_, i) => pt(i, ring).map((v) => v.toFixed(1)).join(",")).join(" ");
+    grid += `<polygon points="${poly}" fill="none" stroke="rgba(148,163,184,0.28)" stroke-width="1"/>`;
+  });
+  grid += angles.map((_, i) => {
+    const [x, y] = pt(i, 1);
+    return `<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="rgba(148,163,184,0.28)" stroke-width="1"/>`;
+  }).join("");
+  const values = abs.map((a) => a.level / Math.max(1, caps[a.id] || 12));
+  const poly = values.map((v, i) => pt(i, v).map((n) => n.toFixed(1)).join(",")).join(" ");
+  const labels = abs.map((a, i) => {
+    const [x, y] = pt(i, 1.24);
+    return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" font-size="10.5" fill="#a7f3d0">${escapeHeartHtml(a.title.split(" ")[0])} Lv${a.level}</text>`;
+  }).join("");
+  svg.innerHTML =
+    grid +
+    `<polygon points="${poly}" fill="rgba(52,211,153,0.28)" stroke="#34d399" stroke-width="2"/>` +
+    values.map((v, i) => {
+      const [x, y] = pt(i, v);
+      return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.4" fill="#6ee7b7"/>`;
+    }).join("") +
+    labels;
+
+  cards.innerHTML = abs.map((a) => {
+    const cap = caps[a.id] || 12;
+    const pct = Math.round((a.level / cap) * 100);
+    const ls = a.last_session;
+    const last = ls
+      ? `마지막 훈련: ${ls.difficulty}난이도 ${ls.correct}/${ls.rounds} · 숨은시험 ${ls.exam} · Lv ${ls.level_before}→${ls.level_after}`
+      : "아직 훈련 기록이 없어요. [🏋️ 훈련] 으로 첫 땀을 흘려보세요!";
+    return (
+      `<div class="gym-card"><div class="gc-head"><span class="gc-title">${escapeHeartHtml(a.title)}</span>` +
+      `<span class="gc-level">Lv ${a.level} / ${cap}</span></div>` +
+      `<div class="gc-bar"><div class="gc-fill" style="width:${pct}%"></div></div>` +
+      `<div class="gc-desc">${escapeHeartHtml(a.desc)}</div>` +
+      `<div class="gc-last">${escapeHeartHtml(last)} · XP ${a.xp}</div>` +
+      `<button class="ghost-btn gc-train" type="button" data-ability="${escapeHeartHtml(a.id)}">🏋️ 훈련</button></div>`
+    );
+  }).join("");
+
+  if (line) {
+    const sorted = [...abs].sort((x, y) => x.level - y.level);
+    const totalXp = abs.reduce((acc, a) => acc + a.xp, 0);
+    line.textContent =
+      `💪 합산 경험치 ${totalXp} XP · 최강 근육 ${sorted[sorted.length - 1].title}(Lv ${sorted[sorted.length - 1].level}) · ` +
+      `가장 애쓰는 근육 ${sorted[0].title}(Lv ${sorted[0].level}) — 심장박동이 4박마다 알아서 훈련해요!`;
+  }
+}
+
+async function trainAbility(abilityId) {
+  try {
+    const res = await fetch("/api/evo/abilities/train", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ability: abilityId || "" }),
+    });
+    const data = await res.json();
+    if (data.session) {
+      const sRow = data.session;
+      if (sRow.leveled_up) {
+        showEvoToast({
+          kind: "train",
+          beat: "🏋️",
+          diary: `${sRow.title} 레벨업! Lv ${sRow.level_before} → ${sRow.level_after} (숨은 시험 ${sRow.exam_correct}/${sRow.exam_total})`,
+        });
+      }
+    }
+    if (data.abilities) renderGym(data.abilities);
+    if (data.status && typeof renderStatus === "function") renderStatus(data.status);
+    pollHeartbeat();
+  } catch (err) { /* ignore */ }
+}
+
+function setupGym() {
+  const anyBtn = document.getElementById("btnGymTrainAny");
+  if (anyBtn) {
+    anyBtn.addEventListener("click", async () => {
+      let weakest = "";
+      try {
+        const res = await fetch("/api/evo/abilities");
+        if (res.ok) {
+          const snap = await res.json();
+          const sorted = [...(snap.abilities || [])].sort((x, y) => x.level - y.level);
+          weakest = sorted.length ? sorted[0].id : "";
+        }
+      } catch (err) { /* ignore */ }
+      trainAbility(weakest);
+    });
+  }
+  const cards = document.getElementById("gymCards");
+  if (cards) {
+    cards.addEventListener("click", (evt) => {
+      const btn = evt.target.closest(".gc-train");
+      if (btn && btn.dataset.ability) trainAbility(btn.dataset.ability);
+    });
+  }
+}
 
 let HEART_CHAT_COUNT = -1;
 
@@ -2268,7 +2396,7 @@ function setupHeartbeat() {
   setInterval(pollHeartbeat, 5000);
 }
 
-const CURRENT_UI_VERSION = "6.1";
+const CURRENT_UI_VERSION = "6.2";
 
 async function init() {
   setupGraphSimulation();
@@ -2276,6 +2404,7 @@ async function init() {
   setupInteractions();
   setupEvoForgeInteractions();
   setupHeartbeat();
+  setupGym();
 
   // Instant 0ms render from server-injected initial state (never stuck on "측정 중...")
   if (window.__INITIAL_STATUS__) {

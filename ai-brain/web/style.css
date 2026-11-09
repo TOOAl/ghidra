@@ -3000,3 +3000,137 @@ code {
 .heart-chat-bar .input-field {
   flex: 1;
 }
+
+/* ---------------------------------------------------------------------------
+   Stage E — Core Ability Growth Gym 🏋️
+--------------------------------------------------------------------------- */
+.evo-gym-card {
+  margin: 12px 0 4px;
+  padding: 14px 16px 14px;
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  background: linear-gradient(135deg, rgba(6, 78, 59, 0.35), rgba(15, 23, 42, 0.88) 55%);
+  border-radius: 16px;
+}
+
+.evo-gym-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.evo-gym-head h3 {
+  margin: 2px 0 3px;
+  font-size: 15.5px;
+  color: #ecfdf5;
+}
+
+.gym-status-line {
+  margin: 0;
+  font-size: 12.2px;
+  color: #a7f3d0;
+}
+
+.evo-gym-body {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: 14px;
+  margin-top: 11px;
+  align-items: start;
+}
+
+.gym-radar-wrap {
+  text-align: center;
+}
+
+.gym-radar {
+  width: 100%;
+  max-width: 240px;
+  height: auto;
+}
+
+.gym-radar-note {
+  font-size: 10.6px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
+.gym-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.gym-card {
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(15, 23, 42, 0.75);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gc-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.gc-title {
+  font-size: 12.8px;
+  font-weight: 800;
+  color: #f0fdf4;
+}
+
+.gc-level {
+  font-size: 10.8px;
+  font-weight: 800;
+  color: #022c22;
+  background: linear-gradient(135deg, #6ee7b7, #34d399);
+  border-radius: 999px;
+  padding: 1.5px 9px;
+}
+
+.gc-bar {
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(51, 65, 85, 0.9);
+  overflow: hidden;
+}
+
+.gc-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #34d399, #22d3ee);
+  transition: width 0.5s ease;
+}
+
+.gc-desc {
+  font-size: 11.2px;
+  color: #cbd5e1;
+  line-height: 1.5;
+}
+
+.gc-last {
+  font-size: 10.8px;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+.gc-train {
+  align-self: flex-start;
+  padding: 3px 10px;
+  font-size: 11px;
+}
+
+.journal-entry.kind-train { border-left-color: #34d399; }
+.journal-entry.kind-train .je-beat { background: linear-gradient(135deg, #a7f3d0, #34d399); }
+
+@media (max-width: 980px) {
+  .evo-gym-body { grid-template-columns: 1fr; }
+  .gym-cards { grid-template-columns: 1fr; }
+}

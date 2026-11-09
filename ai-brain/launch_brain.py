@@ -20,6 +20,8 @@ from urllib.parse import parse_qs, urlparse
 BRAIN_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(BRAIN_ROOT))
 
+from brain_engine.core_ability_engine import ABILITY_ORDER as ABILITY_ROTATION  # noqa: E402
+from brain_engine.core_ability_engine import CoreAbilityEngine  # noqa: E402
 from brain_engine.evolution_heartbeat import EvolutionHeartbeat  # noqa: E402
 from brain_engine.genius_pantheon import GeniusPantheon  # noqa: E402
 from brain_engine.genius_scout import analyze_candidate_genius  # noqa: E402
@@ -47,12 +49,14 @@ class BrainState:
         self.rl_gym = PortableRLGym(root / "state", root / "models")
         self.pantheon = GeniusPantheon(root / "state", root / "models")
         self.evo_forge = SelfEvolvingForge(root)
+        self.abilities = CoreAbilityEngine(root)
         self.heartbeat = EvolutionHeartbeat(
             self.evo_forge,
             self.soul,
             self.gardener,
             self.rl_gym,
             interval_sec=int(__import__('os').environ.get('HEARTBEAT_INTERVAL_SEC', '120')),
+            ability=self.abilities,
         )
         self.host_info = probe_host(root)
         self.soul.register_host(self.host_info)
@@ -75,7 +79,7 @@ class BrainState:
             rl_trained=rl_trained,
         )
         return {
-            "ui_version": "6.1",
+            "ui_version": "6.2",
             "soul": self.soul.snapshot(graph["stats"], env_grade=env_grade),
             "hallucination": hallucination,
             "host": self.host_info,
@@ -134,6 +138,9 @@ def make_handler(state: BrainState):
                 return
             if route == "/api/evo/heartbeat":
                 self._send_json(state.heartbeat.status())
+                return
+            if route == "/api/evo/abilities":
+                self._send_json(state.abilities.snapshot())
                 return
             if route == "/api/notes":
                 self._send_json({"notes": state.gardener.list_notes()})
@@ -486,6 +493,18 @@ def make_handler(state: BrainState):
             if route == "/api/evo/heartbeat/toggle":
                 paused = state.heartbeat.toggle_paused()
                 self._send_json({"paused": paused, "heartbeat": state.heartbeat.status()})
+                return
+
+            if route == "/api/evo/abilities/train":
+                ability = str(body.get("ability") or "").strip()
+                if ability not in ("reasoning", "context", "coding", "organizing"):
+                    ability = ABILITY_ROTATION[int(state.abilities.state.get("train_cursor", 0)) % 4]
+                    state.abilities.state["train_cursor"] = int(state.abilities.state.get("train_cursor", 0)) + 1
+                    state.abilities._save()
+                session = state.abilities.train_session(ability, rounds=6)
+                if session["leveled_up"]:
+                    state.soul.on_ability_level_up(session["title"], session["level_after"])
+                self._send_json({"session": session, "abilities": state.abilities.snapshot(), "status": state.full_status()})
                 return
 
             if route == "/api/evo/heartbeat/chat":

@@ -284,6 +284,16 @@ class TamagotchiSoul:
         self._log_event(f"6단계 자가 진화 스킬 장착: {entry_fn}")
         self._save()
 
+    def on_ability_level_up(self, title: str, level: int) -> None:
+        self.data["xp"] = int(self.data.get("xp", 0)) + 30
+        self.data["mood"] = min(100, int(self.data.get("mood", 85)) + 8)
+        self.data["pose"] = "05_drop"
+        self.data["last_speech"] = (
+            f"🏋️ 핵심 근육 성장! 자가 연습과 숨은 시험으로 {title} 이(가) 레벨 {level} 에 도달했어요! (+30 XP)"
+        )
+        self._log_event(f"핵심 능력 레벨업: {title} Lv{level}")
+        self._save()
+
     def poke(self) -> Dict[str, Any]:
         self.data["mood"] = min(100, int(self.data.get("mood", 75)) + 7)
         self.data["xp"] = int(self.data.get("xp", 0)) + 3

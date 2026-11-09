@@ -16,6 +16,7 @@ state/rl_council.json
 state/genius_pantheon.json
 state/evo_forge.json
 state/evolution_journal.json
+state/core_abilities.json
 specimens/*.elf
 specimens/*.exe
 specimens/*.bin

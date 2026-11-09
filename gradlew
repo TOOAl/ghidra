@@ -139,6 +139,23 @@ if [ -d "${GHIDRA_HOME}/../ghidra.bin" ] || ([ ${application_release_name} != "P
      echo "Please install Gradle ${application_gradle_min} or later and put it on your PATH."
      exit 1
 fi
+
+# Pre-seed Gradle 9.8.0 distribution via GitHub API asset endpoint if not already cached
+# (avoids github.com/.../releases/download/... HTTP 504 gateway timeouts)
+GRADLE_DIST_DIR="${GRADLE_USER_HOME:-$HOME/.gradle}/wrapper/dists/gradle-9.8.0-bin/3m7h6ceboy5k31n8kzwzuxssm"
+if [ ! -f "${GRADLE_DIST_DIR}/gradle-9.8.0-bin.zip.ok" ] && [ ! -f "${GRADLE_DIST_DIR}/gradle-9.8.0-bin.zip" ] && command -v curl >/dev/null 2>&1; then
+    mkdir -p "${GRADLE_DIST_DIR}"
+    GRADLE_ASSET_LOC=$(curl -fsSI -m 20 -H "Accept: application/octet-stream" -H "User-Agent: gradlew" \
+        "https://api.github.com/repos/gradle/gradle-distributions/releases/assets/586068844" 2>/dev/null \
+        | sed -n 's/^[Ll][Oo][Cc][Aa][Tt][Ii][Oo][Nn]:[[:space:]]*//p' | tr -d '\r' | head -n 1)
+    if [ -n "${GRADLE_ASSET_LOC}" ]; then
+        if curl -fsSL --retry 3 --retry-delay 2 -m 180 -o "${GRADLE_DIST_DIR}/gradle-9.8.0-bin.zip.tmp" "${GRADLE_ASSET_LOC}"; then
+            mv "${GRADLE_DIST_DIR}/gradle-9.8.0-bin.zip.tmp" "${GRADLE_DIST_DIR}/gradle-9.8.0-bin.zip"
+        else
+            rm -f "${GRADLE_DIST_DIR}/gradle-9.8.0-bin.zip.tmp"
+        fi
+    fi
+fi
 #---------------------------------------------------------------------------------------------------
 
 # Determine the Java command to use to start the JVM.

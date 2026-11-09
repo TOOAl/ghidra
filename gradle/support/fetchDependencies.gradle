@@ -44,7 +44,8 @@ initscript {
 	dependencies { classpath 'commons-io:commons-io:2.21.0' }
 }
 
-ext.NUM_RETRIES = 3 // # of times to try to download a file before failing
+ext.NUM_RETRIES = 5 // # of times to try to download a file before failing
+ext.ghReleaseAssetCache = [:]
 ext.REPO_DIR = ((Script)this).buildscript.getSourceFile().getParentFile().getParentFile().getParentFile()
 ext.DEPS_DIR = file("${REPO_DIR}/dependencies")
 ext.DOWNLOADS_DIR = file("${DEPS_DIR}/downloads")
@@ -583,6 +584,65 @@ def download(url, file) {
  * @param retries the number of times to attempt to connect if there are failures
  * @return the InputStream for the URL, and the size of the download in bytes as a string
  */
+def resolveGitHubReleaseAssetUrl(String url) {
+	def m = java.util.regex.Pattern.compile('^https://github\\.com/([^/]+)/([^/]+)/releases/download/([^/]+)/([^/?#]+)$').matcher(url)
+	if (!m.matches()) {
+		return url
+	}
+	def owner = m.group(1)
+	def repo = m.group(2)
+	def tag = m.group(3)
+	def assetName = java.net.URLDecoder.decode(m.group(4), "UTF-8")
+	def cacheKey = "${owner}/${repo}@${tag}".toString()
+	try {
+		if (!ghReleaseAssetCache.containsKey(cacheKey)) {
+			def apiUrl = "https://api.github.com/repos/${owner}/${repo}/releases/tags/${tag}"
+			HttpURLConnection apiConn = (HttpURLConnection) new URL(apiUrl).openConnection()
+			apiConn.setConnectTimeout(15000)
+			apiConn.setReadTimeout(30000)
+			apiConn.setRequestProperty("Accept", "application/vnd.github+json")
+			apiConn.setRequestProperty("User-Agent", "ghidra-fetchDependencies")
+			def token = System.getenv("GITHUB_TOKEN") ?: System.getenv("GH_TOKEN")
+			if (token) {
+				apiConn.setRequestProperty("Authorization", "Bearer " + token)
+			}
+			if (apiConn.getResponseCode() == 200) {
+				def raw = apiConn.getInputStream().getText("UTF-8")
+				def assetMap = [:]
+				def am = java.util.regex.Pattern.compile('"(https://api\\.github\\.com/repos/[^"]+/releases/assets/\\d+)".*?"name"\\s*:\\s*"([^"]+)"', java.util.regex.Pattern.DOTALL).matcher(raw)
+				while (am.find()) {
+					assetMap[am.group(2)] = am.group(1)
+				}
+				ghReleaseAssetCache[cacheKey] = assetMap
+			}
+			apiConn.disconnect()
+		}
+		def assetApiUrl = ghReleaseAssetCache[cacheKey]?.get(assetName)
+		if (assetApiUrl) {
+			HttpURLConnection assetConn = (HttpURLConnection) new URL(assetApiUrl).openConnection()
+			assetConn.setInstanceFollowRedirects(false)
+			assetConn.setConnectTimeout(15000)
+			assetConn.setReadTimeout(30000)
+			assetConn.setRequestProperty("Accept", "application/octet-stream")
+			assetConn.setRequestProperty("User-Agent", "ghidra-fetchDependencies")
+			def token = System.getenv("GITHUB_TOKEN") ?: System.getenv("GH_TOKEN")
+			if (token) {
+				assetConn.setRequestProperty("Authorization", "Bearer " + token)
+			}
+			int code = assetConn.getResponseCode()
+			def loc = assetConn.getHeaderField("Location")
+			assetConn.disconnect()
+			if ((code == 301 || code == 302 || code == 303 || code == 307 || code == 308) && loc) {
+				return loc
+			}
+		}
+	}
+	catch (Exception e) {
+		println "   GitHub API fallback lookup failed (" + e.getMessage() + "), using direct URL..."
+	}
+	return url
+}
+
 def establishConnection(url, retries) {
 	for (int i = 0; i < retries; i++) {
 		try {
@@ -590,20 +650,26 @@ def establishConnection(url, retries) {
 				println "   Connecting..." 
 			}
 			else {
+				Thread.sleep(2000L * i)
 				println "   Connecting (" + (i+1) + "/" + retries + ")..."
 			}
-			URLConnection conn = new URL(url).openConnection();
-			conn.setRequestMethod("HEAD");
+			def resolvedUrl = resolveGitHubReleaseAssetUrl(url.toString())
+			URLConnection conn = new URL(resolvedUrl).openConnection();
+			conn.setConnectTimeout(30000);
+			conn.setReadTimeout(120000);
+			conn.setRequestProperty("User-Agent", "ghidra-fetchDependencies");
+			def stream = new BufferedInputStream(conn.getInputStream());
 			def size = conn.getContentLengthLong();
 			if (size == -1) {
 				size = "???" 
 			}
-			return [new BufferedInputStream(new URL(url).openStream()), size]; 
+			return [stream, size]; 
 		}
 		catch (Exception e) {
 			println "   Connection error! " + e
 		}
 	}
+	return [null, "???"]
 }
 
 /**

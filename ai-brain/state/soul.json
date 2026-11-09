@@ -1,0 +1,29 @@
+{
+  "name": "시냅스몽",
+  "born_at": "2026-11-09T08:17:45Z",
+  "xp": 30,
+  "satiety": 78,
+  "mood": 88,
+  "last_fed_ts": 1794212265.9404795,
+  "last_interaction_ts": 1794212265.9404795,
+  "memories_eaten": 4,
+  "questions_answered": 0,
+  "rl_episodes": 0,
+  "binaries_analyzed": 0,
+  "rl_iq_bonus": 0,
+  "re_skill": 0,
+  "hosts_visited": [
+    "e2b.local (Linux-x86_64-2c)"
+  ],
+  "last_speech": "우와! 새로운 컴퓨터(2코어, 여유 RAM 3.56GB)에 연결됐어요! 'Gemma 4 E2B (Q4_K_M · 4비트)' 눈금이 딱 맞겠어요!",
+  "recent_events": [
+    {
+      "time": "2026-11-09T08:17:45Z",
+      "text": "새로운 숙주 컴퓨터 감지: e2b.local (Linux-x86_64-2c) → 추천 두뇌: Gemma 4 E2B (Q4_K_M · 4비트)"
+    },
+    {
+      "time": "2026-11-09T08:17:45Z",
+      "text": "외장하드 포터블 서식지(ai-brain)에서 첫 탄생!"
+    }
+  ]
+}

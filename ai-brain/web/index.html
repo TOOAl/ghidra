@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>포터블 다마고치 AI 두뇌 연구소 (Stage A)</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-logo">🧠</span>
+      <div>
+        <h1>외장하드 다마고치 AI 두뇌 연구소</h1>
+        <p class="subtitle">초소형 양자화 SLM(0.5B~4B) · 마크다운 시냅스 위키 · 무설치 포터블 서식지</p>
+      </div>
+    </div>
+    <div class="roadmap-pills">
+      <span class="pill active">✅ A단계: 제2의 두뇌 위키 &amp; 다마고치</span>
+      <span class="pill next">⏳ B단계: CPU 강화학습 체육관</span>
+      <span class="pill upcoming">⏳ C단계: Ghidra 역공학 해부실</span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- 왼쪽: 살아있는 다마고치 케이지 -->
+    <aside class="pet-column">
+      <section class="card pet-card">
+        <div class="pet-header">
+          <div>
+            <span class="stage-badge" id="petStageBadge">Lv.1 🐣</span>
+            <h2 id="petName">시냅스몽</h2>
+          </div>
+          <div class="pet-actions-mini">
+            <button class="btn-ghost" id="btnRename" title="이름 바꾸기">✏️ 이름</button>
+            <button class="btn-ghost" id="btnPoke" title="쓰다듬기">👋 쓰다듬기</button>
+          </div>
+        </div>
+
+        <div class="pet-screen" id="petScreen">
+          <div class="host-chip" id="hostChip">🔌 숙주 PC 스캔 중...</div>
+          <svg class="pet-svg" id="petSvg" viewBox="0 0 220 190" aria-label="다마고치 두뇌 캐릭터">
+            <defs>
+              <radialGradient id="brainGlow" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.45" />
+                <stop offset="100%" stop-color="#8b5cf6" stop-opacity="0" />
+              </radialGradient>
+              <linearGradient id="bodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#a78bfa" />
+                <stop offset="50%" stop-color="#ec4899" />
+                <stop offset="100%" stop-color="#6366f1" />
+              </linearGradient>
+            </defs>
+            <circle cx="110" cy="102" r="78" fill="url(#brainGlow)" class="pulse-aura" />
+            <!-- 시냅스 안테나 -->
+            <g class="pet-float">
+              <line x1="82" y1="52" x2="66" y2="26" stroke="#c4b5fd" stroke-width="3" stroke-linecap="round" />
+              <circle cx="64" cy="24" r="6" fill="#38bdf8" class="spark-dot" />
+              <line x1="138" y1="52" x2="154" y2="26" stroke="#c4b5fd" stroke-width="3" stroke-linecap="round" />
+              <circle cx="156" cy="24" r="6" fill="#f472b6" class="spark-dot" />
+              <!-- 말랑한 뇌-다마고치 몸통 -->
+              <path d="M55,108 C48,72 74,48 110,48 C146,48 172,72 165,108 C170,136 148,154 110,154 C72,154 50,136 55,108 Z"
+                    fill="url(#bodyGrad)" stroke="#e0e7ff" stroke-width="2.5" />
+              <!-- 뇌 주름 무늬 -->
+              <path d="M78,72 Q95,62 106,74 M114,74 Q125,62 142,72" fill="none" stroke="rgba(255,255,255,0.45)" stroke-width="3" stroke-linecap="round" />
+              <!-- 볼터치 -->
+              <ellipse cx="76" cy="112" rx="9" ry="5" fill="rgba(255,182,193,0.65)" />
+              <ellipse cx="144" cy="112" rx="9" ry="5" fill="rgba(255,182,193,0.65)" />
+              <!-- 눈 -->
+              <g class="pet-eyes">
+                <circle cx="88" cy="100" r="8" fill="#0f172a" />
+                <circle cx="91" cy="97" r="3" fill="#ffffff" />
+                <circle cx="132" cy="100" r="8" fill="#0f172a" />
+                <circle cx="135" cy="97" r="3" fill="#ffffff" />
+              </g>
+              <!-- 입 -->
+              <path id="petMouth" d="M99,115 Q110,125 121,115" fill="none" stroke="#0f172a" stroke-width="3.2" stroke-linecap="round" />
+              <!-- 작은 발 -->
+              <ellipse cx="88" cy="155" rx="12" ry="6" fill="#818cf8" />
+              <ellipse cx="132" cy="155" rx="12" ry="6" fill="#818cf8" />
+            </g>
+          </svg>
+          <div class="emotion-pill" id="petEmotion">신남 · 시냅스 반짝이는 중</div>
+        </div>
+
+        <div class="speech-bubble" id="petSpeech">
+          안녕 주인님! 외장하드 집에서 깨어났어요!
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-row">
+            <span>🍙 지식 포만감</span>
+            <div class="bar"><div class="bar-fill satiety" id="barSatiety" style="width:78%"></div></div>
+            <strong id="valSatiety">78%</strong>
+          </div>
+          <div class="stat-row">
+            <span>💛 기분·활력</span>
+            <div class="bar"><div class="bar-fill mood" id="barMood" style="width:88%"></div></div>
+            <strong id="valMood">88%</strong>
+          </div>
+          <div class="stat-row">
+            <span>✨ 성장 경험치</span>
+            <div class="bar"><div class="bar-fill xp" id="barXp" style="width:60%"></div></div>
+            <strong id="valXp">30/50</strong>
+          </div>
+        </div>
+
+        <div class="kpi-row">
+          <div class="kpi-box">
+            <span class="kpi-num" id="kpiIq">69</span>
+            <span class="kpi-lbl">두뇌 IQ</span>
+          </div>
+          <div class="kpi-box">
+            <span class="kpi-num" id="kpiNotes">4</span>
+            <span class="kpi-lbl">위키 카드</span>
+          </div>
+          <div class="kpi-box">
+            <span class="kpi-num" id="kpiEdges">4</span>
+            <span class="kpi-lbl">시냅스 고리</span>
+          </div>
+        </div>
+
+        <div class="engine-banner" id="engineBanner">
+          🔎 추론 엔진 확인 중...
+        </div>
+
+        <div class="event-log">
+          <h3>📜 최근 성장 일지 (외장하드에 영구 기록)</h3>
+          <ul id="eventList"></ul>
+        </div>
+      </section>
+    </aside>
+
+    <!-- 오른쪽: A단계 제2의 두뇌 워크스페이스 -->
+    <section class="workspace-column">
+      <nav class="tabs">
+        <button class="tab active" data-tab="tab-graph">🕸️ 시냅스 지식 그물망</button>
+        <button class="tab" data-tab="tab-feed">🍙 밥 주기 (지식·메모 주입)</button>
+        <button class="tab" data-tab="tab-chat">💬 내 두뇌와 대화하기</button>
+        <button class="tab" data-tab="tab-host">💾 외장하드 &amp; 숙주 PC 스캐너</button>
+      </nav>
+
+      <!-- 탭 1: 시냅스 그래프 & 마크다운 뷰어 -->
+      <div class="tab-panel active" id="tab-graph">
+        <div class="graph-split">
+          <div class="card graph-box">
+            <div class="section-head">
+              <h3>🧠 실시간 마크다운 시냅스 지도 (클릭해서 기억 열기)</h3>
+              <span class="hint">노드를 마우스로 끌어당기거나 클릭해 보세요!</span>
+            </div>
+            <canvas id="graphCanvas" width="640" height="400"></canvas>
+          </div>
+          <div class="card note-viewer">
+            <div class="section-head">
+              <h3 id="viewerTitle">📄 기억 카드를 선택하세요</h3>
+              <span class="badge-path" id="viewerPath">vault/10_Wiki/</span>
+            </div>
+            <div class="tag-list" id="viewerTags"></div>
+            <pre class="markdown-box" id="viewerBody">왼쪽 신경망에서 동그란 기억 노드를 클릭하면 옵시디언(Obsidian) 100% 호환 마크다운(.md) 원문이 여기에 표시됩니다.</pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- 탭 2: 밥 주기 (P-Reinforce 자율 정원사) -->
+      <div class="tab-panel" id="tab-feed">
+        <div class="card">
+          <h3>🍙 다마고치 두뇌에게 새 지식·메모 먹이기 (P-Reinforce 자율 정원사)</h3>
+          <p class="desc">
+            대충 적은 메모나 공부한 내용을 던져주기만 하세요! 정원사 에이전트가 자동으로
+            <strong>분류 · 핵심 요약 · #해시태그 · 기존 기억과의 <code>[[양방향 링크]]</code></strong>를 만들어
+            <code>vault/10_Wiki/</code>에 마크다운 카드로 심어 줍니다.
+          </p>
+
+          <div class="snack-bar">
+            <span>⚡ 원클릭 간식 샘플:</span>
+            <button class="btn-snack" data-snack="quant">🍫 4비트 양자화 실험 메모</button>
+            <button class="btn-snack" data-snack="rl">🍪 다수가 동의하는 1등 AI 메모</button>
+            <button class="btn-snack" data-snack="ghidra">🍬 Ghidra 문자열 암호화 분석 메모</button>
+          </div>
+
+          <input type="text" id="feedTitle" class="input-text" placeholder="제목 (비워두면 정원사가 첫 문장을 보고 자동으로 지어줍니다)" />
+          <textarea id="feedText" class="input-area" rows="6" placeholder="오늘 배운 것, 떠오른 아이디어, 프롬프트, 역공학 분석 노트를 자유롭게 적어주세요..."></textarea>
+          <div class="action-row">
+            <button class="btn-primary" id="btnFeed">🍽️ 냠냠! 지식 먹이고 시냅스 연결하기</button>
+            <span id="feedStatus" class="status-msg"></span>
+          </div>
+
+          <div id="digestResult" class="digest-result hidden"></div>
+        </div>
+      </div>
+
+      <!-- 탭 3: 내 두뇌와 대화하기 -->
+      <div class="tab-panel" id="tab-chat">
+        <div class="card chat-card">
+          <div class="section-head">
+            <h3>💬 내 제2의 두뇌에게 물어보기 (시냅스 정밀 인출)</h3>
+            <span class="hint">모든 문서를 다 읽지 않고 연결된 핵심 기억 카드만 쏙 뽑아 읽습니다!</span>
+          </div>
+          <div class="quick-questions">
+            <button class="btn-snack" data-q="외장하드에 사는 다마고치 두뇌는 왜 C드라이브를 안 어지럽혀?">질문 예시 1: 외장하드 포터블 원리</button>
+            <button class="btn-snack" data-q="4비트 양자화랑 초소형 언어모델이 왜 데이터센터 없이 돌아가?">질문 예시 2: 4비트 양자화 비결</button>
+            <button class="btn-snack" data-q="Ghidra 헤드리스랑 내 로컬 AI 두뇌를 어떻게 합칠 거야?">질문 예시 3: Ghidra 역공학 결합</button>
+          </div>
+          <div class="chat-log" id="chatLog">
+            <div class="msg bot">
+              <strong>🧠 내 두뇌:</strong> 무엇이든 물어보세요! 제가 먹은 마크다운 위키 기억들 속에서 관련 시냅스만 똑똑하게 찾아 답해 드릴게요.
+            </div>
+          </div>
+          <div class="chat-input-row">
+            <input type="text" id="chatInput" class="input-text" placeholder="내 지식 위키에 대해 질문해 보세요..." />
+            <button class="btn-primary" id="btnChat">전송 🚀</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 탭 4: 외장하드 & 숙주 PC 하드웨어 스캐너 -->
+      <div class="tab-panel" id="tab-host">
+        <div class="card">
+          <h3>💾 연결된 숙주 컴퓨터 실시간 검진 &amp; 초소형 양자화 모델(SLM) 추천표</h3>
+          <p class="desc">
+            이 두뇌는 깨어날 때마다 <strong>현재 외장하드가 꽂힌 컴퓨터의 CPU와 남은 메모리(RAM)</strong>를 스스로 측정해서,
+            버벅이지 않고 돌아가는 최적의 <strong>4비트/8비트 양자화 눈금</strong>을 골라줍니다.
+          </p>
+          <div class="host-specs" id="hostSpecs"></div>
+
+          <h4 class="subhead">📐 양자화(Quantization) 눈금별 메모리 계산표 (현재 숙주 PC 기준)</h4>
+          <div class="table-wrap">
+            <table class="slm-table">
+              <thead>
+                <tr>
+                  <th>초소형 모델 (SLM)</th>
+                  <th>원본(16비트)</th>
+                  <th>압축 후 용량</th>
+                  <th>절약률</th>
+                  <th>필요 여유 RAM</th>
+                  <th>현재 PC 판정</th>
+                </tr>
+              </thead>
+              <tbody id="slmTableBody"></tbody>
+            </table>
+          </div>
+
+          <div class="portable-guide">
+            <h4>🎒 진짜 외장하드(USB/포터블 SSD)로 이사시키는 3단계 방법</h4>
+            <ol>
+              <li>이 저장소의 <code>ai-brain/</code> 폴더를 외장하드(예: <code>E:\ai-brain</code>)에 복사합니다.</li>
+              <li>인터넷 되는 PC에서 최초 1번만 <code>python scripts/download_portable_slm.py --tier 0.8b-q8</code> 실행 → 외장하드 <code>models/</code> 폴더 안에 812MB 두뇌 파일이 저장됩니다.</li>
+              <li>이제 어느 컴퓨터에나 외장하드를 꽂고 <code>start_windows.bat</code> (맥/리눅스는 <code>./start_mac_linux.sh</code>)만 실행하면 호스트 PC 설치 없이 내 다마고치 두뇌가 즉시 깨어납니다!</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

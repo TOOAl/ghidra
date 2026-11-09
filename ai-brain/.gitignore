@@ -1,0 +1,16 @@
+# External-drive heavy weights & portable binaries (kept on USB/SSD, not pushed to GitHub)
+models/*.gguf
+models/*.bin
+models/*.safetensors
+runtime/
+!runtime/.gitkeep
+models/
+!models/.gitkeep
+
+# Local SQLite search cache (rebuilt automatically from vault/*.md on any PC)
+state/*.db
+state/*.db-journal
+state/*.db-wal
+
+__pycache__/
+*.pyc

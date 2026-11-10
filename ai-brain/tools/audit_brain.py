@@ -27,7 +27,7 @@ from typing import Iterable, List
 
 HERE = Path(__file__).resolve().parent
 BRAIN = HERE.parent                      # …/ai-brain
-TEXT_EXT = {".py", ".md", ".json", ".js", ".html", ".css", ".sh", ".bat", ".yml"}
+TEXT_EXT = {".py", ".md", ".json", ".js", ".html", ".css", ".sh", ".bat", ".ps1", ".yml"}
 # 디스크 런타임 산출물 — 커밋 트리에 있으면 안 됨
 RUNTIME_PATTERNS = ("quests.json", "semantic.json", "wiki_index.db", ".gguf",
                     "quest_markers", "sem-prose", "sem-code", ".corrupt-",

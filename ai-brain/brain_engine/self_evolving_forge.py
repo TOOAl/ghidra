@@ -1039,6 +1039,7 @@ class SelfEvolvingForge:
         env_dir = os.environ.get("GHIDRA_INSTALL_DIR", "").strip()
         if env_dir:
             candidates.append(Path(env_dir) / "support" / "analyzeHeadless")
+            candidates.append(Path(env_dir) / "support" / "analyzeHeadless.bat")
         for base in [self.root / "runtime", self.root.parent, self.root.parent / "build" / "dist"]:
             if base.exists():
                 for gdir in sorted(base.glob("ghidra*")):

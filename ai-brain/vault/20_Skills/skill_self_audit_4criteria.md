@@ -15,9 +15,9 @@ created: ""
 걷고, git 있으면 best-effort·없으면 파일시스템 폴백. 네트워크 없음.
 
 ## 🔩 4기준 검사 (audit_brain.py)
-1. **개인정보** — 커밋 텍스트 71장 전수 스캔: 하드 시크릿(AKIA·개인키·
-   ghp_·sk-·AIza…) 0 · 개인 이메일 0 · 사용자 홈경로(`/home/<user>`·
-   `C:\Users\…`) 0.
+1. **개인정보** — 커밋 텍스트 전수 스캔(파일 수는 `audit_brain` 이 보고):
+   하드 시크릿(AKIA·개인키·ghp_·sk-·AIza…) 0 · 개인 이메일 0 · 사용자
+   홈경로(Linux `/home/<user>`·Windows 홈경로 리터럴) 0.
 2. **무료** — 비-localhost URL 은 전부 **dormant 수동 다운로더**
    (`scripts/download_portable_slm.py`, `__main__` 가드·`--tier` 명시) 안에만,
    외부 호스트는 무료 GGUF(huggingface)뿐(유료 API 0), 그리고 그 다운로더를
@@ -40,11 +40,17 @@ created: ""
 콘텐츠**고, 주석의 `/tmp/l_probe` 는 측정 근거 기록이라 부채 아님.)*
 
 ## 📒 부채 원장 (정직 고지 — 미해결/한계)
-1. **Windows 오프라인 이식성** — vendor `jdk4py`·`jpype1` wheel 은
-   **manylinux x86_64 전용**. `start_windows.bat` 이 있어도 Windows 에선
-   Ghidra 경로를 vendor wheel 로 오프라인 실행 불가(스크래치 경로는 고쳤지만
-   플랫폼 wheel 은 남음). 해결엔 win_amd64 wheel 밴들 필요(허용 호스트 pypi
-   에서 가능하나 현재 미밴들).
+1. **✅ Windows 오프라인 이식성 — 해결 (v7.3.3)** — win_amd64 wheel 밴들
+   (`jdk4py-25.0.2.1-py3-none-win_amd64` 31MB·`jpype1-1.7.1-cp311-win_amd64`
+   0.4MB, 둘 다 sha256 검증) + `re_analyzer.py` 플랫폼 인식(`_IS_WIN`: venv
+   `Scripts\python.exe`·JDK PATH `os.pathsep`·`win_x86_64\decompile.exe`·
+   `analyzeHeadless.bat`, 기본값은 Linux/macOS 행동 그대로) + Windows 부트스트랩
+   `tools/fetch_ghidra_dist.ps1`(+`.bat` 래퍼 — vendor 휠 `--no-index` 오프라인
+   설치, 안 맞으면 PyPI 무료 폴백) + `start_windows.bat` 논블로킹 사전점검.
+   **잔여(정직 고지):** ⑴ 이 Linux 샌드박스엔 실제 Windows 호스트가 없어
+   라이브 미검증 — wheel 구조(java.exe·_jpype.pyd)·정적 검토·Linux 회귀
+   그린으로 대리 증명 ⑵ jpype1 벤더 휠은 cp311 태그라 Python 3.11 에서만
+   오프라인 설치, 다른 파이썬은 PyPI(무료) 폴백.
 2. **master 미병합** — N·N1+N2·N1+N2 심화 3커밋(`6df25860`·`e1c57b38`·
    `cc3f32f8`)이 arena 브랜치에 있고 master 미병합(PR#2 는 M단계까지).
 3. **dependency-submission 워크플로 삭제** — dep-graph 는 repo admin 전용

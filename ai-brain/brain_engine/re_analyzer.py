@@ -34,6 +34,11 @@ from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
 CODE_CATEGORY = "역공학·분석결과"
 
+# Windows 인지 — venv 인터프리터(Scripts\python.exe vs bin/python), JDK bin PATH
+# 구분자(; vs :), Ghidra decompiler os 폴더·실행파일, analyzeHeadless.bat 가
+# 플랫폼마다 달라요.  기본(False)은 Linux/macOS = 현재 라이브 숙주 행동 그대로.
+_IS_WIN = os.name == "nt"
+
 
 def norm_symbol(s: str) -> str:
     """`PySys_Audit@@Base` / `printf@plt` / `foo+0x10` -> the plain name."""
@@ -44,10 +49,11 @@ def norm_symbol(s: str) -> str:
 def ghidra_headless() -> Optional[Path]:
     """Where analyzeHeadless lives, if a distribution has been delivered."""
     cands: List[Path] = []
+    _hl = "analyzeHeadless.bat" if _IS_WIN else "analyzeHeadless"
     env = os.environ.get("GHIDRA_HOME")
     if env:
-        cands.append(Path(env) / "support" / "analyzeHeadless")
-    cands += sorted((Path(tempfile.gettempdir()) / "ghidra_dist").glob("ghidra_*/support/analyzeHeadless"))
+        cands.append(Path(env) / "support" / _hl)
+    cands += sorted((Path(tempfile.gettempdir()) / "ghidra_dist").glob(f"ghidra_*/support/{_hl}"))
     for c in cands:
         if c.exists():
             return c
@@ -81,7 +87,7 @@ def _java_env() -> Dict[str, str]:
                 jh = ""
     if jh:
         env["JAVA_HOME"] = jh
-        env["PATH"] = f"{jh}/bin:" + env.get("PATH", "")
+        env["PATH"] = os.path.join(jh, "bin") + os.pathsep + env.get("PATH", "")
     return env
 
 
@@ -94,28 +100,36 @@ def health() -> Dict[str, Any]:
     """
     out: Dict[str, Any] = {}
     tools_dir = Path(__file__).resolve().parent.parent / "tools"
+    _boot = "fetch_ghidra_dist.ps1" if _IS_WIN else "fetch_ghidra_dist.sh"
     headless = ghidra_headless()
     out["dist"] = {"ok": bool(headless),
-                   "detail": str(headless) if headless else "dist 없음 — tools/fetch_ghidra_dist.sh 실행 필요"}
+                   "detail": str(headless) if headless else f"dist 없음 — tools/{_boot} 실행 필요"}
     if headless:
-        decomp = headless.parent.parent / "Ghidra" / "Features" / "Decompiler" / "os" / "linux_x86_64" / "decompile"
+        _os_dir = "win_x86_64" if _IS_WIN else "linux_x86_64"
+        _dec = "decompile.exe" if _IS_WIN else "decompile"
+        decomp = headless.parent.parent / "Ghidra" / "Features" / "Decompiler" / "os" / _os_dir / _dec
         if decomp.exists():
-            try:
-                ldd = subprocess.run(["ldd", str(decomp)], capture_output=True,
-                                     text=True, timeout=30, check=False)
-                missing = [ln.strip() for ln in ldd.stdout.splitlines() if "not found" in ln]
-                out["decompiler"] = {"ok": not missing,
-                                     "detail": "네이티브 decompile — 이 숙주 glibc 와 호환" if not missing
-                                     else f"재주조 필요(fetch 스크립트가 자동): {missing[0][:90]}"}
-            except Exception as exc:  # ldd itself missing etc.
-                out["decompiler"] = {"ok": False, "detail": f"점검 불가: {exc}"}
+            if _IS_WIN:
+                # Windows 에 ldd/glibc 가 없어요 — 네이티브 decompile.exe 존재로 만족.
+                out["decompiler"] = {"ok": True,
+                                     "detail": "네이티브 decompile.exe — Windows (ldd/glibc 점검 대상 아님)"}
+            else:
+                try:
+                    ldd = subprocess.run(["ldd", str(decomp)], capture_output=True,
+                                         text=True, timeout=30, check=False)
+                    missing = [ln.strip() for ln in ldd.stdout.splitlines() if "not found" in ln]
+                    out["decompiler"] = {"ok": not missing,
+                                         "detail": "네이티브 decompile — 이 숙주 glibc 와 호환" if not missing
+                                         else f"재주조 필요(fetch 스크립트가 자동): {missing[0][:90]}"}
+                except Exception as exc:  # ldd itself missing etc.
+                    out["decompiler"] = {"ok": False, "detail": f"점검 불가: {exc}"}
         else:
             out["decompiler"] = {"ok": False, "detail": "decompile 바이너리가 dist 에 없음"}
     else:
         out["decompiler"] = {"ok": False, "detail": "dist 없음"}
     py = ghidra_python()
     out["pyghidra_python"] = {"ok": bool(py),
-                              "detail": str(py) if py else "PyGhidra 인터프리터 없음 (GHIDRA_PYTHON 또는 /tmp/jdkenv)"}
+                              "detail": str(py) if py else "PyGhidra 인터프리터 없음 (GHIDRA_PYTHON 또는 jdkenv venv)"}
     if py:
         try:
             probe = subprocess.run(
@@ -132,11 +146,12 @@ def health() -> Dict[str, Any]:
         out["jvm_and_bridge"] = {"ok": False, "detail": "인터프리터 없음"}
     vendor = Path(__file__).resolve().parent.parent / "vendor"
     wheels = sorted(q.name for q in vendor.glob("*.whl")) if vendor.exists() else []
+    _plat = "win_amd64·cp311" if _IS_WIN else "linux x86_64·cp311"
     out["vendor_wheels"] = {
         "ok": any(w.startswith("jdk4py") for w in wheels) and any(w.startswith("pyghidra") for w in wheels),
-        "detail": (f"{len(wheels)}개 휠을 저장소가 소유 — 오프라인 재구성 가능 (linux x86_64·cp311)"
+        "detail": (f"{len(wheels)}개 휠을 저장소가 소유 — 오프라인 재구성 가능 ({_plat} + py3-none-any)"
                    if wheels else "vendor 없음 — 재구성에 PyPI 연결 필요")}
-    tools = ["ghidra_facts_pyghidra.py", "verify_ghidra_facts.py", "fetch_ghidra_dist.sh"]
+    tools = ["ghidra_facts_pyghidra.py", "verify_ghidra_facts.py", _boot]
     miss = [t for t in tools if not (tools_dir / t).exists()]
     out["tools"] = {"ok": not miss,
                     "detail": "팩트 추출·검증·배달 스크립트 모두 존재" if not miss else f"빠진 도구: {miss}"}
@@ -223,7 +238,8 @@ def ghidra_python() -> Optional[Path]:
     driven in-process through PyGhidra: same analyzers, same decompiler.
     """
     cands = [Path(os.environ.get("GHIDRA_PYTHON", ""))] if os.environ.get("GHIDRA_PYTHON") else []
-    cands += [Path(tempfile.gettempdir()) / "jdkenv" / "bin" / "python"]
+    _venv = Path(tempfile.gettempdir()) / "jdkenv"
+    cands += [_venv / "Scripts" / "python.exe"] if _IS_WIN else [_venv / "bin" / "python"]
     for c in cands:
         if c.exists():
             return c
@@ -233,9 +249,9 @@ def ghidra_python() -> Optional[Path]:
 def _analyze_ghidra(binary: Path, cap: int, project_dir: Optional[Path]) -> Dict[str, Any]:
     """The real Ghidra path — identical note shape, richer facts (decompile)."""
     headless = ghidra_headless()
-    assert headless, "Ghidra dist 가 없어요 (fetch_ghidra_dist.sh 먼저)"
+    assert headless, "Ghidra dist 가 없어요 (fetch_ghidra_dist 스크립트 먼저)"
     py = ghidra_python()
-    assert py, "PyGhidra 인터프리터가 없어요 (GHIDRA_PYTHON 또는 /tmp/jdkenv)"
+    assert py, "PyGhidra 인터프리터가 없어요 (GHIDRA_PYTHON 또는 jdkenv venv)"
     tool = Path(__file__).resolve().parent.parent / "tools" / "ghidra_facts_pyghidra.py"
     out_json = Path(tempfile.gettempdir()) / "brain_facts.json"
     if out_json.exists():

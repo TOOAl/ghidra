@@ -179,3 +179,29 @@ git 있으면 best-effort·없으면 파일시스템 폴백).
   ④ craft 직선 스칼라 가족 한정 ⑤ SLM 브리지 dormant(GGUF 미밴들→grounded
   폴백) ⑥ 산문 절대값 표류(차분 불변식은 항상 성립 — 설계). 상세
   `20_Skills/skill_self_audit_4criteria.md`.
+
+## 🪟 Windows 오프라인 이식성 완성 — 부채 ① 해결 (v7.3.3)
+v7.3.2 종합감사가 남긴 유일한 실질 부채(Windows 오프라인 Ghidra 불가)를 증거
+기반으로 닫았어요. "외장하드 소유" 주장은 Windows 에서도 진짜여야 하니까요.
+- **win_amd64 wheel 밴들** — `vendor/` 에 `jdk4py-25.0.2.1-py3-none-win_amd64`
+  (31MB, `java.exe`+DLL 81개)·`jpype1-1.7.1-cp311-cp311-win_amd64`(0.4MB,
+  `_jpype.pyd`) 추가, 둘 다 PyPI sha256 검증. 기존 py3-none-any(packaging·
+  pyghidra·typing_extensions)는 Windows 에서 그대로 동작 → vendor 7휠·65MB.
+- **`re_analyzer.py` 플랫폼 인식** — `_IS_WIN = os.name == "nt"` 분기: venv
+  인터프리터 `Scripts\python.exe`(vs `bin/python`)·JDK PATH `os.pathsep`
+  (`;` vs `:`)·decompiler `win_x86_64\decompile.exe`(ldd/glibc 점검 생략)·
+  `analyzeHeadless.bat`. **기본값(False)은 Linux/macOS 현행 행동 그대로**라
+  라이브 숙주 무영향 — health all_ok·verify exit0·회복력 32/32·audit 15/15 재확인.
+- **Windows 부트스트랩** — `tools/fetch_ghidra_dist.ps1`(+`.bat` 래퍼)이
+  `fetch_ghidra_dist.sh` 의 정확한 미러: orphan 브랜치(codeload, allow-list)
+  청크 재조립·체크섬 → venv → **vendor 휠 `--no-index` 오프라인 설치**(파이썬/
+  플랫폼 안 맞으면 PyPI 무료 폴백) → PyGhidra 팩트 추출·verify. `$env:TEMP`
+  사용(하드코딩 `/tmp` 0·Windows 홈경로 리터럴 0).
+- **`start_windows.bat`** — 논블로킹 사전점검: `%TEMP%\jdkenv` 있으면 역공학
+  채널 활성 안내, 없으면 objdump 폴백 + `fetch_ghidra_dist.bat` 일회성 힌트.
+- **정직 잔여** — 이 Linux 샌드박스엔 실제 Windows 호스트가 없어 라이브 검증
+  불가(wheel 구조·정적 검토·Linux 회귀 그린으로 대리 증명). jpype1 은 cp311
+  태그라 Python 3.11 에서만 오프라인, 아니면 PyPI(무료) 폴백. `audit_brain.py`
+  `TEXT_EXT` 에 `.ps1` 추가 — 새 부트스트랩도 개인정보 스캔 대상(무료·`/tmp`
+  검사는 `.py` 한정이라 shell/ps1 부트스트랩의 배달 URL 은 dormancy 규칙과
+  무관하게 허용, `fetch_ghidra_dist.sh` 와 동일 대우).

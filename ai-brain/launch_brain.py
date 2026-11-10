@@ -693,6 +693,27 @@ def make_handler(state: BrainState):
                     state.soul.on_remedy(msg)
                     self._send_json({"remedy": res, "message": msg, "status": state.full_status()})
                     return
+                if action == "craft":
+                    # 🛠 Stage N: craft-anything 루프의 두뇌 판 — 원본을
+                    # 검사(Ghidra)하고, 자체 합성하고, 원본 바이트 에뮬레이터와
+                    # 차분 검증. 100% 만 기록해요.
+                    from brain_engine import craft_engine
+                    bin_name = str(body.get("binary") or "").strip()
+                    cand = (state.root / "specimens" / bin_name) if bin_name else None
+                    if cand is None or not cand.exists():
+                        cands = sorted((state.root / "specimens").glob("*"))
+                        cand = cands[0] if cands else None
+                    if cand is None or not cand.exists():
+                        self._send_json({"error": "craft 할 바이너리가 없어요"}, status=404)
+                        return
+                    rep = craft_engine.craft(cand)
+                    paths = craft_engine.record(rep, state.gardener.vault_dir)
+                    if paths:
+                        state.gardener.rebuild_index()
+                        state.gardener.semantic.train(state.gardener.list_notes())
+                    rep["notes_written"] = [q.name for q in paths]
+                    self._send_json(rep)
+                    return
                 if action == "ingest_analysis":
                     # ⚙️ Stage L: teach the machine channel from REAL bytes.
                     # objdump today, analyzeHeadless the moment a distribution

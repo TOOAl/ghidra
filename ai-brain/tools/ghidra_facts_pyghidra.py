@@ -67,8 +67,9 @@ def main() -> int:
             instr = listing.getInstructionAt(f.getEntryPoint())
             guard = 0
             while instr is not None and f.getBody().contains(instr.getMinAddress()) and guard < 16:
-                insns.append("%s:\t%s %s" % (instr.getMinAddress(), instr.getMnemonicString(),
-                                             instr.getDefaultOperandRepresentation(0)))
+                # 전체 피연산자까지 — 첫 피연산자만 적던 버그(XOR AL) 를 고쳐요.
+                # 에뮬레이터·노트 모두 완전한 명령 텍스트가 필요해요.
+                insns.append("%s:\t%s" % (instr.getMinAddress(), instr.toString()))
                 m = instr.getMnemonicString()
                 if m not in mnem:
                     mnem.append(m)

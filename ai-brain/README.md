@@ -80,3 +80,24 @@
 - **콜드스타트 증명**: `/tmp` 전부 삭제 → fetch 스크립트 한 방 → "📦 벤더 휠로 설치 완료 (외부 연결 없음)" → 재주조 자동 발동 → verify 5단계(함수 6·디컴파일 C 6/6·vault 왕복 kind 6/6·산문 불변 476/4/0.083/0.045·구조 구멍 4) → exit 0. 그리고 이제 **조용한 통과가 없어요**: 팩트 추출 실패 = 즉각 exit 6, CLI 스모크처럼 실패해도 `|| true` 로 삼켜지던 경로 삭제.
 - **정직 배선 3종**: `re_analyzer.health()` = 사슬 6고리(dist·decompiler glibc·PyGhidra 인터프리터·JVM+브리지 실임포트·벤더 휠·도구)를 지금 실제로 점검해 `/api/re/backends` 의 `ghidra_health` 로 ✓/✗ 보고 · `analyze(auto)` 는 매직바이트로 라우팅(ELF/PE→Ghidra, 무형식 raw→objdump — Ghidra 에 거짓 언어를 발명시키지 않아요) · 핸들러는 실패 시 빈 연결끊김 대신 사실대로 JSON 502.
 - **흡수 실측(라이브)**: 표본 4종 수유 — `xor_vault.elf` 노트 2 · `crc16_packet.exe` 노트 1 · `puffer_dropper.elf` 노트 2 (전부 backend=analyzeHeadless), `sliding_quant.bin` 은 raw 라 objdump 라우팅·노트 0(정직). 코드 채널 어휘 **134→166**·노트 6→11장, 산문 채널 **476 불변**, 구조 구멍 8개 보고, health ALL_OK.
+
+## N — 🛠 craft-anything 흡수: 검사→제작→비교 루프의 두뇌 판 (v7.2)
+- **원본**: storytold/craft-anything (★25k, **MIT OR Apache-2.0**) — "실제 검사
+  도구로 원본을 분석하고, 나만의 버전을 만들고, 원본과 비교하며 다듬는다".
+  그들의 빌더는 외부 코딩 에이전트(Rust 엔진) — 이 숙주엔 rust 툴체인도,
+  crates.io 허용도 없으므로 **바이너리 흡수는 불가능·불필요**: 루프의
+  *방법*만을 두뇌 소유 부품으로 재주조했어요 (`brain_engine/craft_engine.py`).
+- **세 단계 전부 소유**: 검사 = Ghidra(PyGhidra) 디컴파일 C · 제작 = C 반환식의
+  폭-감싼 산술 파싱→파이썬 합성 · 비교 = **원본 바이트를 실행하는 소형 x86-64
+  에뮬레이터**와의 차분 테스트. 바이트 함수는 256 **전수**, 그 외 1024 벡터.
+- **정직 배선**: 100% 일치만 vault 기록(`record`), 미달성은 match%+불일치 목록
+  보고 · 루프/메모리/점프는 "지원 밖"으로 skip (발명 금지) · 채널 규약
+  (`machine-output` 태그) 준수 —craft 노트 3장이 코드 채널로 흡수됨
+  (code vocab 166→215·notes 14, **prose 476/12 불변**).
+- **실측**: xor_vault 2함수 256 전수 100% · crc16 1024 벡터 100% · 라이브
+  `POST /api/remedy {"action":"craft"}` 동작 · 스킬 노트
+  `20_Skills/skill_craft_anything_cleanroom.md`.
+- **새 숙주 복기에서 고친 것**: verify_ghidra_facts 가 /tmp 픽스처에 의존하던
+  재생산 부채 → 커밋된 vault 산문에서 자가 재생성 + 불변식을 **같은 런 안의
+  전후 차이**(산문만 vs 산문+코드)로 재정의 (낡은 상수 476/4/0.083 은 스냅샷
+  값이었음을 실측으로 확인).

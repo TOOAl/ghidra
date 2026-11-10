@@ -1,12 +1,12 @@
 {
   "name": "시냅스몽",
   "born_at": "2026-11-09T08:37:11Z",
-  "xp": 1907,
+  "xp": 1940,
   "satiety": 15,
   "mood": 100,
-  "pose": "04_brainstorm",
+  "pose": "05_drop",
   "last_fed_ts": 1794219969.3347056,
-  "last_interaction_ts": 1794325620.8958342,
+  "last_interaction_ts": 1794326493.7430446,
   "memories_eaten": 5,
   "questions_answered": 1,
   "brains_forged": 8,
@@ -17,8 +17,16 @@
   "hosts_visited": [
     "e2b.local (Linux-x86_64-2c)"
   ],
-  "last_speech": "꼬르륵... 새로운 메모나 아이디어 한 줄만 먹여 주세요!",
+  "last_speech": "🏋️ 핵심 근육 성장! 자가 연습과 숨은 시험으로 💻 코딩 능력 이(가) 레벨 6 에 도달했어요! (+30 XP)",
   "recent_events": [
+    {
+      "time": "2026-11-10T16:03:33Z",
+      "text": "핵심 능력 레벨업: 💻 코딩 능력 Lv6"
+    },
+    {
+      "time": "2026-11-10T16:01:33Z",
+      "text": "주인님과 교감 (기분 +7, XP +3)"
+    },
     {
       "time": "2026-11-10T15:47:00Z",
       "text": "주인님과 교감 (기분 +7, XP +3)"
@@ -70,14 +78,6 @@
     {
       "time": "2026-11-10T15:09:36Z",
       "text": "핵심 능력 레벨업: 🗂️ 정보 정리 능력 Lv6"
-    },
-    {
-      "time": "2026-11-10T15:03:20Z",
-      "text": "주인님과 교감 (기분 +7, XP +3)"
-    },
-    {
-      "time": "2026-11-10T15:01:20Z",
-      "text": "핵심 능력 레벨업: 📖 문맥 이해 능력 Lv5"
     }
   ],
   "recent_hallucination_checks": [

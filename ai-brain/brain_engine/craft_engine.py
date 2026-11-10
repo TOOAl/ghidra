@@ -19,6 +19,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from brain_engine import re_analyzer
+from brain_engine import x86_cf_emu          # Stage N3: 제어흐름+메모리 oracle
+from brain_engine import c_synthesize        # Stage N3: C 부분집합 → 파이썬 합성기
 
 # ── 레지스터 파일: 이름 → (base, shift, width bits) ─────────────────────────
 _WIDTHS = {"b": 8, "w": 16, "d": 32, "q": 64}
@@ -313,43 +315,63 @@ def input_width(insns: List[str]) -> int:
 
 
 # ── craft 루프 ──────────────────────────────────────────────────────────────
-def craft(binary: Path, cap: int = 200) -> Dict[str, Any]:
-    """원본 바이너리에서 직선 스칼라 변환을 골라 clean-room 복제 + 차분 검증."""
-    facts = re_analyzer.analyze(Path(binary), backend="auto", cap=cap)
-    report: Dict[str, Any] = {"binary": Path(binary).name, "backend": facts["backend"],
-                              "crafted": [], "skipped": []}
-    for f in facts["functions"]:
-        dec = (f.get("decompile") or "").strip()
-        raw_ins = f.get("insns") or []
-        if isinstance(raw_ins, str):
-            raw_ins = raw_ins.splitlines()
-        insns = [i for i in raw_ins if str(i).strip()]
-        if not dec or not insns:
-            report["skipped"].append({"name": f["name"], "why": "디컴파일/명령 없음"})
-            continue
-        is_pe = Path(binary).read_bytes()[:2] == b"MZ"
-        expr = _c_to_lambda(dec, ident_map(insns, is_pe))
-        if expr is None:
-            report["skipped"].append({"name": f["name"], "why": "C 반환식 파싱 불가"})
-            continue
+# Stage N3: 직선 스칼라(경로1) + 제어흐름·메모리(경로2) 를 하나의 정직 게이트로.
+#   경로1 oracle = emulate (직선·레지스터),  build = _c_to_lambda + build_python
+#   경로2 oracle = x86_cf_emu.run (PC·flags·스택메모리·bounded 루프, 네이티브 검증됨),
+#          build = c_synthesize (규칙 기반) [+ SLM 브리지 online 시 LLM 합성]
+# 두 경로 모두 **차분 검증**(oracle vs 합성, 100% 일치만 기록) 으로 환각을 차단해요.
+
+_MIN_CF_COMPARABLE = 32          # 제어흐름 함수: oracle 이 완주한 벡터 최소証拠
+
+
+def synth_for(dec: str, insns: List[str], is_pe: bool,
+              slm: Optional[Any] = None) -> Optional[Dict[str, str]]:
+    """함수 하나에 대한 합성 시도. {"kind","src"[,"via"]} 또는 None(정직 skip).
+
+    직선 스칼라로 표현되고 oracle 이 완주하면 경로1, 아니면 제어흐름 경로2.
+    경로2 는 규칙 기반 합성优先, 실패 시 SLM 브리지(online) 시도, dormant 면
+    규칙 기반이 grounded 폴백(SLM 은 코드 발명 거부).
+    """
+    imap = ident_map(insns, is_pe)
+    expr = _c_to_lambda(dec, imap)
+    if expr is not None:
         try:
-            o0, owid, uns0 = emulate(insns, 0)
-        except Exception as exc:  # noqa: BLE001
-            report["skipped"].append({"name": f["name"], "why": f"에뮬 예외 {exc}"})
-            continue
-        if uns0:
-            report["skipped"].append({"name": f["name"],
-                                      "why": f"지원 밖 연산 {uns0[:3]}"})
-            continue
-        built = build_python(expr, input_width(insns))
+            _o0, _owid, uns0 = emulate(insns, 0)
+        except Exception:  # noqa: BLE001
+            uns0 = ["exc"]
+        if not uns0:
+            return {"kind": "straight", "src": expr, "via": "rule"}
+    src = c_synthesize.synthesize(dec, imap)
+    via = "rule"
+    if src is None and slm is not None:
+        try:
+            res = slm.synthesize_python(dec)
+        except Exception:  # noqa: BLE001
+            res = None
+        if res and res.get("source"):
+            src = res["source"]
+            via = "slm:" + str((res.get("engine") or {}).get("engine_id", "?"))
+    if src is not None:
+        return {"kind": "cf", "src": src, "via": via}
+    return None
+
+
+def differential(insns: List[str], synth: Dict[str, str]) -> Dict[str, Any]:
+    """oracle(원본 바이트 실행) vs 합성 함수 차분 검증 → 일치율/벡터/불일치."""
+    kind = synth["kind"]
+    if kind == "straight":
+        built = build_python(synth["src"], input_width(insns))
+        _o0, owid, _u0 = emulate(insns, 0)
         mask = (1 << owid) - 1
         if owid <= 8:
-            vectors = list(range(256))          # 바이트 함수는 전수 검증
+            vectors: List[int] = list(range(256))       # 바이트 함수 전수 검증
         else:
             rnd = random.Random(42)
             vectors = [rnd.randrange(1, 1 << min(owid, 32)) for _ in range(1024)]
         bad: List[int] = []
+        comp = 0
         for v in vectors:
+            comp += 1
             try:
                 o, _, uns = emulate(insns, v)
                 b = built(v) & mask
@@ -358,11 +380,84 @@ def craft(binary: Path, cap: int = 200) -> Dict[str, Any]:
                 continue
             if uns or (o & mask) != b:
                 bad.append(v)
-        match = 100.0 * (len(vectors) - len(bad)) / len(vectors)
-        entry = {"name": f["name"], "expr": expr, "out_width": owid,
-                 "vectors": len(vectors), "match_pct": round(match, 2),
-                 "exhaustive": owid <= 8, "mismatches": bad[:5]}
-        report["crafted"].append(entry)
+        match = 100.0 * (comp - len(bad)) / comp if comp else 0.0
+        return {"kind": kind, "match_pct": round(match, 2), "vectors": comp,
+                "mismatches": bad[:5], "out_width": owid, "exhaustive": owid <= 8}
+    # 경로2: 제어흐름+메모리 — 루프 완주 가능한 bounded 벡터로 차분 검증
+    built_fn = c_synthesize.build_func(synth["src"])
+    vectors = list(range(-128, 257))                    # 음수·0·양수(루프/분기 포괄)
+    comp = 0
+    matches = 0
+    bad = []
+    owid = 32
+    owid_set = False
+    for v in vectors:
+        try:
+            o, w, uns = x86_cf_emu.run(insns, v)
+        except Exception:  # noqa: BLE001
+            continue
+        if uns:
+            continue                                    # oracle 이 이 입력에서 미완주 → 비교 불가
+        if not owid_set:
+            owid = w
+            owid_set = True
+        mask = (1 << owid) - 1
+        comp += 1
+        try:
+            b = built_fn(v) & mask
+        except Exception:  # noqa: BLE001
+            bad.append(v)
+            continue
+        if (o & mask) == b:
+            matches += 1
+        else:
+            bad.append(v)
+    match = 100.0 * matches / comp if comp else 0.0
+    return {"kind": "cf", "match_pct": round(match, 2), "vectors": comp,
+            "mismatches": bad[:5], "out_width": owid, "exhaustive": False}
+
+
+def craft_function(f: Dict[str, Any], is_pe: bool,
+                   slm: Optional[Any] = None) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """함수 facts 하나 → (검증 entry, None) 또는 (None, skip 사유)."""
+    name = f.get("name", "?")
+    dec = (f.get("decompile") or "").strip()
+    raw_ins = f.get("insns") or []
+    insns = raw_ins.splitlines() if isinstance(raw_ins, str) else [i for i in raw_ins if str(i).strip()]
+    if not dec or not insns:
+        return None, "디컴파일/명령 없음"
+    synth = synth_for(dec, insns, is_pe, slm)
+    if synth is None:
+        return None, "합성 불가(직선·제어흐름 모두 정직 거부)"
+    try:
+        diff = differential(insns, synth)
+    except Exception as exc:  # noqa: BLE001
+        return None, f"차분검증 예외 {type(exc).__name__}"
+    if synth["kind"] == "cf" and diff["vectors"] < _MIN_CF_COMPARABLE:
+        return None, f"제어흐름 비교가능 벡터 부족({diff['vectors']}<{_MIN_CF_COMPARABLE})"
+    entry = {"name": name, "kind": synth["kind"], "via": synth.get("via", "rule"),
+             "expr": synth["src"], "out_width": diff["out_width"],
+             "vectors": diff["vectors"], "match_pct": diff["match_pct"],
+             "exhaustive": diff["exhaustive"], "mismatches": diff["mismatches"]}
+    return entry, None
+
+
+def craft(binary: Path, cap: int = 200, slm: Optional[Any] = None) -> Dict[str, Any]:
+    """원본 바이너리에서 clean-room 복제 가능 함수를 골라 차분 검증.
+
+    직선 스칼라 변환(Stage N) + 루프/분기/스택메모리 함수(Stage N3) 모두
+    `craft_function` 한 경로로 처리하고, 100% 일치만 crafted 에 들어가요.
+    """
+    facts = re_analyzer.analyze(Path(binary), backend="auto", cap=cap)
+    report: Dict[str, Any] = {"binary": Path(binary).name, "backend": facts["backend"],
+                              "crafted": [], "skipped": []}
+    is_pe = Path(binary).read_bytes()[:2] == b"MZ"
+    for f in facts["functions"]:
+        entry, why = craft_function(f, is_pe, slm)
+        if entry is None:
+            report["skipped"].append({"name": f.get("name", "?"), "why": why})
+        else:
+            report["crafted"].append(entry)
     report["all_verified"] = bool(report["crafted"]) and all(
         c["match_pct"] == 100.0 for c in report["crafted"])
     return report
@@ -378,6 +473,18 @@ def record(report: Dict[str, Any], vault_dir: Path) -> List[Path]:
             continue  # 미검증은 기록하지 않아요 — 발명 금지
         safe = re.sub(r"[^\w가-힝.-]", "_", f"{report['binary']}-{c['name']}")[:80]
         p = d / f"craft-{safe}.md"
+        kind = c.get("kind", "straight")
+        if kind == "cf":
+            code_block = c["expr"]                       # 'def fn(x): ...' 전체 소스
+            class_txt = "제어흐름 함수(루프/분기/스택 메모리)"
+            oracle_txt = "제어흐름+메모리 x86-64 부분집합 에뮬레이터(네이티브 실행과 대조 검증됨)"
+            build_txt = ("규칙 기반 C→파이썬 합성" if str(c.get("via", "rule")).startswith("rule")
+                         else f"SLM 브리지 합성({c.get('via')}) + 차분 검증")
+        else:
+            code_block = f"lambda x: {c['expr']}"
+            class_txt = "직선 스칼라 변환"
+            oracle_txt = "직선 스칼라 x86-64 부분집합 에뮬레이터"
+            build_txt = "규칙 기반 C 반환식 파싱"
         body = f"""---
 title: "🛠 craft — {report['binary']}:{c['name']}"
 category: "역공학·자가복제"
@@ -390,17 +497,17 @@ created: ""
 
 ## 💡 핵심 요약
 원본 바이트를 직접 실행한 에뮬레이터와 차분 테스트 **{c['match_pct']}%**
-({c['vectors']}개 벡터{', 전수 검증' if c['exhaustive'] else ''}) 를 통과한 자가 복제 변환이에요.
+({c['vectors']}개 벡터{', 전수 검증' if c['exhaustive'] else ''}) 를 통과한 자가 복제 {class_txt}이에요.
 
 ## 🔩 합성된 변환 (Ghidra 디컴파일 C 로부터)
 ```python
-lambda x: {c['expr']}
+{code_block}
 ```
 
 ## 🧭 출처와 방법
 영감: storytold/craft-anything (MIT OR Apache-2.0) — 검사→제작→비교 루프.
-우리 판은 외부 모델 없이: 검사=Ghidra(PyGhidra) · 제작=규칙 기반 C 파싱 ·
-비교=원본 바이트 실행 소형 에뮬레이터. 불일치였다면 이 노트는 없었어요.
+검사=Ghidra(PyGhidra) · 제작={build_txt} · 비교={oracle_txt}.
+불일치였다면(100% 미만) 이 노트는 존재하지 않아요 — 발명 금지, 증거만 기록.
 """
         p.write_text(body, encoding="utf-8")
         out.append(p)

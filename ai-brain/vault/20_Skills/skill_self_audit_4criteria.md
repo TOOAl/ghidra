@@ -56,17 +56,30 @@ created: ""
    불변식·.sh 단계 패리티를 재생산 가능하게 증명 → **첫 Windows 실행만이
    마지막 미목격 단계** ⑵ jpype1 벤더 휠은 cp311 태그라 Python 3.11 에서만
    오프라인 설치, 다른 파이썬은 PyPI(무료) 폴백.
-2. **master 미병합** — N·N1+N2·심화·종합감사·Windows 이식성·검증강화 6커밋
-   (`6df25860`·`e1c57b38`·`cc3f32f8`·`8f0d857c`·`3555921f`·+v7.3.4)이 arena
-   브랜치에 있고 master 미병합(PR#2 는 M단계까지).
+2. **✅ master 병합 — 해결 (v7.3.5)** — PR #3 MERGED(merge commit `503f1163`,
+   CI `Build Ghidra #3` pass 11m0s). N·N1+N2·심화·종합감사·Windows 이식성·
+   검증강화·인수검토 7커밋 전부 origin/master 조상 확인. 부채 해소.
 3. **dependency-submission 워크플로 삭제** — dep-graph 는 repo admin 전용
    설정(PATCH 403, admin 없음). 복원법: Settings→Dependency graph 활성화 후
    `d4a629a8` yml 복구.
-4. **craft_engine 한계** — 직선 스칼라 변환 가족만; 루프·메모리·점프는
-   정직 skip. 일반목적 "무엇이든" 은 N3(SLM) 여정의 몫.
-5. **SLM 브리지 dormant** — GGUF 미밴들(`models/` gitignore, 다운로드는 수동
-   opt-in). 로컬 엔진(llama.cpp·ollama·LM Studio, 전부 127.0.0.1) 없으면
-   grounded Synapse 폴백으로 동작 — 발명 0 이지만 일반목적 추론은 아님.
+4. **✅ craft_engine 제어흐름·메모리 — 해결 (v7.3.6, Stage N3)** — 직선 스칼라
+   전용 한계를 넘어, **제어흐름+스택메모리 x86-64 부분집합 에뮬레이터**
+   (`brain_engine/x86_cf_emu.py`: PC·flags ZF/SF/OF/CF·`[rbp±K]` 메모리·조건/
+   무조건점프·bounded 루프(스텝캡)·lea) + **규칙 기반 C 부분집합→파이썬 합성기**
+   (`brain_engine/c_synthesize.py`: 선언·대입·for/while·if/else·return·폭/부호
+   인식). oracle 은 **gcc 네이티브 실행 ground truth 와 1446/1446 전수 일치**로
+   기계 증명(루프 `sum_to`·분기 `classify`·스택 `with_local`·lea/rotate `rotl`·
+   부분레지스터 `mix`). craft 는 두 경로(직선/제어흐름) 모두 **차분 검증 100%
+   만 기록**. 게이트 `tools/test_n3_craft.py` **29/29 그린**(exit 코드).
+   **잔여(정직 고지):** CALL(다른 함수)·복잡 addressing·캡 초과 루프는 계속
+   정직 skip(발명 금지) — 일반목적 "무엇이든" 은 여전히 여정의 몫.
+5. **SLM 브리지 — dormant 이지만 이제 실제 역할 있음 (v7.3.6, Stage N3)** —
+   `synthesize_python()` 합성 oracle hook 추가: 로컬 엔진(llama.cpp·ollama·
+   LM Studio, 전부 127.0.0.1) online 이면 디컴파일 C 의 clean-room 파이썬 합성을
+   LLM 에 요청(정적 안전검증 + craft 차분 검증이 최종 게이트 → 환각 기록 구조적
+   불가), offline(dormant) 면 **grounded 폴백으로 코드 발명을 정직 거부**
+   (`source=None` → 규칙 기반 합성기 사용). GGUF 미밴들(`models/` gitignore,
+   다운로드는 수동 opt-in)이라 이 샌드박스엔 dormant — 발명 0.
 6. **산문 절대값 표류** — vault 가 자율 성장하면 산문 구멍 수·코사인 절대값이
    움직여요(현재 1장·0.137/0.08). **차분 불변식(코드 수유 전후 동일)은 항상
    성립**하지만 문서의 낡은 상수(476/4/0.083 등)는 스냅샷 값 — 살아있는

@@ -233,3 +233,27 @@ v7.3.3 의 `.ps1` 은 썼지만 이 Linux 샌드박스엔 **실제 Windows 호�
   Windows 실행이 마지막 잔여로 부채원장에 남아요. `audit_brain.py` 는 이 게이트
   `.py` 도 개인정보 스캔(82파일)하며, 게이트 속 검사 needle(`/tmp`·`c:\users`·`://`)은
   자가오염 0(HOME_RE·TMP_RUNTIME_RE·URL_RE 어느 것도 안 걸림).
+
+## 🌀 Stage N3 — 제어흐름·메모리 자가복제: craft 가 루프/분기/스택을 배우다 (v7.3.6)
+부채④(craft 직선 스칼라 전용)·⑤(SLM dormant)를 **증거 기반**으로 해소했어요.
+직선 코드만 복제하던 craft 가 이제 **루프·분기·스택 메모리** 함수까지 정직하게
+복제·검증해요. 핵심은 "짐작이 아니라 증거" — 새 oracle 을 **gcc 네이티브 실행과
+1446/1446 전수 대조**로 기계 증명했어요.
+
+- **제어흐름+메모리 에뮬레이터** (`brain_engine/x86_cf_emu.py`) — PC·플래그
+  (ZF/SF/OF/CF)·스택 메모리(`[rbp±K]`)·조건/무조건점프·**스텝캡 bounded 루프**·
+  lea·부분레지스터(AL/AH)·movzx/movsx. 입력 레지스터 **사전 탐지**(LEA/메모리
+  경유 읽힘 포함). CALL·복잡 addressing·캡 초과 → 정직 bail(발명 금지).
+- **C 부분집합→파이썬 합성기** (`brain_engine/c_synthesize.py`) — 선언·대입·
+  for/while·if/else·return·폭/부호 인식(signed `int` 비교·두's complement 래핑)·
+  `1U` 리터럴. 파싱 불가 → `None`(정직 skip).
+- **SLM 합성 hook** (`slm_bridge.synthesize_python`) — online 이면 LLM clean-room
+  합성(차분 검증이 최종 게이트), dormant 면 grounded 폴백으로 **코드 발명 정직 거부**.
+- **차분 검증 게이트 유지** — 직선/제어흐름 두 경로 모두 oracle vs 합성 **100%
+  일치만 기록**. 합성기나 SLM 이 환각해도 차분 검증이 차단 → vault 오염 구조적 불가.
+- **게이트** `tools/test_n3_craft.py` **29/29 그린**(exit 코드) — 실제 Ghidra insn +
+  gcc 네이티브 ground truth 픽스처로 oracle==native·synth==native·craft 100%·
+  CALL-bail·corrupt-reject·SLM-grounded·safe-source 검증. 회귀 없음(audit 15/15·
+  quest 32·windows 49/49 유지).
+- **정직 잔여** — CALL/복잡 addressing/캡 초과 루프는 계속 정직 skip. "무엇이든"
+  이 아니라 "검증 가능한 만큼만" craft.

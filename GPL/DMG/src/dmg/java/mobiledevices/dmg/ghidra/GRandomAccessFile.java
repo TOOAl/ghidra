@@ -80,13 +80,6 @@ public class GRandomAccessFile {
 		this.open = true;
 	}
 
-	@Override
-	protected void finalize() {
-		if (open) {
-			//TODO Msg.warn(this, "FAIL TO CLOSE " + file);
-		}
-	}
-
 	/**
 	 * Closes this random access file stream and releases any system 
 	 * resources associated with the stream. A closed random access 

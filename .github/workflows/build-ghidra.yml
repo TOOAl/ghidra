@@ -1,12 +1,22 @@
 name: Build Ghidra
 
-on: [push]
+# ai-brain/** 전용 push 는 Ghidra 전체 빌드를 돌릴 이유가 없어요
+# (두뇌 코드만 바뀌는데 10분짜리 C++/Java 빌드를 태우는 낭비).
+# 워크플로·Ghidra 소스·Gradle 변경은 여전히 검증돼요.
+on:
+  push:
+    paths-ignore:
+      - 'ai-brain/**'
+  pull_request:
 
 jobs:
   build:
     strategy:
       matrix:
-        platform: [ubuntu-latest]
+        # ubuntu-latest 는 2026-10-19 부터 Ubuntu 26 으로 이주 중 —
+        # 러너를 고정해야 배달되는 dist 의 glibc 가 재현 가능해져요
+        # (24.04 = glibc 2.38; 숙주가 더 늙으면 fetch 스크립트가 재주조).
+        platform: [ubuntu-24.04]
 
     runs-on: ${{ matrix.platform }}
     steps:

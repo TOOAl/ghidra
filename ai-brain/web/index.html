@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>시냅스몽 · 나만의 양자화 AI 두뇌 연구소</title>
+  <link rel="stylesheet" href="ui-v3.css?v=7.0" />
+  <!--__INITIAL_STATE__-->
+</head>
+<body>
+  <!-- 상단 글로벌 헤더 -->
+  <header class="app-header">
+    <div class="brand-group">
+      <div class="brand-mark" aria-hidden="true">✦</div>
+      <div>
+        <div class="brand-title-row">
+          <h1>시냅스몽 AI 두뇌 연구소</h1>
+          <span class="live-chip"><span class="live-dot"></span>외장하드 포터블 서식지</span>
+        </div>
+        <p class="brand-sub">데이터센터 없이 자라나는 마크다운 위키 · 독자 양자화(.sbrain) · 천재 성좌 · 6단계 자가 진화 공방</p>
+      </div>
+    </div>
+
+    <div class="stage-track" aria-label="통합 구축 단계">
+      <div class="stage-pill done"><strong>✔ A단계</strong> 위키 &amp; 자체 양자화</div>
+      <span class="stage-arrow">›</span>
+      <div class="stage-pill done"><strong>✔ B단계</strong> CPU 심판단 &amp; 천재 성좌</div>
+      <span class="stage-arrow">›</span>
+      <div class="stage-pill current" id="headerStageCPill" style="cursor:pointer" title="클릭해 6단계 자가 진화 공방 열기"><strong>⚡ C단계</strong> 6단계 자가 진화 공방</div>
+    </div>
+  </header>
+
+  <!-- 메인 2단 조종석 레이아웃 -->
+  <main class="cockpit">
+    <!-- 좌측: 시냅스몽 바이오 캡슐 -->
+    <aside class="bio-capsule">
+      <!-- 1. 캡슐 상단 이름표 -->
+      <div class="capsule-head">
+        <div>
+          <span class="level-pill" id="petStageBadge">Lv.1 ✦ 꼬마 뉴런</span>
+          <h2 class="pet-name" id="petName">시냅스몽</h2>
+        </div>
+        <div class="capsule-actions">
+          <button class="ghost-btn" id="btnRename" type="button">이름 변경</button>
+          <button class="ghost-btn accent" id="btnPoke" type="button">✨ 교감하기</button>
+        </div>
+      </div>
+
+      <!-- 2. 우주 유리돔 캐릭터 뷰어 -->
+      <div class="dome-stage" id="portraitFrame" title="클릭하면 시냅스몽과 교감합니다">
+        <img id="petImage" class="dome-img" src="assets/01_greet.jpg" alt="시냅스몽 캐릭터" />
+        <div class="dome-vignette"></div>
+        <div class="dome-top-badges">
+          <span class="condition-pill"><i class="cond-dot"></i><span id="petEmotion">최상 컨디션</span></span>
+          <span class="iq-pill">IQ <strong id="badgeIq">69</strong></span>
+        </div>
+      </div>
+
+      <!-- 3. 말풍선 (상황·감정에 따라 8가지 모습이 자동으로 바뀝니다) -->
+      <div class="speech-bubble" id="petSpeech">
+        안녕 주인님! 외장하드 집에서 반짝이며 깨어났어요.
+      </div>
+
+      <!-- 4. 핵심 생명 상태바 3종 + 두뇌 환각 위험도 계측기 -->
+      <div class="vitals-box">
+        <div class="vital-row">
+          <span class="v-label">지식 포만감</span>
+          <div class="v-bar"><div class="v-fill satiety" id="barSatiety" style="width:80%"></div></div>
+          <strong class="v-num" id="valSatiety">80%</strong>
+        </div>
+        <div class="vital-row">
+          <span class="v-label">기분 · 활력</span>
+          <div class="v-bar"><div class="v-fill mood" id="barMood" style="width:90%"></div></div>
+          <strong class="v-num" id="valMood">90%</strong>
+        </div>
+        <div class="vital-row">
+          <span class="v-label">성장 경험치</span>
+          <div class="v-bar"><div class="v-fill xp" id="barXp" style="width:60%"></div></div>
+          <strong class="v-num" id="valXp">30/50</strong>
+        </div>
+
+        <!-- 두뇌 환각 위험도 & 맞춤 저감 처방 -->
+        <div class="halluc-divider"></div>
+        <div class="halluc-head">
+          <span class="halluc-title">🛡️ 두뇌 환각 위험도</span>
+          <span class="halluc-badge safe" id="hallucBadge">안심 · 10%</span>
+        </div>
+        <div class="v-bar">
+          <div class="v-fill halluc-safe" id="barHalluc" style="width:10%"></div>
+        </div>
+        <p class="halluc-tip-text" id="hallucTopTip">
+          💡 맞춤 처방: 고정밀 INT8 재주조 및 취약 분야 보강 가능
+        </p>
+        <div class="halluc-btn-grid">
+          <button class="halluc-action-btn clinic" id="btnOpenClinic" type="button">
+            🩺 환각 처방창 열기
+          </button>
+          <button class="halluc-action-btn test" id="btnQuickHallucTest" type="button">
+            🧪 방어 테스트 실행
+          </button>
+        </div>
+      </div>
+
+      <!-- 6. 요청하신 '작업 환경 상태창' (3대 상태바 바로 아래, 계기판 타일형) -->
+      <section class="env-panel" aria-label="시냅스몽 작업 환경 상태창">
+        <div class="env-header">
+          <span class="env-heading">🖥️ 작업 환경 상태</span>
+          <span class="env-grade optimal" id="envBadge">쾌적 · 77점</span>
+        </div>
+
+        <div class="env-grid">
+          <div class="env-tile">
+            <span class="tile-k">여유 메모리 (RAM)</span>
+            <strong class="tile-v" id="envRamText">3.55 / 3.84 GB</strong>
+            <div class="mini-bar"><div class="mini-fill" id="envRamBar" style="width:90%"></div></div>
+          </div>
+          <div class="env-tile">
+            <span class="tile-k">연산 장치</span>
+            <strong class="tile-v" id="envCpuText">2코어 · 순수 CPU</strong>
+            <span class="tile-sub" id="envOsText">Linux x86_64</span>
+          </div>
+          <div class="env-tile">
+            <span class="tile-k">외장하드 여유</span>
+            <strong class="tile-v" id="envDiskText">-- GB</strong>
+            <span class="tile-sub">독립 서식지 확보</span>
+          </div>
+          <div class="env-tile">
+            <span class="tile-k">두뇌 확장 구조</span>
+            <strong class="tile-v accent-text" id="envTierText">∞ 무제한 확장</strong>
+            <span class="tile-sub" id="envTierSub">성좌 모듈 스왑 · 한계 없음</span>
+          </div>
+        </div>
+
+        <p class="env-note" id="envComment">
+          외장하드 성좌 모듈 스왑으로 메모리 한계 없이 끝없이 성장하는 무한 확장 구조예요!
+        </p>
+      </section>
+
+      <!-- 7. 하단 요약 스탯 도크 -->
+      <div class="kpi-dock">
+        <div class="kpi-cell">
+          <strong id="kpiIq">69</strong>
+          <span>두뇌 IQ</span>
+        </div>
+        <div class="kpi-cell">
+          <strong id="kpiNotes">4</strong>
+          <span>위키 노트</span>
+        </div>
+        <div class="kpi-cell">
+          <strong id="kpiRl">0</strong>
+          <span>강화학습 판</span>
+        </div>
+        <div class="kpi-cell">
+          <strong id="kpiForged">0</strong>
+          <span>주조 모듈</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 우측: 연구소 메인 콘솔 -->
+    <section class="lab-console">
+      <div class="console-topbar">
+        <nav class="seg-tabs" role="tablist">
+          <button class="seg-tab active" data-tab="tab-graph" type="button">🌟 천재·시냅스 성좌</button>
+          <button class="seg-tab" id="btnTopEvoShortcut" data-evo-jump="1" type="button">🧬 자가 진화 공방</button>
+          <button class="seg-tab" data-tab="tab-feed" type="button">🌱 지식 먹이기</button>
+          <button class="seg-tab" data-tab="tab-forge" type="button">⚒️ 양자화 주조</button>
+          <button class="seg-tab" data-tab="tab-rl" type="button">🏋️ 강화학습 체육관</button>
+          <button class="seg-tab" data-tab="tab-clinic" type="button">🩺 환각 처방실</button>
+          <button class="seg-tab" data-tab="tab-chat" type="button">💬 대화하기</button>
+        </nav>
+        <div class="engine-indicator" id="engineStatusPill">
+          위키 기억망 + 무한 성좌 + 6단계 자가 진화 엔진 가동 중
+        </div>
+      </div>
+
+      <!-- [탭 1] 삼중 시냅스 천문대: 영역별 천재 성좌 ⇄ 내 마크다운 기억 성좌도 ⇄ 6단계 자가 진화 공방 -->
+      <div class="tab-pane active" id="tab-graph">
+        <div class="constellation-mode-bar">
+          <div class="cm-pills">
+            <button class="cm-btn active" id="btnModeGenius" type="button">🌌 영역별 천재 성좌 &amp; 원탁 담론</button>
+            <button class="cm-btn" id="btnModeWiki" type="button">📘 내 마크다운 기억 성좌도</button>
+            <button class="cm-btn evo-mode-btn" id="btnModeEvo" type="button">🧬 6단계 자가 진화 공방</button>
+            <button class="cm-btn evo-img-btn" id="btnOpenEvoImage" type="button" title="4대 핵심 능력 × 5대 필수 기관 × 6단계 자가 진화 공방 조화 이미지 보기">🖼️ 진화 두뇌 조화도 이미지</button>
+          </div>
+          <span class="cm-hint" id="constellationHint">영역별 성좌 안에 모인 천재들이 서로 의견을 주고받으며 한계 없는 지혜를 꼬마 뉴런에 전수합니다!</span>
+        </div>
+
+        <!-- 모드 A: 영역별 인류 천재 성좌 & 실시간 담론장 -->
+        <div class="pane-grid graph-layout" id="viewGeniusConstellation">
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <h3>영역별 천재 성좌도 (성좌 내 집단 지성 &amp; 성좌 간 공명)</h3>
+                <p>각 <strong>영역 성좌(빛나는 성운 구역)</strong> 안에 여러 천재 별들이 모여 있습니다! 성좌 구역이나 아래 칩을 클릭해 담론에 참여할 성좌들을 선택해 보세요.</p>
+              </div>
+            </div>
+            <div class="canvas-wrap">
+              <canvas id="geniusCanvas" width="700" height="430"></canvas>
+            </div>
+
+            <div class="mentor-team-box" style="margin-top:10px">
+              <div class="vb-head">담론에 소집된 영역 성좌 (클릭해 영역 추가·해제 가능)</div>
+              <div id="activeMentorChips" class="chip-row" style="margin-bottom:8px"></div>
+              <div id="activeSynergyBox" class="synergy-callout" style="margin-bottom:0"></div>
+            </div>
+
+            <!-- 천재 인물 심층 조사 · 검증 & 성좌 배치 심사원 -->
+            <div class="scout-console-box" id="scoutConsoleBox">
+              <div class="scout-console-head">
+                <div class="scout-title-wrap">
+                  <span class="scout-kicker">GENIUS SCOUT &amp; PLACEMENT</span>
+                  <h4>🔭 천재 인물 심층 조사 · 검증 &amp; 성좌 배치 심사원</h4>
+                </div>
+                <span class="tag-pill" style="border-color:rgba(129,140,248,0.5);color:#c7d2fe">설계 한계 없음 ∞</span>
+              </div>
+
+              <!-- 1단계: 인물 이름 검색 & 조사 버튼 -->
+              <div class="scout-search-bar">
+                <input type="text" id="scoutQueryInput" class="input-field" value="이성계" placeholder="영입할 인물 이름 검색 (예: 이성계, 이순신, 세종대왕, 다윈, 토르발스, 존 내시...)" />
+                <button class="primary-btn scout-btn" id="btnScoutGenius" type="button">
+                  🔭 인물 조사 · 천재성 검증
+                </button>
+              </div>
+
+              <div class="chip-row" id="scoutPresetChips" style="margin-top:7px">
+                <button type="button" class="preset-chip active" data-scout="이성계">🏹 이성계</button>
+                <button type="button" class="preset-chip" data-scout="이순신">⚔️ 이순신</button>
+                <button type="button" class="preset-chip" data-scout="세종대왕">👑 세종대왕</button>
+                <button type="button" class="preset-chip" data-scout="정도전">🏛️ 정도전</button>
+                <button type="button" class="preset-chip" data-scout="찰스 다윈">🧬 찰스 다윈</button>
+                <button type="button" class="preset-chip" data-scout="리누스 토르발스">🐧 리누스 토르발스</button>
+                <button type="button" class="preset-chip" data-scout="존 내시">🎯 존 내시</button>
+                <button type="button" class="preset-chip" data-scout="아이작 뉴턴">🍎 아이작 뉴턴</button>
+              </div>
+
+              <!-- 2단계: 업적 추적 · 천재성 입증 · 강점 vs 한계 심층 분석 리포트 -->
+              <div id="scoutDossierBox" class="scout-dossier-box" style="margin-top:9px">
+                인물 이름을 입력하고 <strong>[🔭 인물 조사 · 천재성 검증]</strong> 버튼을 누르면 ① 업적 추적 · ② 천재성 입증 · ③ 천재성과 한계 대조 · ④ 최적 성좌 배치가 이곳에 표시됩니다.
+              </div>
+
+              <!-- 3단계: 추천 성좌 배치 (또는 원하는 다른 성좌로 자유 변경!) -->
+              <div class="placement-panel" id="scoutPlacementPanel">
+                <div class="vb-head" id="placementLabel">🎯 추천 배치 성좌 선택 (다른 성좌로 보내고 싶다면 메뉴에서 자유롭게 변경하세요)</div>
+                <div class="placement-action-row">
+                  <select id="addTargetConst" class="input-field" style="flex:1.35"></select>
+                  <input type="text" id="addNewConstName" class="input-field hidden" style="flex:1.1" placeholder="새 영역 성좌 이름 입력" />
+                  <button class="primary-btn place-confirm-btn" id="btnAddGenius" type="button">
+                    ✦ 이 성좌에 배치 확정
+                  </button>
+                </div>
+
+                <!-- 고급 수동 편집 (평소에는 깔끔하게 접혀 있음) -->
+                <details class="mini-custom-edit">
+                  <summary>✏️ 세부 관점·철학 직접 수정 또는 미등록 인물 힌트 입력 (선택)</summary>
+                  <div class="mini-custom-body">
+                    <input type="text" id="scoutHintInput" class="input-field" placeholder="사전에 없는 인물일 때 분야·업적 힌트 한 줄 입력 후 위 [🔭 인물 조사] 클릭" />
+                    <div class="expand-row">
+                      <input type="text" id="addGeniusEmoji" class="input-field" style="max-width:60px;text-align:center" value="🏹" placeholder="이모지" />
+                      <input type="text" id="addGeniusName" class="input-field" style="flex:1" placeholder="천재 이름" />
+                      <input type="text" id="addGeniusLens" class="input-field" style="flex:1.3" placeholder="핵심 관점" />
+                    </div>
+                    <input type="text" id="addGeniusCredo" class="input-field" placeholder="성좌 토론 핵심 철학 한 줄" />
+                  </div>
+                </details>
+
+                <div id="scoutFeedback" class="clinic-feedback hidden" style="margin-top:6px;margin-bottom:0"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <span class="step-kicker">CONSTELLATION AGORA · 천재 원탁 담론장</span>
+                <h3 id="geniusTitle">영역 성좌 속 천재들의 의견 교환 &amp; 전수</h3>
+              </div>
+            </div>
+
+            <div id="geniusDetailBox" class="genius-detail-box"></div>
+
+            <div class="agora-topic-box">
+              <div class="vb-head">💬 천재들에게 던질 토론 주제 (직접 입력하거나 추천 주제 클릭)</div>
+              <div class="chip-row" id="debatePresetChips" style="margin-bottom:7px">
+                <button type="button" class="preset-chip active" data-topic="외장하드 두뇌가 메모리 한계 없이 무한히 커지려면 어떻게 해야 할까?">∞ 무한 확장 두뇌 설계</button>
+                <button type="button" class="preset-chip" data-topic="정체불명의 암호화된 실행파일을 실수 없이 역공학으로 해부하려면?">🔐 수상한 실행파일 해부</button>
+                <button type="button" class="preset-chip" data-topic="모르는 질문 앞에서 절대 아는 척(환각)하지 않고 진실만 말하려면?">🔬 환각 0% 무결성 방어</button>
+              </div>
+              <input type="text" id="debateTopicInput" class="input-field" value="외장하드 두뇌가 메모리 한계 없이 무한히 커지려면 어떻게 해야 할까?" placeholder="천재 성좌들이 함께 토론할 주제를 자유롭게 적어주세요!" />
+              <button class="primary-btn full" id="btnDistillGenius" type="button" style="margin-top:8px">
+                🗣️ 선택 성좌 천재들 의견 주고받기(담론 시작) &amp; 꼬마 뉴런 전수
+              </button>
+            </div>
+
+            <div id="debateFeedBox" class="debate-feed-box"></div>
+
+            <!-- 👑 주인님 생각 제안 & 성좌 입체 피드백 창 -->
+            <div class="user-thought-box" id="userThoughtBox">
+              <div class="vb-head">👑 성좌들의 의견에 나의 생각 물어보고 피드백 받기</div>
+              <p class="thought-sub">
+                천재들의 토론을 보고 떠오른 <strong>내 생각·반론·궁금한 점</strong>을 적어보세요! 각 성좌 천재들이 <strong>✨ 빛나는 강점</strong>과 <strong>🔍 날카로운 보완점</strong>을 피드백하고 공동 합의 공식에 반영합니다.
+              </p>
+              <div class="chip-row" id="thoughtPresetChips" style="margin-bottom:7px">
+                <button type="button" class="preset-chip" data-thought="자주 쓰는 핵심 성좌는 미리 캐시에 올려두면 외장하드 스왑 속도가 훨씬 빨라지지 않을까?">💡 자주 쓰는 성좌 캐시 제안</button>
+                <button type="button" class="preset-chip" data-thought="만약 두 영역 성좌의 의견이 끝까지 정반대로 충돌하면 어떤 기준으로 결정하는 게 맞을까?">⚖️ 성좌 의견 충돌 시 결정법</button>
+                <button type="button" class="preset-chip" data-thought="처음부터 너무 안전만 따지면 오히려 판단 속도가 느려지는 단점은 없을까?">⚡ 안전 vs 속도 반론 질문</button>
+              </div>
+              <textarea id="userThoughtInput" class="input-field thought-textarea" rows="2" placeholder="예: 내 생각엔 자주 쓰는 성좌 모듈은 미리 캐시에 올려두면 훨씬 빠를 것 같은데 어떻게 생각해?"></textarea>
+              <button class="secondary-btn full thought-cta-btn" id="btnAskFeedback" type="button" style="margin-top:7px">
+                💬 나의 생각 건네고 성좌 천재들에게 입체 피드백 받기
+              </button>
+            </div>
+
+            <div id="distillFeedback" class="clinic-feedback hidden" style="margin-top:8px;margin-bottom:0"></div>
+          </div>
+        </div>
+
+        <!-- 모드 B: 실시간 마크다운 위키 기억 성좌도 -->
+        <div class="pane-grid graph-layout hidden" id="viewWikiConstellation">
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <h3>실시간 마크다운 시냅스 성좌도</h3>
+                <p>노드를 클릭하거나 드래그해 연결된 지식 별자리를 탐색해 보세요.</p>
+              </div>
+              <div class="legend-pills">
+                <span><i style="background:#818cf8"></i>양자화·모델</span>
+                <span><i style="background:#34d399"></i>강화학습</span>
+                <span><i style="background:#f472b6"></i>역공학</span>
+                <span><i style="background:#38bdf8"></i>포터블</span>
+              </div>
+            </div>
+            <div class="canvas-wrap">
+              <canvas id="graphCanvas" width="700" height="440"></canvas>
+            </div>
+          </div>
+
+          <div class="card note-reader-card">
+            <div class="card-head">
+              <div>
+                <span class="path-badge" id="viewerPath">vault/10_Wiki/</span>
+                <h3 id="viewerTitle">기억 카드 뷰어</h3>
+              </div>
+            </div>
+            <div class="tag-strip" id="viewerTags"></div>
+            <div class="viewer-semantic" id="viewerSemantic"></div>
+            <div class="note-content" id="viewerBody">
+              왼쪽 시냅스 성좌도에서 별(노드)을 클릭하면 마크다운 기억 원문과 연결 고리가 여기에 표시됩니다.
+            </div>
+          </div>
+        </div>
+
+        <!-- 모드 C: 6단계 자가 진화 시냅스 공방 (4대 핵심 능력 × 5대 필수 기관 × 6단계 공방) -->
+        <div class="evo-forge-region hidden" id="viewEvoForge">
+          <!-- 상단 조화 배너 & 6단계 진행 트랙 -->
+          <div class="evo-harmony-banner">
+            <div class="evo-banner-thumb" id="btnBannerThumb" title="클릭해 조화 설계도 이미지 크게 보기">
+              <img src="assets/evo_forge_harmony.jpg" alt="6단계 자가 진화 두뇌 조화도" />
+              <span class="thumb-zoom-pill">🔍 크게 보기</span>
+            </div>
+            <div class="evo-banner-body">
+              <div class="evo-banner-top">
+                <div>
+                  <span class="step-kicker">STAGE C · SELF-EVOLVING SYNAPSE FORGE</span>
+                  <h3>🧬 6단계 자가 진화 시냅스 공방 (4대 핵심 능력 × 5대 필수 기관 조화)</h3>
+                </div>
+                <div class="evo-banner-actions">
+                  <button class="ghost-btn evo-img-cta" id="btnBannerOpenImage" type="button">🖼️ 두뇌 조화 설계도 이미지 보기</button>
+                  <button class="primary-btn" id="btnEvoOneClickCycle" type="button">⚡ 1~5단계 연속 해부·수리·검증</button>
+                </div>
+              </div>
+              <div class="evo-stepper" id="evoStepperBar">
+                <div class="evo-step active" data-step="1"><strong>1. 분해·해부</strong><span>능력① · X-Ray</span></div>
+                <div class="evo-step" data-step="2"><strong>2. 원리 설계도</strong><span>기관① 번역기</span></div>
+                <div class="evo-step" data-step="3"><strong>3. 우리 식 코딩</strong><span>능력② 이식</span></div>
+                <div class="evo-step" data-step="4"><strong>4. 결함·독 탐지</strong><span>능력③ · 기관③⑤</span></div>
+                <div class="evo-step" data-step="5"><strong>5. 수리 &amp; 유리방</strong><span>능력④ · 기관②④</span></div>
+                <div class="evo-step" data-step="6"><strong>6. 두뇌 영구장착</strong><span>기관⑤ 카트리지</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 💓 D단계: 자가 진화 심장박동 & 주인님 부재중 진화 일지 -->
+          <div class="card evo-heart-card" id="evoHeartPanel">
+            <div class="evo-heart-head">
+              <div class="heart-lamp" id="heartLamp" title="두뇌 심장박동 상태등"><span class="heart-core">💓</span></div>
+              <div class="evo-heart-titles">
+                <span class="step-kicker">STAGE D · SELF-EVOLVING HEARTBEAT</span>
+                <h3>💓 자가 진화 심장박동 — 주인님 없는 사이의 진화 일지</h3>
+                <p class="heart-status-line" id="heartStatusLine">💌 심장박동 신호를 연결하는 중...</p>
+              </div>
+              <div class="evo-heart-actions">
+                <button class="ghost-btn" id="btnHeartToggle" type="button">😴 잠시 재우기</button>
+                <button class="primary-btn" id="btnHeartNow" type="button">⚡ 지금 바로 한 박동!</button>
+              </div>
+            </div>
+            <div class="evo-journal-list" id="evoJournalList"></div>
+            <div class="heart-chat">
+              <div class="heart-chat-head">💬 주인님 소원 속삭임 창 — 두뇌에게 원하는 것을 말씀해 보세요! (예: "온도 평균 스킬 꿈꿔 줘", "지금 바로 한 박동", "잠깐 재워")</div>
+              <div class="heart-chat-log" id="heartChatLog"></div>
+              <div class="heart-chat-bar">
+                <input type="text" id="heartChatInput" class="input-field" placeholder="두뇌에게 바라는 것을 속삭이고 Enter (예: 온도 평균 스킬 꿈꿔 줘)" />
+                <button class="primary-btn" id="btnHeartChat" type="button">💬 속삭이기</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 🏋️ E단계: 핵심 능력 성장 체육관 -->
+          <div class="card evo-gym-card" id="evoGymPanel">
+            <div class="evo-gym-head">
+              <div>
+                <span class="step-kicker">STAGE E · CORE ABILITY GROWTH GYM</span>
+                <h3>🏋️ 핵심 능력 성장 체육관 — 스킬 개수가 아닌 4대 근육!</h3>
+                <p class="gym-status-line" id="gymStatusLine">🏋️ 근육 상태를 계측하는 중...</p>
+              </div>
+              <button class="primary-btn" id="btnGymTrainAny" type="button">🏋️ 가장 약한 근육 지금 자율 훈련!</button>
+            </div>
+            <div class="evo-gym-body">
+              <div class="gym-radar-wrap">
+                <svg id="gymRadar" viewBox="0 0 220 220" class="gym-radar" role="img" aria-label="4대 핵심 능력 레이더 차트"></svg>
+                <div class="gym-radar-note">4대 근육 레이더 — 바깥 고리일수록 강력! (자가 진화 훈련마다 실시간 변형)</div>
+              </div>
+              <div class="gym-cards" id="gymCards"></div>
+            </div>
+          </div>
+
+          <!-- ⚔️ H단계: 근육 실전 투입 보고서 -->
+          <div class="card field-report-card" id="fieldReportPanel">
+            <div class="field-head">
+              <div>
+                <span class="step-kicker">STAGE H · FIELD DEPLOYMENT REPORT</span>
+                <h3>⚔️ 근육 실전 투입 보고서 — 체육관이 아니라 진짜 일터에서!</h3>
+                <p class="field-status-line" id="fieldStatusLine">⚔️ 실전 원장을 계측하는 중...</p>
+              </div>
+              <button class="primary-btn" id="btnFieldSortie" type="button">⚔️ 지금 당장 실전 투입!</button>
+            </div>
+            <div class="field-muscles" id="fieldMuscles"></div>
+            <div class="field-ledger-head">📜 최근 실전 출동 기록 (최신순 · 최대 10건)</div>
+            <div class="field-ledger" id="fieldLedger"></div>
+          </div>
+
+          <div class="card exp-notebook-card" id="expNotebookPanel">
+            <div class="field-head">
+              <div>
+                <span class="step-kicker">STAGE I · EXPERIENCE NOTEBOOK</span>
+                <h3>📓 실전 오답 노트 — 근육이 자기 경험으로 다시 배워요</h3>
+                <p class="field-status-line" id="expStatusLine">📓 오답 노트를 불러오는 중...</p>
+              </div>
+              <button class="ghost-btn" id="btnExpRefresh" type="button">🔄 노트 다시 보기</button>
+            </div>
+            <div class="exp-muscles" id="expMuscles"></div>
+            <div class="field-ledger-head">📝 최근 실전 채점지 (최신순 · 최대 12장) — ✘ 오답이 다음 훈련의 교재가 돼요</div>
+            <div class="field-ledger" id="expLedger"></div>
+          </div>
+
+          <div class="card semantic-card" id="semanticPanel">
+            <div class="field-head">
+              <div>
+                <span class="step-kicker">STAGE L · TWO LANGUAGES, TWO BUDGETS — PROSE AND MACHINE TRUTH NEVER SHARE A VOCABULARY</span>
+                <h3>💡 의미 기억 층 — 단어가 아니라 뜻으로 기억을 찾아요</h3>
+                <p class="field-status-line" id="semStatusLine">💡 의미 공간을 계측하는 중...</p>
+              </div>
+              <button class="ghost-btn" id="btnSemTrain" type="button">🧠 의미 층 다시 훈련</button>
+            </div>
+
+            <div class="sem-facts" id="semFacts"></div>
+
+            <div class="sem-gaps" id="semGaps"></div>
+            <div class="sem-questions" id="semQuestions"></div>
+            <div class="sem-codegaps" id="semCodeGaps"></div>
+
+            <div class="sem-probe">
+              <div class="sem-probe-head">
+                🔬 뜻 알아보기 실험 — 같은 질문에 <b>단어만 쓰는 두뇌</b>와 <b>의미를 아는 두뇌</b>를 나란히 돌려봐요
+              </div>
+              <div class="sem-probe-row">
+                <input type="text" id="semProbeInput" class="input-field"
+                       placeholder="예: 무거운 지능을 가볍게 만들어 가지고 다니는 요령" />
+                <button class="primary-btn" id="btnSemProbe" type="button">💡 뜻 알아볼까?</button>
+              </div>
+              <div class="sem-compare" id="semCompare"></div>
+            </div>
+          </div>
+
+          <div class="pane-grid evo-grid">
+            <!-- 좌측: 1단계 역공학 해부실 + 2단계 핵심 원리 설계도 번역기 -->
+            <div class="card">
+              <div class="card-head">
+                <div>
+                  <span class="step-kicker">STEP 1 &amp; 2 · BINARY X-RAY &amp; BLUEPRINT TRANSLATOR</span>
+                  <h3>🔭 [1~2단계] 프로그램 해부 &amp; 핵심 원리 설계도 번역기</h3>
+                  <p>실행파일을 해부(능력①)하고, 복잡한 기계어 주소를 걷어내 순수 원리 설계도(기관①)로 번역합니다.</p>
+                </div>
+                <span class="tag-pill" id="evoGhidraBadge" style="border-color:rgba(56,189,248,0.45);color:#bae6fd">Ghidra 12.3 연동 준비</span>
+              </div>
+
+              <div class="chip-row" id="evoSpecimenChips">
+                <button type="button" class="preset-chip active" data-spec="xor_rot_vault">🔐 XOR-회전 금고 (.elf)</button>
+                <button type="button" class="preset-chip" data-spec="crc16_packet">📡 패킷 무결성 CRC16 (.exe)</button>
+                <button type="button" class="preset-chip" data-spec="puffer_rle_sanitizer">🐡 복어독 혼입 압축기 (.elf)</button>
+                <button type="button" class="preset-chip" data-spec="int8_clamp_filter">⚡ 센서 양자화 필터 (.bin)</button>
+                <button type="button" class="preset-chip upload-chip" id="btnEvoUpload">📂 내 파일 직접 올리기</button>
+                <input type="file" id="evoFileInput" class="hidden" />
+              </div>
+
+              <!-- 1단계: 바이너리 X-Ray & 섀넌 엔트로피 레이더 -->
+              <div class="evo-panel-box" id="evoXrayBox">
+                바이너리 표본을 해부하는 중...
+              </div>
+
+              <!-- 2단계 (기관 ①): 기계어 -> 핵심 원리 설계도 번역기 -->
+              <div class="evo-panel-box blueprint-theme" id="evoBlueprintBox" style="margin-top:10px">
+                기계어를 핵심 원리 설계도로 번역하는 중...
+              </div>
+            </div>
+
+            <!-- 우측: 3단계 코딩 -> 4단계 원인 돋보기 & 복어독 제거 -> 5단계 타임머신 & 유리방 -> 6단계 카트리지 장착 -->
+            <div class="card">
+              <div class="card-head">
+                <div>
+                  <span class="step-kicker">STEP 3~6 · CODE · DIAGNOSE · GLASS SANDBOX · CARTRIDGE</span>
+                  <h3>🛠️ [3~6단계] 코딩 · 원인 역추적 · 유리방 수리 &amp; 스킬 장착</h3>
+                  <p>코드를 직접 다듬고(능력②), 줄 번호 원인과 복어 독을 잡아내어(능력③·기관③⑤), 유리방 100% 검증 후 장착합니다.</p>
+                </div>
+              </div>
+
+              <!-- 기관 ④: 타임머신 세이브 포인트 바 -->
+              <div class="timemachine-bar">
+                <span class="tm-badge">⏪ 기관④ 타임머신 세이브</span>
+                <select id="evoSnapshotSelect" class="input-field tm-select"></select>
+                <button class="ghost-btn" id="btnEvoRollback" type="button">⏪ 0.1초 복구</button>
+              </div>
+
+              <!-- 3단계: 우리 식 코딩 워크벤치 -->
+              <div class="code-workbench">
+                <div class="cw-head">
+                  <span id="evoEditorTitle">💻 3단계 · 우리 두뇌 이식용 파이썬 코드 (직접 수정 가능!)</span>
+                  <span class="cw-sub">AST 보안 게이트 + 격리 샌드박스 보호 중</span>
+                </div>
+                <textarea id="evoCodeEditor" class="evo-code-textarea" rows="10" spellcheck="false"></textarea>
+              </div>
+
+              <div class="evo-action-bar">
+                <button class="secondary-btn" id="btnEvoAudit" type="button">🔍 4단계: 잘못된 곳 · 복어독 찾기</button>
+                <button class="primary-btn" id="btnEvoAutoRepair" type="button">🩹 5단계: 자동 수리 &amp; 유리방 시험</button>
+                <button class="ghost-btn accent" id="btnEvoTestCustom" type="button">🧪 내 직접 수정 코드 검증</button>
+              </div>
+
+              <!-- 📎 첨부 업로드창 + 🧩 우리 뇌 이식 적용 + 🔍 원인 역추적 대화창 (주인님 워크벤치 3종) -->
+              <div class="workbench-trio">
+                <div class="trio-upload">
+                  <div class="vb-head">📎 첨부파일 업로드창 — 내 코드(.py/.txt)나 바이너리(.elf/.exe/.bin)를 첨부하세요!</div>
+                  <div class="trio-upload-row">
+                    <button class="ghost-btn" id="btnBenchUpload" type="button">📎 파일 첨부</button>
+                    <span class="upload-filename" id="benchUploadName">첨부된 파일 없음</span>
+                    <input type="file" id="benchFileInput" class="hidden" accept=".py,.txt,.md,.elf,.exe,.bin" />
+                  </div>
+                  <div class="trio-hint">코드 파일은 3단계 편집창에 그대로 착륙! 바이너리는 1단계 X-Ray 해부 후 이식 초안으로 번역돼요. (업로드 즉시 4단계 돋보기 자동 가동!)</div>
+                </div>
+                <button class="primary-btn full port-btn" id="btnBenchPort" type="button">🧩 우리 뇌에 지금 이식 적용 — 편집창 코드 유리방 검증 + 영구 이식 (.py + .sbrain + 위키)</button>
+                <div class="trace-chat">
+                  <div class="heart-chat-head">🔍 원인 역추적 대화창 — 돋보기 기관(기관③)에게 무엇이든 물어보세요! (예: "왜 깨졌어?", "복어독 있어?", "어떻게 고쳐?", "원리 공식 알려줘")</div>
+                  <div class="trace-chat-log" id="traceChatLog"></div>
+                  <div class="heart-chat-bar">
+                    <input type="text" id="traceChatInput" class="input-field" placeholder="원인 역추적 질문을 적고 Enter..." />
+                    <button class="secondary-btn" id="btnTraceChat" type="button">🔍 역추적</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 4단계: 기관 ③ 원인 역추적 돋보기 + 기관 ⑤a 복어 독 제거기 -->
+              <div class="evo-panel-box" id="evoAuditBox" style="margin-top:9px">
+                <strong>[🔍 4단계: 잘못된 곳 · 복어독 찾기]</strong>를 누르면 정확한 줄 번호와 깨진 원인을 콕 집어냅니다.
+              </div>
+
+              <!-- 5단계: 수리 전·후 Diff & 기관 ② 투명 유리방 쌍둥이 대조 실험실 -->
+              <div id="evoDiffBox" class="evo-diff-box hidden" style="margin-top:9px"></div>
+              <div id="evoSandboxBox" class="evo-panel-box sandbox-theme" style="margin-top:9px">
+                🧪 <strong>기관② 투명 유리방 실험실 대기 중</strong> — 수리 또는 검증을 실행하면 원본 바이너리와 6가지 쌍둥이 입력값을 실시간 대조합니다.
+              </div>
+
+              <!-- 6단계: 기관 ⑤b 영구 스킬 카트리지 슬롯 -->
+              <div class="cartridge-install-box" style="margin-top:10px">
+                <button class="primary-btn full cartridge-btn" id="btnEvoInstall" type="button">
+                  🧩 6단계: 유리방 100% 합격 스킬을 우리 두뇌에 영구 장착 (.py + .sbrain + 위키)
+                </button>
+                <div id="evoInstallFeedback" class="clinic-feedback hidden" style="margin-top:8px;margin-bottom:0"></div>
+
+                <div class="installed-dock" style="margin-top:10px">
+                  <div class="vb-head">🧩 우리 두뇌에 영구 장착된 스킬 카트리지 &amp; 실전 호출 테스트</div>
+                  <div id="evoInstalledList" class="vb-list"></div>
+                  <div class="skill-runner-row" id="evoSkillRunnerRow">
+                    <select id="evoRunSkillSelect" class="input-field" style="max-width:190px"></select>
+                    <input type="text" id="evoRunArgsInput" class="input-field" value="[[16, 32, 255, 129]]" placeholder="실전 테스트 인자 JSON (예: [[16, 32, 255, 129]])" />
+                    <button class="ghost-btn accent" id="btnEvoRunSkill" type="button">▶ 스킬 실행</button>
+                  </div>
+                  <div id="evoRunSkillOutput" class="skill-run-out hidden"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- [탭 2] 지식 먹이기 -->
+      <div class="tab-pane" id="tab-feed">
+        <div class="pane-grid feed-layout">
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <h3>자율 위키 정원사 (지식 먹이기)</h3>
+                <p>메모·코드 분석·아이디어를 자유롭게 넣으면 분류·해시태그·<code>[[양방향 링크]]</code>를 스스로 엮어 저장합니다.</p>
+              </div>
+            </div>
+
+            <div class="chip-row">
+              <span class="chip-hint">예시 불러오기:</span>
+              <button class="preset-chip" data-snack="quant" type="button">자체 4비트 니블 패킹 원리</button>
+              <button class="preset-chip" data-snack="rl" type="button">작은 AI 심판 합의 원리</button>
+              <button class="preset-chip" data-snack="ghidra" type="button">Ghidra 헤드리스 함수 추출</button>
+            </div>
+
+            <div class="composer">
+              <label class="input-label">
+                <span>기억 카드 제목 (선택)</span>
+                <input type="text" id="feedTitle" class="input-field" placeholder="비워두면 첫 문장을 요약해 제목을 자동 생성합니다" />
+              </label>
+              <label class="input-label">
+                <span>기억시킬 내용</span>
+                <textarea id="feedText" class="input-field area" rows="7" placeholder="기억시키고 싶은 내용을 적어주세요..."></textarea>
+              </label>
+              <div class="action-row">
+                <button class="primary-btn" id="btnFeed" type="button">🌱 지식 소화 &amp; 시냅스 연결하기</button>
+                <span class="status-msg" id="feedStatus"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card side-guide-card">
+            <div class="card-head">
+              <div>
+                <h3>소화 결과 &amp; 기억 구조화 리포트</h3>
+                <p>데이터센터 없이도 작은 두뇌가 똑똑해지는 비결은 ‘정돈된 외부 마크다운 기억망’입니다.</p>
+              </div>
+            </div>
+
+            <div id="digestResult" class="digest-box empty">
+              아직 새로 먹인 메모가 없습니다.<br />
+              왼쪽에서 예시 칩을 누르고 <strong>「지식 소화 &amp; 시냅스 연결하기」</strong>를 눌러보세요!
+            </div>
+
+            <div class="principle-list">
+              <div class="p-item">
+                <strong>1. 전체 문서를 매번 읽지 않습니다</strong>
+                <span>질문할 때 필요한 <code>[[시냅스 노드]]</code> 2개만 핀셋처럼 집어 읽어 메모리 소모를 70% 이상 줄입니다.</span>
+              </div>
+              <div class="p-item">
+                <strong>2. 먹인 지식이 곧 우리 두뇌의 재료가 됩니다</strong>
+                <span>새 노트가 쌓일수록 <strong>「우리만의 양자화 주조소」</strong>에서 굽는 <code>.sbrain</code> 신경망의 어휘와 연상 시냅스가 함께 자라납니다.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- [탭 3] 우리만의 양자화 주조소 -->
+      <div class="tab-pane" id="tab-forge">
+        <div class="pane-grid forge-layout">
+          <!-- 좌측: 외부 모델 골격 해부대 -->
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <span class="step-kicker">STEP 1 · BLUEPRINT DISSECTION</span>
+                <h3>외부 모델 골격 해부대</h3>
+                <p>남의 양자화 모델을 통째로 쓰지 않고, 내부 구조만 분해해 <strong>우리 기본 틀에 필요한 알짜 설계만 흡수</strong>합니다.</p>
+              </div>
+            </div>
+
+            <div class="chip-row">
+              <button class="preset-chip active" data-bp="custom-synapse-seed" type="button">✦ 우리 독자 틀 (Synapse-Core)</button>
+              <button class="preset-chip" data-bp="donor-qwen-0.8b" type="button">Qwen 0.8B 해부</button>
+              <button class="preset-chip" data-bp="donor-gemma4-e2b" type="button">Gemma 4 E2B 해부</button>
+            </div>
+
+            <div class="anatomy-panel" id="anatomyBox">
+              설계도를 불러오는 중...
+            </div>
+          </div>
+
+          <!-- 우측: 자체 .sbrain 양자화 두뇌 주조기 -->
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <span class="step-kicker">STEP 2 · SYNAPSEQUANT FORGE</span>
+                <h3>우리만의 양자화 두뇌 직접 주조 (<code>.sbrain</code>)</h3>
+                <p>내 위키 어휘와 시냅스 행렬로 신경망 가중치를 빚고, <strong>32-블록 스케일링 + 니블 패킹</strong>으로 직접 압축합니다.</p>
+              </div>
+            </div>
+
+            <div class="forge-options">
+              <span class="opt-title">양자화 압축 방식 선택</span>
+              <div class="quant-cards" id="quantBitsGroup">
+                <button class="q-card active" data-bits="4" type="button">
+                  <div class="q-card-top">
+                    <strong>INT4 니블 패킹</strong>
+                    <span class="rec-tag">추천 · -84% 압축</span>
+                  </div>
+                  <p>1바이트에 4비트 가중치 2개를 짝지어 수납하는 초경량 외장하드 표준</p>
+                </button>
+                <button class="q-card" data-bits="8" type="button">
+                  <div class="q-card-top">
+                    <strong>INT8 블록 스케일링</strong>
+                    <span class="rec-tag subtle">-72% 압축</span>
+                  </div>
+                  <p>8비트 대칭 눈금으로 원본 신경망 방향성을 99.9% 이상 보존</p>
+                </button>
+              </div>
+
+              <span class="opt-title">신경망 은닉 차원 (두뇌 용량)</span>
+              <div class="dim-pills" id="quantDimGroup">
+                <button class="dim-pill" data-dim="48" type="button">48차원 · 씨앗형</button>
+                <button class="dim-pill active" data-dim="64" type="button">64차원 · 균형형</button>
+                <button class="dim-pill" data-dim="96" type="button">96차원 · 고밀도형</button>
+              </div>
+
+              <button class="primary-btn full" id="btnForge" type="button">
+                ⚡ 우리만의 양자화 두뇌 (.sbrain) 직접 주조하기
+              </button>
+            </div>
+
+            <div id="forgeResult" class="forge-report hidden"></div>
+
+            <div class="vault-brains">
+              <div class="vb-head">외장하드 <code>models/</code> 에 주조된 우리 두뇌 목록</div>
+              <div id="forgedList" class="vb-list"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- [탭 3.2] B단계: CPU 강화학습 체육관 & 다수 심판 합의 판단기 -->
+      <div class="tab-pane" id="tab-rl">
+        <div class="pane-grid rl-layout">
+          <!-- 좌측: CPU 강화학습 훈련소 & 3대 전략 비교 -->
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <span class="step-kicker">STAGE B · CPU REINFORCEMENT GYM</span>
+                <h3>CPU 강화학습 &amp; 다수 심판 합의 실험</h3>
+                <p>데이터센터 GPU 없이 내 컴퓨터 CPU만으로 5개 꼬마 뉴런을 훈련하고, 가중치 병합 없이 <strong>‘다수 심판 거부권 + 최고 전문가 결정(Good Judges)’</strong>으로 연결합니다.</p>
+              </div>
+            </div>
+
+            <div class="rl-controls">
+              <span class="opt-title">1회 훈련 판수 선택 (순수 CPU 시뮬레이터)</span>
+              <div class="dim-pills" id="rlEpGroup">
+                <button class="dim-pill" data-ep="300" type="button">300판 · 워밍업</button>
+                <button class="dim-pill active" data-ep="600" type="button">600판 · 표준 훈련</button>
+                <button class="dim-pill" data-ep="1200" type="button">1,200판 · 집중 특훈</button>
+              </div>
+              <button class="primary-btn full" id="btnRlTrain" type="button">
+                🏋️ CPU로 5인 꼬마 뉴런 강화학습 가동하기
+              </button>
+            </div>
+
+            <div class="rl-bench-box" id="rlBenchBox">
+              아직 강화학습 전입니다. 위 버튼을 눌러 0.3초 만에 600판 훈련과 미공개 실전 비교 실험을 실행해 보세요!
+            </div>
+
+            <div class="rl-roster-wrap">
+              <div class="vb-head">5인 꼬마 뉴런단 훈련 랭킹 (각자 다른 성향·예산으로 학습)</div>
+              <div class="rl-roster" id="rlAgentRoster"></div>
+            </div>
+          </div>
+
+          <!-- 우측: 선택지 확률 채점 & 주인님 코칭석 -->
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <span class="step-kicker">OPTION SCORING &amp; HUMAN-IN-THE-LOOP</span>
+                <h3>실전 선택지 채점기 &amp; 주인님 코칭석</h3>
+                <p>자유 수다 대신 행동 선택지(A~D) 확률을 채점하며, <strong>확신도 75% 미만이면 억지로 찍지 않고 주인님께 코칭을 요청</strong>합니다.</p>
+              </div>
+            </div>
+
+            <div class="chip-row" id="rlScenarioChips">
+              <button class="preset-chip active" data-sc="sc_ambiguous_crypto" type="button">🤔 낯선 암호 루프 (코칭 추천)</button>
+              <button class="preset-chip" data-sc="sc_low_ram_laptop" type="button">💻 0.9GB 노트북</button>
+              <button class="preset-chip" data-sc="sc_ungrounded_trap" type="button">🛑 미공개 취약점 질문</button>
+              <button class="preset-chip" data-sc="sc_verified_wiki" type="button">📚 검증된 위키 질문</button>
+            </div>
+
+            <div id="rlScenarioView" class="rl-scenario-view">
+              시나리오를 불러오는 중...
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- [탭 3.5] 환각 원인 진단 & 저감 처방실 -->
+      <div class="tab-pane" id="tab-clinic">
+        <div class="pane-grid clinic-layout">
+          <!-- 좌측: 4대 환각 원인 정밀 진단표 -->
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <span class="step-kicker">DIAGNOSTIC SCANNER</span>
+                <h3>4대 환각 원인 정밀 진단표</h3>
+                <p>작은 AI 두뇌가 거짓말(환각)을 하는 4가지 원인을 실시간 점검합니다.</p>
+              </div>
+            </div>
+
+            <div class="clinic-summary-banner" id="clinicBanner">
+              <div>
+                <span class="cs-label">현재 두뇌 신뢰도 · 환각 억제 상태</span>
+                <strong class="cs-val" id="clinicHeadline">환각 위험 10% · 근거 신뢰도 90%</strong>
+                <p class="cs-sub" id="clinicNote">기억 카드들이 시냅스로 검증되어 있고, 모르는 질문은 차단합니다.</p>
+              </div>
+              <div class="cs-actions">
+                <button class="ghost-btn" id="btnClinicStress" type="button">🧪 함정 질문 실험</button>
+                <button class="ghost-btn" id="btnClinicReset" type="button">🔄 경보 영점 조정</button>
+              </div>
+            </div>
+
+            <div class="diag-list" id="clinicBreakdown"></div>
+          </div>
+
+          <!-- 우측: 맞춤형 환각 저감 처방전 -->
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <span class="step-kicker">ACTIONABLE PRESCRIPTIONS</span>
+                <h3>맞춤형 환각 저감 처방전 (원클릭 실행)</h3>
+                <p>현재 두뇌 상태에서 환각 위험을 가장 효과적으로 낮추는 맞춤 해법입니다.</p>
+              </div>
+            </div>
+
+            <div id="clinicFeedback" class="clinic-feedback hidden"></div>
+
+            <div class="rx-list" id="clinicPrescriptions"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- [탭 4] 시냅스몽과 대화 -->
+      <div class="tab-pane" id="tab-chat">
+        <div class="card chat-card">
+          <div class="card-head">
+            <div>
+              <h3>시냅스몽과 대화하기</h3>
+              <p>질문과 연결된 마크다운 시냅스 카드만 골라 읽고 답합니다.</p>
+            </div>
+            <div class="chip-row no-margin">
+              <button class="preset-chip" data-q="외장하드에 사는 시냅스몽은 어떻게 다른 컴퓨터에서도 그대로 깨어나?" type="button">외장하드 서식 원리</button>
+              <button class="preset-chip" data-q="외부 모델을 그대로 안 쓰고 우리만의 양자화 두뇌를 어떻게 만들어?" type="button">자체 양자화 전략</button>
+              <button class="preset-chip" data-q="Ghidra 헤드리스 분석이랑 어떻게 연결될 예정이야?" type="button">Ghidra 역공학 결합</button>
+              <button class="preset-chip test-warn" data-q="2099년 화성 올림픽 우승국은 어디야?" type="button">🧪 환각 방어 테스트</button>
+            </div>
+          </div>
+
+          <div class="chat-feed" id="chatLog">
+            <div class="msg-row bot">
+              <img src="assets/01_greet.jpg" alt="시냅스몽" class="msg-avatar" />
+              <div class="msg-bubble">
+                안녕하세요 주인님! 제 마크다운 위키 기억망과 직접 구운 <code>.sbrain</code> 두뇌로 무엇이든 함께 탐구해 볼게요. 위 예시 질문을 누르거나 직접 물어봐 주세요!
+              </div>
+            </div>
+          </div>
+
+          <div class="chat-input-bar">
+            <input type="text" id="chatInput" class="input-field" placeholder="시냅스몽에게 궁금한 점을 입력하고 Enter를 누르세요..." />
+            <button class="primary-btn" id="btnChat" type="button">질문 보내기</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 💓 자가 진화 심장박동 새 박동 알림 토스트 -->
+  <div class="evo-toast hidden" id="evoToast" role="status"></div>
+
+  <!-- 🖼️ 4대 핵심 능력 × 5대 필수 기관 × 6단계 자가 진화 공방 조화 설계도 이미지 모달 -->
+  <div class="evo-modal-backdrop hidden" id="evoHarmonyModal" style="display:none" role="dialog" aria-modal="true" aria-labelledby="evoModalTitle">
+    <div class="evo-modal-dialog">
+      <div class="evo-modal-head">
+        <div>
+          <span class="step-kicker">SYNAPSE BRAIN ARCHITECTURE · 4 × 5 × 6 HARMONY MAP</span>
+          <h3 id="evoModalTitle">🖼️ 우리 두뇌의 「4대 핵심 능력 × 5대 필수 기관 × 6단계 자가 진화 공방」 조화 설계도</h3>
+        </div>
+        <div class="evo-modal-head-actions">
+          <button class="primary-btn" id="btnModalGoForge" type="button">🚀 6단계 공방에서 직접 해부·수리해보기</button>
+          <button class="ghost-btn" id="btnCloseEvoModal" type="button">✕ 닫기</button>
+        </div>
+      </div>
+
+      <div class="evo-cutaway-stage">
+        <img src="assets/evo_forge_harmony.jpg" alt="외장하드 자가 진화 AI 두뇌 6단계 공방 단면도" class="evo-cutaway-img" />
+        <button type="button" class="evo-hotspot active" data-spot="1" style="left:21%;top:27%">
+          <span class="hs-num">1</span><span class="hs-txt">분해·해부 (X-Ray)</span>
+        </button>
+        <button type="button" class="evo-hotspot" data-spot="2" style="left:46%;top:23%">
+          <span class="hs-num">2</span><span class="hs-txt">기관① 원리 설계도 번역</span>
+        </button>
+        <button type="button" class="evo-hotspot" data-spot="3" style="left:69%;top:35%">
+          <span class="hs-num">3</span><span class="hs-txt">우리 식 코딩 이식</span>
+        </button>
+        <button type="button" class="evo-hotspot" data-spot="4" style="left:21%;top:68%">
+          <span class="hs-num">4</span><span class="hs-txt">기관③ 돋보기 &amp; ⑤ 복어독 제거</span>
+        </button>
+        <button type="button" class="evo-hotspot" data-spot="5" style="left:46%;top:72%">
+          <span class="hs-num">5</span><span class="hs-txt">기관② 유리방 &amp; ④ 타임머신</span>
+        </button>
+        <button type="button" class="evo-hotspot" data-spot="6" style="left:73%;top:71%">
+          <span class="hs-num">6</span><span class="hs-txt">기관⑤ 카트리지 &amp; 기억나무</span>
+        </button>
+      </div>
+
+      <div class="evo-spot-caption" id="evoSpotCaption">
+        <strong>① [1단계 · 분해/해부 (능력①)]</strong> — 파란 X-Ray 프리즘이 실행파일(<code>.elf</code> / <code>.exe</code>)의 기계어와 숨은 암호 구역(엔트로피)을 투명하게 발라냅니다! <span style="color:#a5b4fc">(그림 위의 ①~⑥ 번호 핀을 눌러 각 방의 역할을 확인해 보세요!)</span>
+      </div>
+
+      <div class="harmony-three-cols">
+        <div class="hm-card">
+          <h4>👑 주인님의 4대 핵심 능력</h4>
+          <ul>
+            <li><strong>능력 ① 분해·파악·해석</strong> — Ghidra 12.3 &amp; Binary X-Ray 해부</li>
+            <li><strong>능력 ② 우리 식 코딩</strong> — 우리 두뇌 규격 파이썬 스킬로 합성</li>
+            <li><strong>능력 ③ 잘못된 곳 찾기</strong> — 버그·경계값·위험 명령 정밀 적발</li>
+            <li><strong>능력 ④ 직접·자동 수정</strong> — 코드 수리 및 전·후 비교 완성</li>
+          </ul>
+        </div>
+        <div class="hm-card">
+          <h4>🛡️ 5가지 필수 안전·연결 기관</h4>
+          <ul>
+            <li><strong>기관 ① 🧬 원리 설계도 번역기</strong> — 기계어 주소 제거 → 순수 공식화</li>
+            <li><strong>기관 ② 🧪 투명 유리방 쌍둥이 실험실</strong> — 격리 실행 6종 정답 대조</li>
+            <li><strong>기관 ③ 🔍 원인 역추적 돋보기</strong> — 정확한 줄 번호·깨진 이유 진단</li>
+            <li><strong>기관 ④ ⏪ 타임머신 세이브 포인트</strong> — 수리 전 백업 &amp; 0.1초 복구</li>
+            <li><strong>기관 ⑤ 🚦 복어 독 제거 &amp; 🧩 카트리지</strong> — 위험 명령 차단 후 영구 장착</li>
+          </ul>
+        </div>
+        <div class="hm-card">
+          <h4>🔄 6단계 자가 진화 순환 고리</h4>
+          <ul>
+            <li><strong>1→2단계</strong>: 남의 프로그램을 해부해 순수 원리만 흡수</li>
+            <li><strong>3→4단계</strong>: 코딩 초안에서 숨은 버그와 복어 독 색출</li>
+            <li><strong>5→6단계</strong>: 유리방 100% 합격 코드만 <code>.py</code> + <code>.sbrain</code> + <code>[[위키]]</code>로 영구 진화!</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="ui-v3.js?v=7.0"></script>
+</body>
+</html>

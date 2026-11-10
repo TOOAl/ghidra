@@ -1,0 +1,28 @@
+# External-drive heavy weights & portable binaries (kept on USB/SSD, not pushed to GitHub)
+models/*.gguf
+models/*.sbrain
+models/forged_brains.json
+models/*.bin
+models/*.safetensors
+runtime/
+!runtime/.gitkeep
+models/
+!models/.gitkeep
+
+# Local SQLite search cache (rebuilt automatically from vault/*.md on any PC)
+state/*.db
+state/*.db-journal
+state/rl_council.json
+state/genius_pantheon.json
+state/evo_forge.json
+state/evolution_journal.json
+state/core_abilities.json
+specimens/*.elf
+specimens/*.exe
+specimens/*.bin
+skills/skill_*.py
+vault/00_Raw/*.md
+state/*.db-wal
+
+__pycache__/
+*.pyc

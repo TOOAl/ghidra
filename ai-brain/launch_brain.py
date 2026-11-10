@@ -1,0 +1,1050 @@
+#!/usr/bin/env python3
+"""
+Portable Living AI Brain Launcher (Zero external dependencies).
+Run directly from an external drive (USB/SSD) on Windows, macOS, or Linux:
+    python3 launch_brain.py --port 8765
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import mimetypes
+import re
+import sys
+from http import HTTPStatus
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from typing import Any, Dict
+from urllib.parse import parse_qs, urlparse
+
+BRAIN_ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(BRAIN_ROOT))
+
+from brain_engine.core_ability_engine import ABILITY_ORDER as ABILITY_ROTATION  # noqa: E402
+from brain_engine.core_ability_engine import CoreAbilityEngine, context_experience_case  # noqa: E402
+from brain_engine.evolution_heartbeat import EvolutionHeartbeat  # noqa: E402
+from brain_engine.genius_pantheon import GeniusPantheon  # noqa: E402
+from brain_engine.genius_scout import analyze_candidate_genius  # noqa: E402
+from brain_engine.hallucination import (  # noqa: E402
+    audit_chat_grounding,
+    evaluate_brain_hallucination,
+)
+from brain_engine.host_probe import probe_host  # noqa: E402
+from brain_engine.quant_forge import CustomBrainForge, dissect_architecture  # noqa: E402
+from brain_engine.rl_gym import PortableRLGym  # noqa: E402
+from brain_engine.self_evolving_forge import SelfEvolvingForge  # noqa: E402
+from brain_engine.slm_bridge import PortableSLMBridge  # noqa: E402
+from brain_engine.tamagotchi import TamagotchiSoul  # noqa: E402
+from brain_engine.wiki_gardener import WikiGardener  # noqa: E402
+
+# 🕳️ Stage K — a note counts as a BLIND SPOT when even its strongest meaning
+# neighbour sits below this cosine.  0.45 is measured, not chosen: on the real
+# vault pairs inside one drawer average 0.452 (median 0.374) while pairs across
+# drawers average 0.117 (median 0.069), so this is where "related" stops being
+# evidence.  At 0.30 only a true orphan shows up; at 0.45 the vault reports the
+# notes it holds most loosely, which is what a gardener needs to see.
+GAP_COS_MIN = 0.45
+
+
+class BrainState:
+    def __init__(self, root: Path) -> None:
+        self.root = root
+        self.web_dir = root / "web"
+        self.gardener = WikiGardener(root / "vault", root / "state" / "wiki_index.db")
+        self.soul = TamagotchiSoul(root / "state" / "soul.json")
+        self.slm = PortableSLMBridge(root / "models")
+        self.forge = CustomBrainForge(root / "models")
+        self.rl_gym = PortableRLGym(root / "state", root / "models")
+        self.pantheon = GeniusPantheon(root / "state", root / "models")
+        self.evo_forge = SelfEvolvingForge(root)
+        self.abilities = CoreAbilityEngine(root)
+        self.heartbeat = EvolutionHeartbeat(
+            self.evo_forge,
+            self.soul,
+            self.gardener,
+            self.rl_gym,
+            interval_sec=int(__import__('os').environ.get('HEARTBEAT_INTERVAL_SEC', '120')),
+            ability=self.abilities,
+        )
+        self.host_info = probe_host(root)
+        self.soul.register_host(self.host_info)
+
+    def full_status(self) -> Dict[str, Any]:
+        self.host_info = probe_host(self.root)
+        notes = self.gardener.list_notes()
+        graph = self.gardener.get_graph()
+        forged = self.forge.list_forged_brains()
+        rl_snap = self.rl_gym.status_snapshot()
+        rl_trained = bool(rl_snap.get("benchmark", {}).get("trained", False))
+        env_grade = self.host_info.get("environment", {}).get("grade", "optimal")
+        recent_checks = self.soul.data.get("recent_hallucination_checks", [])
+        recent_missing = self.soul.data.get("recent_missing_topics", [])
+        hallucination = evaluate_brain_hallucination(
+            notes,
+            forged,
+            recent_checks,
+            recent_missing_topics=recent_missing,
+            rl_trained=rl_trained,
+        )
+        return {
+            "ui_version": "7.0",
+            "soul": self.soul.snapshot(graph["stats"], env_grade=env_grade),
+            "hallucination": hallucination,
+            "host": self.host_info,
+            "engine": self.slm.detect_active_engine(),
+            "forged_brains": forged,
+            "rl": rl_snap,
+            "pantheon": self.pantheon.snapshot(),
+            "evo_forge": self.evo_forge.snapshot(),
+            "graph": graph,
+            "roadmap": {
+                "stage_a": {"status": "done", "title": "A단계: 마크다운 위키 & 자체 양자화 주조"},
+                "stage_b": {"status": "done", "title": "B단계: CPU 강화학습 & 천재 성좌 합의"},
+                "stage_c": {"status": "active", "title": "C단계: 6단계 자가 진화 역공학·코딩 공방"},
+            },
+        }
+
+
+def make_handler(state: BrainState):
+    class BrainHTTPHandler(BaseHTTPRequestHandler):
+        def log_message(self, fmt: str, *args: Any) -> None:
+            sys.stdout.write(f"[ai-brain] {self.address_string()} - {fmt % args}\n")
+            sys.stdout.flush()
+
+        def _send_json(self, payload: Any, status: int = 200) -> None:
+            data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.end_headers()
+            self.wfile.write(data)
+
+        def _read_json_body(self) -> Dict[str, Any]:
+            length = int(self.headers.get("Content-Length", "0") or "0")
+            if length <= 0:
+                return {}
+            raw = self.rfile.read(length).decode("utf-8", errors="ignore")
+            return json.loads(raw) if raw.strip() else {}
+
+        def do_OPTIONS(self) -> None:  # noqa: N802
+            self.send_response(HTTPStatus.NO_CONTENT)
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.end_headers()
+
+        def do_GET(self) -> None:  # noqa: N802
+            parsed = urlparse(self.path)
+            route = parsed.path
+
+            if route == "/api/status":
+                self._send_json(state.full_status())
+                return
+            if route == "/api/evo/heartbeat":
+                self._send_json(state.heartbeat.status())
+                return
+            if route == "/api/evo/abilities":
+                self._send_json(state.abilities.snapshot())
+                return
+            if route == "/api/evo/field":
+                self._send_json(state.abilities.field_report())
+                return
+            if route == "/api/evo/experience":
+                self._send_json(state.abilities.experience_report())
+                return
+            if route == "/api/semantic":
+                from brain_engine.core_ability_engine import (
+                    field_context_semantic_trust,
+                    field_org_semantic_trust,
+                    field_org_threshold,
+                )
+
+                ctx_field = state.abilities.field_profile("context")
+                org_field = state.abilities.field_profile("organizing")
+                engine = state.gardener.semantic.status()
+                notes = state.gardener.list_notes()
+                # 🕳️ Stage K: the vault's blind spots — notes whose STRONGEST
+                # meaning neighbour is still weak.  Only reported once the space
+                # is actually trained; an untrained guess about what the brain
+                # does not know would be worse than silence.
+                gaps = []
+                code_gaps: list = []
+                questions: list = []
+                if engine.get("trained"):
+                    try:
+                        gaps = state.gardener.semantic.orphans(notes, cos_min=GAP_COS_MIN, top_k=8)
+                        # 💡 Stage L: machine memories get their exact structural
+                        # detector (the call graph), and prose blind spots become
+                        # the questions that would fill them.
+                        code_gaps = state.gardener.semantic.code_orphans(notes)
+                        questions = state.gardener.gap_questions(notes, gaps)
+                    except Exception:
+                        gaps = gaps or []
+                self._send_json(
+                    {
+                        "engine": engine,
+                        "trust_w_sem": round(field_context_semantic_trust(ctx_field), 3),
+                        "muscle": {
+                            "level": int(ctx_field.get("level", 1)),
+                            "tier": int(ctx_field.get("tier", 0)),
+                        },
+                        "metrics": state.abilities.field_metrics("context"),
+                        # 💡 Stage K: the organizing muscle now trusts meaning too,
+                        # and its trust is learned from real weaving.
+                        "organizing": {
+                            "trust_w_sem": round(field_org_semantic_trust(org_field), 3),
+                            "shelf_threshold": round(field_org_threshold(org_field), 3),
+                            "level": int(org_field.get("level", 1)),
+                            "tier": int(org_field.get("tier", 0)),
+                            "metrics": state.abilities.field_metrics("organizing"),
+                        },
+                        "notes": len(notes),
+                        "gaps": gaps,
+                        "gap_cos_min": GAP_COS_MIN,
+                        # 💡 Stage L: two languages, two vocabulary budgets.  The
+                        # prose numbers above are exactly Stage K's; the code
+                        # channel reports blind spots as structural FACTS (who
+                        # calls whom), because cosine is measured-useless there.
+                        "channels": engine.get("channels") or {},
+                        "code_gaps": code_gaps,
+                        "code_gap_count": len(code_gaps),
+                        "questions": questions,
+                    }
+                )
+                return
+            if route == "/api/re/backends":
+                from brain_engine import re_analyzer
+                self._send_json({
+                    "backends": re_analyzer.available_backends(),
+                    "ghidra_health": re_analyzer.health(),
+                    "ghidra_headless": str(re_analyzer.ghidra_headless() or ""),
+                    "specimens": sorted(q.name for q in (state.root / "specimens").glob("*")
+                                          if q.is_file() and q.suffix in (".elf", ".exe", ".bin", ".so")),
+                })
+                return
+            if route == "/api/notes":
+                self._send_json({"notes": state.gardener.list_notes()})
+                return
+            if route == "/api/note":
+                qs = parse_qs(parsed.query)
+                slug = (qs.get("slug") or [""])[0]
+                all_notes = state.gardener.list_notes()
+                for note in all_notes:
+                    if note["slug"] == slug:
+                        # 💡 Stage K: what this memory MEANS next to, with the
+                        # words that bridge them — so a reader can follow the
+                        # train of thought instead of only the [[links]].
+                        neighbours = []
+                        try:
+                            if state.gardener.semantic.status().get("trained"):
+                                neighbours = state.gardener.semantic.neighbours(note, all_notes, top_k=4)
+                        except Exception:
+                            neighbours = []
+                        self._send_json({"note": note, "semantic_neighbors": neighbours})
+                        return
+                self._send_json({"error": "Note not found"}, status=404)
+                return
+            if route == "/api/dissect":
+                qs = parse_qs(parsed.query)
+                bp_id = (qs.get("id") or ["custom-synapse-seed"])[0]
+                self._send_json(dissect_architecture(bp_id, state.root / "models"))
+                return
+            if route == "/api/rl/scenario":
+                qs = parse_qs(parsed.query)
+                sc_id = (qs.get("id") or ["sc_ambiguous_crypto"])[0]
+                self._send_json(state.rl_gym.evaluate_scenario(sc_id))
+                return
+
+            rel = "index.html" if route in ("", "/") else route.lstrip("/")
+            target = (state.web_dir / rel).resolve()
+            if not str(target).startswith(str(state.web_dir.resolve())) or not target.is_file():
+                target = state.web_dir / "index.html"
+
+            ctype, _ = mimetypes.guess_type(str(target))
+            if not ctype:
+                ctype = "application/octet-stream"
+            if ctype.startswith("text/") or ctype in ("application/javascript", "application/json"):
+                ctype += "; charset=utf-8"
+
+            content = target.read_bytes()
+            if target.name == "index.html":
+                boot_json = json.dumps(state.full_status(), ensure_ascii=False)
+                inject = f"<script>window.__INITIAL_STATUS__ = {boot_json};</script>".encode("utf-8")
+                content = content.replace(b"<!--__INITIAL_STATE__-->", inject)
+
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(content)))
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+            self.send_header("Pragma", "no-cache")
+            self.send_header("Expires", "0")
+            self.end_headers()
+            self.wfile.write(content)
+
+        def do_POST(self) -> None:  # noqa: N802
+            parsed = urlparse(self.path)
+            route = parsed.path
+            try:
+                body = self._read_json_body()
+            except Exception as exc:
+                self._send_json({"error": f"Invalid JSON: {exc}"}, status=400)
+                return
+
+            if route == "/api/feed":
+                raw_text = str(body.get("text") or "").strip()
+                custom_title = str(body.get("title") or "").strip()
+                if not raw_text:
+                    self._send_json({"error": "먹일 지식이나 메모 내용을 입력해 주세요!"}, status=400)
+                    return
+                digested = state.gardener.digest_raw_memory(raw_text, custom_title=custom_title)
+                state.soul.on_feed_memory(digested["title"], len(digested["links"]))
+                self._send_json({"digested": digested, "status": state.full_status()})
+                return
+
+            if route == "/api/evo/feedback":
+                # 💡 Stage J: the master grades a memory the brain could not grade
+                # by itself.  This is the only honest supervision for a question
+                # that was understood partly — and it teaches the muscle how much
+                # to trust meaning.
+                from brain_engine.core_ability_engine import master_feedback_case
+
+                query = str(body.get("query") or "").strip()
+                slug = str(body.get("slug") or "").strip()
+                if not query or not slug:
+                    self._send_json({"error": "질문과 기억을 모두 알려주세요!"}, status=400)
+                    return
+                ctx_field = state.abilities.field_profile("context")
+                bundle = state.gardener.recall_memories(query, limit=3, field=ctx_field)
+                case = master_feedback_case(ctx_field, query, bundle, slug)
+                if not case:
+                    self._send_json(
+                        {"error": "그 기억이 방금 인출 목록에 없어 채점할 수 없어요 (다시 질문해 주세요)."},
+                        status=400,
+                    )
+                    return
+                state.abilities.record_experience("context", case)
+                self._send_json(
+                    {
+                        "graded": case["ok"],
+                        "note": case["note"],
+                        "metrics": state.abilities.field_metrics("context"),
+                        "semantic": bundle.get("semantic"),
+                        "status": state.full_status(),
+                    }
+                )
+                return
+
+            if route == "/api/semantic/probe":
+                # 💡 Stage J: show the master EXACTLY what changed.  The same
+                # question is answered twice on the same vault: once with the
+                # muscle's meaning trust forced to zero (the old keyword brain)
+                # and once with the trust it has actually learned.
+                from brain_engine.core_ability_engine import field_context_semantic_trust
+
+                query = str(body.get("query") or "").strip()
+                if not query:
+                    self._send_json({"error": "뜻을 알아볼 질문을 입력해 주세요!"}, status=400)
+                    return
+                base = state.abilities.field_profile("context")
+                rows = []
+                for label, trust in (("keyword", 0.0), ("meaning", field_context_semantic_trust(base))):
+                    fld = dict(base, weights=dict(base["weights"], w_sem=trust))
+                    bundle = state.gardener.recall_memories(query, limit=3, field=fld)
+                    audit = audit_chat_grounding(query, bundle)
+                    rows.append(
+                        {
+                            "mode": label,
+                            "trust_w_sem": round(trust, 3),
+                            "recalled": [
+                                {
+                                    "title": n["title"],
+                                    "slug": n["slug"],
+                                    "category": n["category"],
+                                    "why": (bundle.get("semantic") or {}).get("why", {}).get(n["slug"], ""),
+                                }
+                                for n in bundle["recalled"]
+                            ],
+                            "count": len(bundle["recalled"]),
+                            "top_score": bundle.get("top_score"),
+                            "audit": {
+                                "grade": audit["grade"],
+                                "risk_pct": audit["risk_pct"],
+                                "badge": audit["badge"],
+                                "reason": audit["reason"],
+                                "grounding_kind": audit.get("grounding_kind"),
+                                "semantic_pct": audit.get("semantic_pct"),
+                                "semantic_confidence_pct": audit.get("semantic_confidence_pct"),
+                            },
+                            "semantic": {
+                                "grounded_pct": (bundle.get("semantic") or {}).get("grounded_pct"),
+                                "coverage": (bundle.get("semantic") or {}).get("query_coverage"),
+                                "bridges": (bundle.get("semantic") or {}).get("bridges"),
+                            },
+                        }
+                    )
+                self._send_json(
+                    {
+                        "query": query,
+                        "engine": state.gardener.semantic.status(),
+                        "comparison": rows,
+                        "status": state.full_status(),
+                    }
+                )
+                return
+
+            if route == "/api/semantic/train":
+                notes = state.gardener.list_notes()
+                stats = state.gardener.semantic.train(notes)
+                self._send_json({"engine": stats, "notes": len(notes), "status": state.full_status()})
+                return
+
+            if route == "/api/chat":
+                question = str(body.get("question") or "").strip()
+                if not question:
+                    self._send_json({"error": "질문을 입력해 주세요!"}, status=400)
+                    return
+                ctx_field = state.abilities.field_profile("context")
+                recall_bundle = state.gardener.recall_memories(question, limit=2, field=ctx_field)
+                state.abilities.log_deployment(
+                    "context",
+                    f"💬 채팅 질문 「{question[:22]}」 — 위키 기억 {recall_bundle['total_notes']}장 중 "
+                    f"{len(recall_bundle['recalled'])}장을 문맥 가중치로 재랭킹해 선별",
+                    {
+                        "recalled": len(recall_bundle["recalled"]),
+                        "total_notes": recall_bundle["total_notes"],
+                        "cards_limit": recall_bundle.get("cards_limit"),
+                        "top_score": recall_bundle.get("top_score"),
+                    },
+                )
+                audit = audit_chat_grounding(question, recall_bundle)
+                ctx_case = context_experience_case(ctx_field, question, recall_bundle, audit)
+                if ctx_case:
+                    ctx_case["key"] = f"recall:{question[:28]}"
+                if ctx_case:
+                    state.abilities.record_experience("context", ctx_case)
+                result = state.slm.answer_with_memories(question, recall_bundle)
+                state.soul.on_chat(
+                    len(recall_bundle["recalled"]),
+                    risk_pct=audit["risk_pct"],
+                    missing_terms=audit.get("missing_terms", []),
+                )
+                self._send_json(
+                    {
+                        "answer": result["answer"],
+                        "engine": result["engine"],
+                        "hallucination_audit": audit,
+                        "recalled": [
+                            {"slug": n["slug"], "title": n["title"], "category": n["category"]}
+                            for n in recall_bundle["recalled"]
+                        ],
+                        "saved_tokens_pct": recall_bundle["saved_tokens_pct"],
+                        "field_context": recall_bundle.get("field"),
+                        "semantic": recall_bundle.get("semantic"),
+                        "status": state.full_status(),
+                    }
+                )
+                return
+
+            if route == "/api/forge":
+                bits = int(body.get("bits") or 4)
+                hidden_dim = int(body.get("hidden_dim") or 64)
+                notes = state.gardener.list_notes()
+                record = state.forge.forge_from_wiki(notes, bits=bits, hidden_dim=hidden_dim)
+                state.soul.on_forge_brain(
+                    bits=record["bits"],
+                    saved_pct=record["saved_vs_fp32_pct"],
+                    cos_sim=record["cosine_similarity_pct"],
+                )
+                self._send_json({"forged": record, "status": state.full_status()})
+                return
+
+            if route in ("/api/pantheon/debate", "/api/pantheon/distill"):
+                cids = body.get("constellation_ids") or body.get("genius_ids") or []
+                if not isinstance(cids, list):
+                    cids = []
+                topic = str(body.get("topic") or "").strip()
+                r_field = state.abilities.field_profile("reasoning")
+                res = state.pantheon.convene_debate(
+                    [str(x) for x in cids], topic, state.rl_gym, field=r_field
+                )
+                rf = res.get("field") or {}
+                if res.get("experience_case"):
+                    state.abilities.record_experience("reasoning", res["experience_case"])
+                state.abilities.log_deployment(
+                    "reasoning",
+                    f"🏛️ 원탁 담론 「{res['topic'][:20]}」 — {rf.get('chain_hops')} hop 논증 체인을 엮어 "
+                    f"심판 합의 {res['before_score']} → {res['after_score']}점",
+                    {
+                        "chain_hops": rf.get("chain_hops"),
+                        "before_score": res["before_score"],
+                        "after_score": res["after_score"],
+                        "gain_pts": res["gain_pts"],
+                        "distill_boost": rf.get("distill_boost"),
+                    },
+                )
+                digested = state.gardener.digest_raw_memory(
+                    res["wiki_note_body"], custom_title=res["wiki_note_title"]
+                )
+                state.soul.on_genius_mentorship(
+                    res["mentors"], res["after_score"], res["constellations"]
+                )
+                self._send_json(
+                    {
+                        "debate": res,
+                        "distilled": res,
+                        "digested_note": digested,
+                        "status": state.full_status(),
+                    }
+                )
+                return
+
+            if route == "/api/pantheon/scout":
+                query = str(body.get("query") or "").strip()
+                if not query:
+                    self._send_json({"error": "검색할 인물 이름을 입력해 주세요!"}, status=400)
+                    return
+                custom_hint = str(body.get("custom_hint") or "").strip()
+                dossier = analyze_candidate_genius(
+                    query_name=query,
+                    constellations=state.pantheon.data["constellations"],
+                    wiki_notes=state.gardener.list_notes(),
+                    custom_hint=custom_hint,
+                )
+                self._send_json({"dossier": dossier})
+                return
+
+            if route == "/api/pantheon/add":
+                g_name = str(body.get("genius_name") or "").strip()
+                strengths = str(body.get("strengths") or "").strip()
+                limitations = str(body.get("limitations") or "").strip()
+                proof = str(body.get("proof_of_genius") or "").strip()
+                achievements = body.get("achievements") or []
+                added = state.pantheon.add_genius_or_constellation(
+                    target_constellation_id=str(body.get("target_constellation_id") or ""),
+                    new_constellation_name=str(body.get("new_constellation_name") or ""),
+                    genius_name=g_name,
+                    lens=str(body.get("lens") or ""),
+                    credo=str(body.get("credo") or ""),
+                    emoji=str(body.get("emoji") or "🌟"),
+                    strengths=strengths,
+                    limitations=limitations,
+                )
+                if g_name and (strengths or proof):
+                    ach_txt = "\n".join(f"- {a}" for a in achievements[:4]) if isinstance(achievements, list) else ""
+                    dossier_md = (
+                        f"영입 천재: {g_name} ({added['added_genius']['lens']})\n"
+                        f"배치 성좌: {added['constellation']['name']}\n\n"
+                        f"[주요 업적 추적]\n{ach_txt}\n\n"
+                        f"[천재성 입증]\n{proof}\n\n"
+                        f"[천재성 강점]: {strengths}\n"
+                        f"[명확한 한계점]: {limitations}\n"
+                        f"[원탁 핵심 철학]: {added['added_genius']['credo']}"
+                    )
+                    state.gardener.digest_raw_memory(
+                        dossier_md, custom_title=f"천재 영입 심사록 — {g_name}"
+                    )
+                    state.soul.on_feed_memory(f"천재 영입: {g_name}", 2)
+                self._send_json({"added": added, "status": state.full_status()})
+                return
+
+            if route == "/api/pantheon/move":
+                gid = str(body.get("genius_id") or "").strip()
+                to_cid = str(body.get("to_constellation_id") or "").strip()
+                new_cname = str(body.get("new_constellation_name") or "").strip()
+                try:
+                    moved = state.pantheon.move_genius(gid, to_cid, new_cname)
+                except ValueError as exc:
+                    self._send_json({"error": str(exc)}, status=400)
+                    return
+                state.soul._log_event(
+                    f"천재 성좌 이동: {moved['moved_genius']['name']} ({moved['from_constellation']['name']} → {moved['to_constellation']['name']})"
+                )
+                state.soul.data["pose"] = "06_star"
+                state.soul.data["last_speech"] = (
+                    f"자리 이동 완료! [{moved['moved_genius']['name']}] 스승님이 "
+                    f"[{moved['from_constellation']['name']}]에서 [{moved['to_constellation']['name']}] 성좌로 합류하셨어요!"
+                )
+                state.soul._save()
+                self._send_json({"moved": moved, "status": state.full_status()})
+                return
+
+            if route == "/api/pantheon/feedback":
+                user_thought = str(body.get("user_thought") or "").strip()
+                if not user_thought:
+                    self._send_json({"error": "주인님의 생각을 한 줄 이상 적어주세요!"}, status=400)
+                    return
+                cids = body.get("constellation_ids") or []
+                if not isinstance(cids, list):
+                    cids = []
+                topic = str(body.get("topic") or "").strip()
+                ctx_field = state.abilities.field_profile("context")
+                recall_bundle = state.gardener.recall_memories(user_thought, limit=2, field=ctx_field)
+                state.abilities.log_deployment(
+                    "context",
+                    f"🧠 주인님 생각 피드백 — 위키 기억 {recall_bundle['total_notes']}장 중 "
+                    f"{len(recall_bundle['recalled'])}장을 성좌 담론 근거로 선별",
+                    {
+                        "recalled": len(recall_bundle["recalled"]),
+                        "total_notes": recall_bundle["total_notes"],
+                        "cards_limit": recall_bundle.get("cards_limit"),
+                    },
+                )
+                fb = state.pantheon.feedback_on_user_thought(
+                    constellation_ids=[str(x) for x in cids],
+                    user_thought=user_thought,
+                    topic=topic,
+                    recalled_notes=recall_bundle.get("recalled", []),
+                    rl_gym=state.rl_gym,
+                )
+                digested = state.gardener.digest_raw_memory(
+                    fb["wiki_note_body"], custom_title=fb["wiki_note_title"]
+                )
+                state.soul.on_user_thought_feedback(
+                    fb["analysis"]["badge"], user_thought
+                )
+                self._send_json(
+                    {
+                        "feedback": fb,
+                        "digested_note": digested,
+                        "status": state.full_status(),
+                    }
+                )
+                return
+
+            if route == "/api/rl/train":
+                episodes = int(body.get("episodes") or 600)
+                snap = state.rl_gym.train_episodes(episodes=episodes)
+                bm = snap.get("benchmark", {})
+                state.soul.on_rl_train(
+                    episodes=episodes,
+                    judges_score=float(bm.get("good_judges_score", 0.0)),
+                    solo_score=float(bm.get("solo_top1_score", 0.0)),
+                )
+                self._send_json({"rl": snap, "status": state.full_status()})
+                return
+
+            if route == "/api/rl/coach":
+                scenario_id = str(body.get("scenario_id") or "sc_ambiguous_crypto")
+                action_id = int(body.get("action_id") or 3)
+                coached = state.rl_gym.coach_scenario(scenario_id, action_id)
+                sc_title = coached["updated_eval"]["scenario"]["title"]
+                conf = coached["updated_eval"]["council_confidence_pct"]
+                state.soul.on_rl_coach(sc_title, conf)
+                self._send_json({"coached": coached, "status": state.full_status()})
+                return
+
+            if route == "/api/re/backends":
+                from brain_engine import re_analyzer
+                self._send_json({
+                    "backends": re_analyzer.available_backends(),
+                    "ghidra_health": re_analyzer.health(),
+                    "ghidra_headless": str(re_analyzer.ghidra_headless() or ""),
+                    "specimens": sorted(p.name for p in (state.root / "specimens").glob("*")
+                                          if p.is_file() and p.suffix in (".elf", ".exe", ".bin", ".so")),
+                })
+                return
+            if route == "/api/remedy":
+                action = str(body.get("action") or "").strip()
+                if action == "relink_synapses":
+                    o_field = state.abilities.field_profile("organizing")
+                    res = state.gardener.weave_missing_synapses(field=o_field)
+                    added = res["added_pairs"]
+                    of = res.get("field") or {}
+                    # 💡 Stage K: the manual remedy must report the SAME evidence
+                    # the heartbeat sortie does, or the two paths tell the master
+                    # different stories about one and the same act.
+                    sem_added = int(res.get("semantic_pairs") or 0)
+                    gap_count = int(res.get("gap_count") or 0)
+                    sem_trust = res.get("sem_trust")
+                    if res.get("experience_case"):
+                        state.abilities.record_experience("organizing", res["experience_case"])
+                    state.abilities.log_deployment(
+                        "organizing",
+                        f"🕸️ 위키 시냅스 엮기 — 노트 {res['total_notes']}장 중 {of.get('pairs_examined')}쌍을 "
+                        f"학습 임계값 {of.get('threshold')} 로 심사해 {added}쌍 엮음"
+                        + (f" · 💡 그중 {sem_added}쌍은 뜻으로 이음 (의미 신뢰도 {sem_trust})" if sem_added else "")
+                        + (f" · 🕳️ 외톨이 노트 {gap_count}장" if gap_count else ""),
+                        {
+                            "threshold": of.get("threshold"),
+                            "pairs_examined": of.get("pairs_examined"),
+                            "pairs_approved": of.get("pairs_approved"),
+                            "total_notes": res["total_notes"],
+                            "semantic_pairs": sem_added,
+                            "sem_trust": sem_trust,
+                            "gap_count": gap_count,
+                        },
+                    )
+                    if added > 0 and sem_added:
+                        msg = (
+                            f"시냅스 그물망을 점검해 고리 {added}쌍을 엮었어요 — "
+                            f"그중 {sem_added}쌍은 단어가 아니라 뜻이 통해서 이어졌어요!"
+                        )
+                        if gap_count:
+                            msg += f" 뜻으로 봐도 외톨이인 노트 {gap_count}장은 제 지식의 구멍이에요."
+                    elif added > 0:
+                        msg = f"시냅스 그물망을 점검해 새로운 교차검증 고리 {added}쌍을 엮었어요!"
+                    else:
+                        msg = "모든 노트의 시냅스 교차검증 그물망을 재정비 완료했어요!"
+                    state.soul.on_remedy(msg)
+                    self._send_json({"remedy": res, "message": msg, "status": state.full_status()})
+                    return
+                if action == "ingest_analysis":
+                    # ⚙️ Stage L: teach the machine channel from REAL bytes.
+                    # objdump today, analyzeHeadless the moment a distribution
+                    # lands — same note shape, same channel, own vocabulary.
+                    from brain_engine import re_analyzer
+                    bin_name = str(body.get("binary") or "").strip()
+                    backend = str(body.get("backend") or "auto").strip()
+                    cand = (state.root / "specimens" / bin_name) if bin_name else None
+                    if cand is None or not cand.exists():
+                        gl = sorted((state.root.parent / "GhidraDocs" / "GhidraClass" /
+                                     "ExerciseFiles" / "Advanced").glob("*.so"))
+                        cand = gl[0] if gl else None
+                    if cand is None or not cand.exists():
+                        self._send_json({"error": "분석할 바이너리가 없어요"}, status=404)
+                        return
+                    try:
+                        facts = re_analyzer.analyze(cand, backend=backend)
+                    except Exception as exc:
+                        # 빈 응답·연결 끊김 대신 사실대로 JSON 오류를 돌려줘요.
+                        self._send_json({
+                            "error": f"분석 실패 — {cand.name}: {str(exc)[:400]}",
+                            "binary": cand.name, "backend": backend,
+                        }, status=502)
+                        return
+                    notes_new = re_analyzer.build_notes(facts)
+                    re_analyzer.write_code_notes(state.gardener.vault_dir, notes_new)
+                    state.gardener.rebuild_index()
+                    alln = state.gardener.list_notes()
+                    st = state.gardener.semantic.train(alln)
+                    cg = state.gardener.semantic.code_orphans(alln)
+                    edges = re_analyzer.call_edges(alln)
+                    state.abilities.log_deployment(
+                        "coding",
+                        f"⚙️ 기계어 채널 수유 — {cand.name} 를 {facts['backend']} 로 해부해 "
+                        f"기계 기억 {len(notes_new)}장 흡수 (호출 간선 {len(edges)}개)",
+                        {"backend": facts["backend"], "binary": cand.name,
+                         "notes_added": len(notes_new), "call_edges": len(edges),
+                         "code_gaps": len(cg)},
+                    )
+                    self._send_json({
+                        "backend": facts["backend"], "binary": cand.name,
+                        "notes_added": len(notes_new),
+                        "code_notes": int((st.get("channel_notes") or {}).get("code", 0)),
+                        "code_vocab": int(((st.get("channels") or {}).get("code") or {}).get("vocab_size", 0)),
+                        "prose_vocab": int(((st.get("channels") or {}).get("prose") or {}).get("vocab_size", 0)),
+                        "call_edges": len(edges), "code_gaps": cg,
+                        "message": f"⚙️ {cand.name} 에서 기계 기억 {len(notes_new)}장을 배웠어요 — "
+                                     f"산문 어휘 {((st.get('channels') or {}).get('prose') or {}).get('vocab_size', 0)}개는 그대로예요.",
+                    })
+                    return
+                if action == "answer_gap":
+                    # 💡 Stage L: the master answers a blind-spot question, and the
+                    # brain must PROVE the hole closed — nearest-neighbour cosine
+                    # of that orphan before and after the answer lands, the same
+                    # instrument Stage K grew a gap with (0.222 -> 0.469).
+                    slug = str(body.get("slug") or "").strip()
+                    text = str(body.get("text") or "").strip()
+                    if not slug or not text:
+                        self._send_json({"error": "slug 과 text 가 필요해요"}, status=400)
+                        return
+                    notes0 = state.gardener.list_notes()
+                    target = next((n for n in notes0 if n["slug"] == slug), None)
+                    if target is None:
+                        self._send_json({"error": "노트를 못 찾았어요"}, status=404)
+                        return
+                    sem = state.gardener.semantic
+                    sem.ensure_trained(notes0)
+                    g0 = sem.orphans(notes0, cos_min=GAP_COS_MIN, top_k=99)
+                    before = next((g for g in g0 if g.get("slug") == slug), None)
+                    title = str(body.get("title") or f"주인님의 답 — {target['title'][:28]}").strip()
+                    tag0 = (target.get("tags") or ["답"])[0]
+                    safe = re.sub(r"[^\w가-힣.-]", "_", title)[:80]
+                    path = state.gardener.vault_dir / "10_Wiki" / f"{safe}.md"
+                    path.write_text(
+                        "---\n"
+                        f'title: "{title}"\n'
+                        'category: "아이디어·노하우"\n'
+                        f"tags: [주인님의답, {tag0}]\n"
+                        "---\n\n"
+                        f"# {title}\n\n"
+                        f"## 💡 핵심 요약\n{text}\n\n"
+                        "## 🔗 연결된 시냅스 (Wiki Links)\n"
+                        f"- [[{target['title']}]]\n",
+                        encoding="utf-8",
+                    )
+                    state.gardener.rebuild_index()
+                    notes1 = state.gardener.list_notes()
+                    sem.train(notes1)
+                    nb = sem.neighbours(target, notes1, top_k=1)
+                    after_cos = round(nb[0]["cos"], 3) if nb else 0.0
+                    g1 = sem.orphans(notes1, cos_min=GAP_COS_MIN, top_k=99)
+                    still = next((g for g in g1 if g.get("slug") == slug), None)
+                    before_cos = before["best_cos"] if before else None
+                    closed = still is None
+                    msg = (f"주인님의 답을 «{title[:24]}» 로 소화했어요 — "
+                           f"구멍 cos {before_cos} → {after_cos}"
+                           + (", 임계를 넘어 메워졌어요! 🎉" if closed else ", 아직 부족해요. 한 줄 더 주세요."))
+                    state.soul.on_remedy(msg)
+                    self._send_json({
+                        "message": msg, "before_cos": before_cos, "after_cos": after_cos,
+                        "closed": closed, "orphans_left": len(g1),
+                        "note": path.name,
+                    })
+                    return
+                if action == "reset_checks":
+                    state.soul.data["recent_hallucination_checks"] = []
+                    state.soul.data["recent_missing_topics"] = []
+                    state.soul.on_remedy("최근 환각 경보 기록을 초기화하고 방어막 영점을 재조정했어요!")
+                    self._send_json({"message": "초기화 완료", "status": state.full_status()})
+                    return
+                self._send_json({"error": "Unknown remedy action"}, status=400)
+                return
+
+            if route == "/api/evo/dissect":
+                spec_id = str(body.get("specimen_id") or "xor_rot_vault").strip()
+                up_name = str(body.get("uploaded_name") or "").strip()
+                up_b64 = str(body.get("uploaded_b64") or "").strip()
+                bundle = state.evo_forge.dissect_and_draft(
+                    specimen_id=spec_id,
+                    uploaded_name=up_name,
+                    uploaded_b64=up_b64,
+                )
+                self._send_json({"bundle": bundle, "status": state.full_status()})
+                return
+
+            if route == "/api/evo/audit":
+                spec_id = str(body.get("specimen_id") or "xor_rot_vault").strip()
+                code = str(body.get("code") or "")
+                c_field = state.abilities.field_profile("coding")
+                audit = state.evo_forge.audit_code(specimen_id=spec_id, code=code, field=c_field)
+                cm = audit.get("field") or {}
+                if cm:
+                    if cm.get("experience_case"):
+                        state.abilities.record_experience("coding", cm["experience_case"])
+                    state.abilities.log_deployment(
+                        "coding",
+                        f"🛠️ 4단계 원인 감사 — 버그 지문 {cm.get('lit_fingerprints')}개 점등 · {cm.get('verdict', '')}",
+                        {
+                            "predicted": cm.get("predicted"),
+                            "truth_classes": cm.get("truth_classes"),
+                            "top1_hit": cm.get("top1_hit"),
+                            "lit_fingerprints": cm.get("lit_fingerprints"),
+                        },
+                    )
+                self._send_json({"audit": audit, "field_report": state.abilities.field_report()})
+                return
+
+            if route == "/api/evo/repair":
+                spec_id = str(body.get("specimen_id") or "xor_rot_vault").strip()
+                current_code = str(body.get("current_code") or "")
+                mode = str(body.get("mode") or "auto").strip()
+                edited_code = str(body.get("edited_code") or "")
+                repaired = state.evo_forge.repair_and_verify(
+                    specimen_id=spec_id,
+                    current_code=current_code,
+                    mode=mode,
+                    edited_code=edited_code,
+                )
+                self._send_json({"repaired": repaired, "status": state.full_status()})
+                return
+
+            if route == "/api/evo/rollback":
+                spec_id = str(body.get("specimen_id") or "xor_rot_vault").strip()
+                snap_id = str(body.get("snap_id") or "").strip()
+                rb = state.evo_forge.rollback_snapshot(specimen_id=spec_id, snap_id=snap_id)
+                self._send_json({"rollback": rb})
+                return
+
+            if route == "/api/evo/install":
+                spec_id = str(body.get("specimen_id") or "xor_rot_vault").strip()
+                code = str(body.get("code") or "")
+                try:
+                    installed = state.evo_forge.install_skill_cartridge(
+                        specimen_id=spec_id,
+                        verified_code=code,
+                        gardener=state.gardener,
+                        rl_gym=state.rl_gym,
+                    )
+                except ValueError as exc:
+                    self._send_json({"error": str(exc)}, status=400)
+                    return
+                state.soul.on_evo_skill_installed(installed["title"], installed["entry_fn"])
+                self._send_json({"installed": installed, "status": state.full_status()})
+                return
+
+            if route == "/api/evo/run-skill":
+                skill_id = str(body.get("skill_id") or "").strip()
+                args_val = body.get("args")
+                try:
+                    ran = state.evo_forge.execute_installed_skill(skill_id, args_val)
+                except ValueError as exc:
+                    self._send_json({"error": str(exc)}, status=400)
+                    return
+                self._send_json({"ran": ran})
+                return
+
+            if route == "/api/evo/heartbeat/toggle":
+                paused = state.heartbeat.toggle_paused()
+                self._send_json({"paused": paused, "heartbeat": state.heartbeat.status()})
+                return
+
+            if route == "/api/evo/abilities/train":
+                ability = str(body.get("ability") or "").strip()
+                if ability not in ("reasoning", "context", "coding", "organizing"):
+                    ability = ABILITY_ROTATION[int(state.abilities.state.get("train_cursor", 0)) % 4]
+                    state.abilities.state["train_cursor"] = int(state.abilities.state.get("train_cursor", 0)) + 1
+                    state.abilities._save()
+                session = state.abilities.train_session(ability, rounds=6)
+                if session["leveled_up"]:
+                    state.soul.on_ability_level_up(session["title"], session["level_after"])
+                self._send_json({"session": session, "abilities": state.abilities.snapshot(), "status": state.full_status()})
+                return
+
+            if route == "/api/evo/abilities/breakthrough":
+                ability = str(body.get("ability") or "").strip()
+                if ability not in ("reasoning", "context", "coding", "organizing"):
+                    snap = state.abilities.snapshot()
+                    at_caps = [x for x in snap["abilities"] if x["at_cap"]]
+                    ability = (at_caps or snap["abilities"])[0]["id"]
+                session = state.abilities.breakthrough_session(ability)
+                if session["kind"] == "research":
+                    try:
+                        state.gardener.digest_raw_memory(session.get("note_body", ""), custom_title=session.get("note_title", "열린 연구 과제"))
+                    except Exception:
+                        pass
+                elif session.get("success"):
+                    state.soul.on_ability_level_up(session["title"], session["cap_after"])
+                self._send_json({"session": session, "abilities": state.abilities.snapshot(), "status": state.full_status()})
+                return
+
+            if route == "/api/evo/trace-chat":
+                spec_id = str(body.get("specimen_id") or "xor_rot_vault").strip()
+                code = str(body.get("code") or "")
+                message = str(body.get("message") or "").strip()
+                spec = state.evo_forge._resolve_spec(spec_id)
+                cur = code or spec["initial_buggy_code"]
+                diag = state.evo_forge.audit_code(
+                    spec_id, cur, field=state.abilities.field_profile("coding")
+                )["diagnosis"]
+                findings = diag.get("findings", [])
+                toxins = [f for f in findings if f.get("severity") == "toxin"]
+                sandbox = diag.get("sandbox")
+                bp = spec.get("blueprint", {})
+                if not message:
+                    reply = "히잇! 저는 🔍 원인 역추적 돋보기 기관이에요! \'왜 깨졌어?\', \'몇 번째 줄?\', \'복어독?\', \'어떻게 고쳐?\', \'원리 공식?\', \'유리방 결과?\' 라고 물어봐 주세요!"
+                elif any(k in message for k in ("왜", "원인", "깨졌", "이유", "틀렸")):
+                    if findings:
+                        lines = "\n".join(f"· {f.get('line')}번째 줄 — {f.get('badge')}: {f.get('root_cause')}" for f in findings[:3])
+                        reply = f"🔍 역추적 완료! 돋보기로 파고든 깨진 원인들은 이래요:\n{lines}"
+                    else:
+                        reply = "🔍 돋보기로 역추적했는데 균열이 없어요! 이 코드는 지금 깨끗한 상태랍니다."
+                elif any(k in message for k in ("어디", "몇 번째", "줄번", "위치")):
+                    reply = ("🔍 범인 줄 목록: " + ", ".join(f"{f.get('line')}줄" for f in findings)) if findings else "🔍 범인 줄 없음! 모든 줄이 결백해요."
+                elif any(k in message for k in ("복어", "독", "위험", "보안")):
+                    if toxins:
+                        reply = f"🐡 복어 독 {len(toxins)}건 격리 중: " + " / ".join(f["root_cause"] for f in toxins) + " — AST 게이트가 실행을 이미 차단했어요!"
+                    else:
+                        reply = "🐡 복어 독 0건! 지금 코드는 깨끗한 밥상이에요."
+                elif any(k in message for k in ("어떻게 고", "고쳐", "수리", "해결", "방법")):
+                    hints = [f.get("fix_hint") for f in findings if f.get("fix_hint")]
+                    reply = ("🩹 처방전: " + " / ".join(hints[:3])) if hints else "🩹 처방전 필요 없음! 지금 [🧩 우리 뇌에 지금 이식 적용] 을 눌러도 완벽해요."
+                    reply += " [🩹 5단계: 자동 수리 & 유리방 시험] 을 누르면 제가 직접 고쳐 유리방 6/6 을 확인해요!"
+                    mus = diag.get("muscle") or {}
+                    if mus:
+                        reply += f" (💻 코딩 근육 Lv{mus.get('level')} 실전 의견: {mus.get('verdict', '')})"
+                elif any(k in message for k in ("원리", "공식", "설계도", "원본", "블루프린트")):
+                    reply = (
+                        f"🧬 핵심 공식: {bp.get('core_formula')} | 입력: {bp.get('inputs')} | 출력: {bp.get('outputs')} | "
+                        "불변식: " + " / ".join(bp.get("invariants", [])) + f" | 성좌 감수: {bp.get('mentor_comment')}"
+                    )
+                elif any(k in message for k in ("테스트", "유리방", "쌍둥이", "통과")):
+                    if sandbox:
+                        fails = [r["name"] for r in sandbox.get("results", []) if not r["passed"]]
+                        reply = f"🧪 유리방 쌍둥이 대조: {sandbox['passed_count']}/{sandbox['total_count']} 통과 ({sandbox['pass_rate_pct']}%)."
+                        reply += f" 떨어진 테스트: {', '.join(fails)}" if fails else " 쌍둥이 전부 손잡았어요!"
+                    else:
+                        reply = "🧪 유리방은 복어 독 때문에 현재 봉인 중 — 독 제거 후 열려요!"
+                else:
+                    reply = (
+                        f"🔍 현재 진단 요약: 결함 {len(findings)}건 (복어독 {len(toxins)}) / 유리방 "
+                        + (f"{sandbox['pass_rate_pct']}%" if sandbox else "봉인")
+                        + ". '왜 / 어디 / 복어독 / 어떻게 고쳐 / 원리 / 테스트' 를 더 물어봐 주세요!"
+                    )
+                self._send_json({"reply": reply, "findings": len(findings), "toxins": len(toxins), "pass_rate": (sandbox or {}).get("pass_rate_pct")})
+                return
+
+            if route == "/api/evo/heartbeat/chat":
+                message = str(body.get("message") or "")
+                talked = state.heartbeat.chat(message)
+                self._send_json(talked)
+                return
+
+            if route == "/api/evo/field/sortie":
+                entry = state.heartbeat.field_sortie(trigger="manual")
+                self._send_json(
+                    {
+                        "sortie": entry,
+                        "field": state.abilities.field_report(),
+                        "status": state.full_status(),
+                    }
+                )
+                return
+
+            if route == "/api/evo/heartbeat/beat":
+                entry = state.heartbeat.beat_once(trigger="manual")
+                self._send_json({"entry": entry, "heartbeat": state.heartbeat.status(), "status": state.full_status()})
+                return
+
+            if route == "/api/poke":
+                state.soul.poke()
+                self._send_json({"status": state.full_status()})
+                return
+
+            if route == "/api/rename":
+                name = str(body.get("name") or "").strip()
+                state.soul.rename(name)
+                self._send_json({"status": state.full_status()})
+                return
+
+            self._send_json({"error": "Unknown endpoint"}, status=404)
+
+    return BrainHTTPHandler
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Portable Tamagotchi AI Brain Server")
+    parser.add_argument("--host", default="0.0.0.0", help="Bind host (default: 0.0.0.0)")
+    parser.add_argument("--port", type=int, default=8765, help="Bind port (default: 8765)")
+    args = parser.parse_args()
+
+    (BRAIN_ROOT / "models" / ".gitkeep").parent.mkdir(parents=True, exist_ok=True)
+    (BRAIN_ROOT / "models" / ".gitkeep").touch(exist_ok=True)
+    (BRAIN_ROOT / "runtime" / ".gitkeep").parent.mkdir(parents=True, exist_ok=True)
+    (BRAIN_ROOT / "runtime" / ".gitkeep").touch(exist_ok=True)
+
+    state = BrainState(BRAIN_ROOT)
+    env = state.host_info["environment"]
+    server = ThreadingHTTPServer((args.host, args.port), make_handler(state))
+    print("============================================================")
+    print(f" 🧠 Portable Living AI Brain awake at http://{args.host}:{args.port}")
+    print(f" 📂 Habitat Root : {BRAIN_ROOT}")
+    print(f" 💻 Host Sensor  : {state.host_info['cpu_cores']} cores | Free RAM {state.host_info['ram_available_gb']} GB")
+    print(f" 🌡️ Workspace    : {env['label']} ({env['score']}/100)")
+    print("============================================================", flush=True)
+    state.heartbeat.start()
+    print(f" 💓 Heartbeat    : every {state.heartbeat.interval_sec}s (dream quests: {state.heartbeat.status()['pool_size']})")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        state.heartbeat.stop()
+        server.server_close()
+
+
+if __name__ == "__main__":
+    main()

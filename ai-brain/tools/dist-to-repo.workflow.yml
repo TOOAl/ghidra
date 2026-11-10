@@ -141,31 +141,43 @@ jobs:
           OUT_BRANCH: ${{ github.event.inputs.branch || 'ghidra-dist' }}
         run: |
           set -euo pipefail
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          # An orphan branch so master and every working branch stay clean.
+          # v2 fixes two defects measured against run #1 (exit 128):
+          #   1. the README heredoc terminator was indented inside this YAML
+          #      block, so bash never closed it and swallowed git add/commit/
+          #      push as README text — the push never ran at all;
+          #   2. `git config` ran BEFORE any repository existed, dying with
+          #      "fatal: not in a git directory" (exit 128) whenever the step's
+          #      cwd was not the checkout.
+          # Now: configure INSIDE the fresh repo, and write the README with a
+          # brace group instead of a heredoc.
           rm -rf /tmp/publish && mkdir -p /tmp/publish
           cd /tmp/publish
           git init -q -b "$OUT_BRANCH"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           cp /tmp/chunks/* .
-          cat > README.md <<'MD'
-          # 🚚 Ghidra headless dist — chunked for sandbox delivery
-
-          Reassemble with:
-
-              cat ghidra_headless.tgz.part* > ghidra_headless.tgz
-              sha256sum -c SHA256SUMS.txt   # (compare against the file)
-              tar xzf ghidra_headless.tgz
-
-          This branch is disposable.  Delete it once consumed:
-
-              git push origin --delete ghidra-dist
-          MD
+          {
+            echo "# Ghidra headless dist - chunked for sandbox delivery"
+            echo
+            echo "Reassemble with:"
+            echo
+            echo "    cat ghidra_headless.tgz.part* > ghidra_headless.tgz"
+            echo "    sha256sum -c <(echo "$(cat SHA256SUMS.txt)  ghidra_headless.tgz")"
+            echo "    tar xzf ghidra_headless.tgz"
+            echo
+            echo "Disposable branch. Delete once consumed:"
+            echo
+            echo "    git push origin --delete $OUT_BRANCH"
+          } > README.md
           git add -A
-          git commit -q -m "chore: publish trimmed headless Ghidra dist ($CHUNKS chunks, $(du -sh /tmp/ghidra_headless.tgz | cut -f1))"
+          git commit -q -m "chore: publish trimmed headless Ghidra dist ($CHUNKS chunks)"
           git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/$GITHUB_REPOSITORY.git"
-          git push -f origin "$OUT_BRANCH"
+          echo "pushing $(du -sh . | cut -f1) in $CHUNKS chunks to $OUT_BRANCH ..."
+          if ! err=$(git push -f origin "$OUT_BRANCH" 2>&1); then
+            echo "$err"
+            echo "::error::push rejected — log above says why (token write scope / branch rules / size)"
+            exit 1
+          fi
           echo "✅ published to $OUT_BRANCH"
 
       - name: Report

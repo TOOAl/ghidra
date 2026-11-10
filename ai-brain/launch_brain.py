@@ -52,6 +52,9 @@ class BrainState:
         self.root = root
         self.web_dir = root / "web"
         self.gardener = WikiGardener(root / "vault", root / "state" / "wiki_index.db")
+        from brain_engine import quest_runners  # noqa: F401  러너 등록(기동 전!)
+        from brain_engine.quest_ledger import QuestLedger
+        self.ledger = QuestLedger(root / "state")
         self.soul = TamagotchiSoul(root / "state" / "soul.json")
         self.slm = PortableSLMBridge(root / "models")
         self.forge = CustomBrainForge(root / "models")
@@ -216,6 +219,15 @@ def make_handler(state: BrainState):
                         "questions": questions,
                     }
                 )
+                return
+            if route == "/api/quests":
+                qs = list(state.ledger.quests.values())
+                self._send_json({
+                    "quests": [{k: q.get(k) for k in
+                                ("id", "kind", "title", "status", "step_index", "steps")}
+                               for q in qs],
+                    "active": len(state.ledger.active()),
+                })
                 return
             if route == "/api/re/backends":
                 from brain_engine import re_analyzer
@@ -638,6 +650,55 @@ def make_handler(state: BrainState):
                 self._send_json({"coached": coached, "status": state.full_status()})
                 return
 
+            if route == "/api/quests":
+                import threading
+
+                from brain_engine import quest_runners  # noqa: F401  러너 등록
+                kind = str(body.get("kind") or "").strip()
+                if kind == "markers":
+                    steps = [f"s{i + 1}" for i in range(int(body.get("steps") or 4))]
+                    payload = {"dir": str(state.root / "state" / "quest_markers"),
+                               "delay": float(body.get("delay") or 0)}
+                    title = "markers — 끈기 기계 증명"
+                elif kind == "craft":
+                    bin_name = str(body.get("binary") or "").strip()
+                    cand = state.root / "specimens" / bin_name
+                    if not cand.exists():
+                        self._send_json({"error": "바이너리가 없어요"}, status=404)
+                        return
+                    payload = {"binary": str(cand)}
+                    steps = ["inspect", "build", "compare", "record"]
+                    title = f"craft — {bin_name}"
+                elif kind == "chain":
+                    question = str(body.get("question") or "").strip()
+                    if not question:
+                        self._send_json({"error": "질문을 입력해 주세요"}, status=400)
+                        return
+                    payload = {"question": question,
+                               "notes": state.gardener.list_notes(),
+                               "root": str(state.root)}
+                    steps = ["reason", "audit"]
+                    title = f"chain — {question[:40]}"
+                else:
+                    self._send_json({"error": f"모르는 kind: {kind}"}, status=400)
+                    return
+                qid = state.ledger.begin(kind, title, payload, steps)
+                if kind == "markers":  # 퀘스트별 디렉터리 — 정확한 1회 검증
+                    state.ledger.quests[qid]["payload"]["dir"] += f"/{qid}"
+                    state.ledger._save()
+                threading.Thread(target=state.ledger.run, args=(qid,), daemon=True,
+                                 name=f"quest-{qid}").start()
+                self._send_json({"qid": qid, "status": "started"})
+                return
+            if route == "/api/reason":
+                from brain_engine import chain_reasoner
+                question = str(body.get("question") or "").strip()
+                if not question:
+                    self._send_json({"error": "질문을 입력해 주세요"}, status=400)
+                    return
+                self._send_json(chain_reasoner.reason(question,
+                                                      state.gardener.list_notes()))
+                return
             if route == "/api/re/backends":
                 from brain_engine import re_analyzer
                 self._send_json({
@@ -1059,6 +1120,9 @@ def main() -> None:
     print(f" 🌡️ Workspace    : {env['label']} ({env['score']}/100)")
     print("============================================================", flush=True)
     state.heartbeat.start()
+    import threading as _threading
+    _threading.Thread(target=state.ledger.resume_all, daemon=True,
+                      name="quest-resume").start()
     print(f" 💓 Heartbeat    : every {state.heartbeat.interval_sec}s (dream quests: {state.heartbeat.status()['pool_size']})")
     try:
         server.serve_forever()

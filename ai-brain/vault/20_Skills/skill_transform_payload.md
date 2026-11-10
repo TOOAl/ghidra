@@ -32,3 +32,4 @@ def transform_payload(data):
 - [[역공학 해부 도감 — 🔐 XOR-회전 금고 해독기 (ELF64 x86-64)]]
 - [[다수 작은 심판 합의형 CPU 강화학습 (Good Judges)]]
 - [[자가 진화 스킬 카트리지 — compress_rle_safe]]
+- [[자가 진화 스킬 카트리지 — pack_nibbles]]

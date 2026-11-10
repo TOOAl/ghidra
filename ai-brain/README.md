@@ -101,3 +101,31 @@
   재생산 부채 → 커밋된 vault 산문에서 자가 재생성 + 불변식을 **같은 런 안의
   전후 차이**(산문만 vs 산문+코드)로 재정의 (낡은 상수 476/4/0.083 은 스냅샷
   값이었음을 실측으로 확인).
+
+## N1+N2 — 🧭🔗 끈기 원장 + 증거 사슬 추론: Fable 의 로컬 등가물 (v7.3)
+사용자가 "N1+N2 결합"을 직접 선택 — 장기 에이전트의 **끈기**(N1)와 고도
+추론의 **증거 사슬**(N2)을 외부 모델·비용·데이터센터 없이 두뇌 소유 부품으로.
+- **N1 🧭 영속 퀘스트 원장** (`brain_engine/quest_ledger.py` · `quest_runners.py`):
+  스텝 = *멱등 효과 → `checkpoint(next_index)`* 순서로 `state/quests.json` 에
+  **원자 기록**(tmp + `os.replace`). `kill -9` 로 죽어도 원장은 남고, 기동 시
+  `resume_all()` 이 `active` 퀘스트를 **멈춘 인덱스부터** 이어요. 러너는
+  `@runner("kind")` 레지스트리(markers·craft·chain), 예외 시 좀비 대신 정직
+  `failed`+proof. — **기계 증명**: markers(4스텝·스텝당 4초)를 step 2/4 에서
+  `kill -9` → 동결(`active·index=2`, markers.log `s1,s2`) → 재기동 → `done·4/4`,
+  markers.log `s1,s2,s3,s4` **각 정확히 1회**(중복 0).
+- **N2 🔗 증거 사슬 다홉 추론** (`brain_engine/chain_reasoner.py`): 질문을
+  `'A 와 B'` 두 초점으로 쪼개 각 초점을 vault 노트에 대응시킨 뒤, **실제 증거
+  3종**(`[[링크]]`·공유 태그·기계 식별자 `호출/참조`)으로만 놓인 간선을 BFS
+  ≤3홉으로 탐색. 답은 사슬 노트의 제목·요약 + 다리 증거로만 조립(새 주장 금지),
+  **한쪽 초점이라도 vault 에 없거나 사슬이 닿지 않으면 발명 대신 "증거로 이을 수
+  없어요"**(구멍 보고). chain 퀘스트의 `audit` 스텝은 각 엣지를 **노트 파일과
+  대조**(link=`[[제목]]` 존재, tag·ident=다리 토큰이 두 파일에, 대소문자 무시)해
+  `audit_ok` 를 proof 로 남김. — **실측**: 2-홉 양성 벤치마크 6/6 · 고립/한쪽-결측
+  질문 `known:False` 발명 거부 · 라이브 `/api/reason` + chain 퀘스트 `audit_ok:True`.
+- **배선**: `GET/POST /api/quests`(kind=markers·craft·chain, 기동 시 `resume_all`),
+  `POST /api/reason`. craft 퀘스트는 같은 원장으로 end-to-end(inspect→build→
+  compare→record) — xor_vault 두 함수 256 전수 100%.
+- **정직·프라이버시**: quests.json·quest_markers 는 **이 드라이브의 런타임 상태**
+  (`state/.gitignore`) — 끈기는 "같은 두뇌가 다시 켜질 때"의 것, git 복제가 아님.
+  비밀 0·유료 0·외부 흐름 0. 스킬 노트
+  `20_Skills/skill_quest_ledger_persistence.md`·`skill_chain_reasoner_evidence.md`.

@@ -2,3 +2,9 @@
 # learns from its own vault (re-trained in ~0.3s at first recall), so it is a
 # runtime artifact like state/models — not source, never committed.
 semantic.json
+
+# Stage-N quest ledger: the persistence lives on THIS drive's filesystem (that is
+# the whole point — it survives kill -9 locally and resume_all() picks it up on
+# reboot). It is per-machine runtime state, never source, so never committed.
+quests.json
+quest_markers/

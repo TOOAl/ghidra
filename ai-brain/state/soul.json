@@ -1,24 +1,44 @@
 {
   "name": "시냅스몽",
   "born_at": "2026-11-09T08:37:11Z",
-  "xp": 1079,
-  "satiety": 15,
+  "xp": 1205,
+  "satiety": 27,
   "mood": 100,
-  "pose": "04_brainstorm",
+  "pose": "07_eureka",
   "last_fed_ts": 1794219969.3347056,
-  "last_interaction_ts": 1794309261.1207416,
+  "last_interaction_ts": 1794318706.106747,
   "memories_eaten": 5,
   "questions_answered": 1,
-  "brains_forged": 2,
+  "brains_forged": 4,
   "rl_episodes": 800,
   "binaries_analyzed": 0,
-  "rl_iq_bonus": 50,
+  "rl_iq_bonus": 62,
   "re_skill": 0,
   "hosts_visited": [
     "e2b.local (Linux-x86_64-2c)"
   ],
-  "last_speech": "꼬르륵... 새로운 메모나 아이디어 한 줄만 먹여 주세요!",
+  "last_speech": "유레카!! [🛰️ 수 패리티 수호기]을 분해·수리하고 유리방 100% 검증을 통과해 `parity_guard` 영구 스킬 카트리지(.py + .sbrain + 위키)로 제 두뇌에 장착했어요! (+45 XP)",
   "recent_events": [
+    {
+      "time": "2026-11-10T13:59:37Z",
+      "text": "6단계 자가 진화 스킬 장착: parity_guard"
+    },
+    {
+      "time": "2026-11-10T13:57:37Z",
+      "text": "핵심 능력 레벨업: 🗂️ 정보 정리 능력 Lv2"
+    },
+    {
+      "time": "2026-11-10T13:51:46Z",
+      "text": "주인님과 교감 (기분 +7, XP +3)"
+    },
+    {
+      "time": "2026-11-10T13:44:53Z",
+      "text": "6단계 자가 진화 스킬 장착: pack_nibbles"
+    },
+    {
+      "time": "2026-11-10T13:42:53Z",
+      "text": "주인님과 교감 (기분 +7, XP +3)"
+    },
     {
       "time": "2026-11-10T11:14:21Z",
       "text": "주인님과 교감 (기분 +7, XP +3)"
@@ -57,26 +77,6 @@
     },
     {
       "time": "2026-11-10T10:48:56Z",
-      "text": "주인님과 교감 (기분 +7, XP +3)"
-    },
-    {
-      "time": "2026-11-10T10:46:56Z",
-      "text": "주인님과 교감 (기분 +7, XP +3)"
-    },
-    {
-      "time": "2026-11-10T10:39:25Z",
-      "text": "핵심 능력 레벨업: 🗂️ 정보 정리 능력 Lv18"
-    },
-    {
-      "time": "2026-11-10T10:37:25Z",
-      "text": "주인님과 교감 (기분 +7, XP +3)"
-    },
-    {
-      "time": "2026-11-10T10:35:25Z",
-      "text": "핵심 능력 레벨업: 📖 문맥 이해 능력 Lv18"
-    },
-    {
-      "time": "2026-11-10T10:30:15Z",
       "text": "주인님과 교감 (기분 +7, XP +3)"
     }
   ],

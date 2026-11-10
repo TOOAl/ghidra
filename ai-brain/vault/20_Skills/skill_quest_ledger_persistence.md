@@ -64,3 +64,4 @@ payload 의 경로(vault·db)로 `WikiGardener` 를 **재구성**해요(원장�
 ## 🔗 연결된 시냅스 (Wiki Links)
 - [[자가 복제 공작 루프 — craft-anything 두뇌 판 (clean-room)]]
 - [[증거 사슬 다홉 추론 — 인용되거나 침묵하거나 (chain_reasoner)]]
+- [[자가 종합 감사 — 4기준 기계 재감사와 부채 원장 (audit_brain)]]

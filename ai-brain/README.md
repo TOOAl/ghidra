@@ -152,3 +152,30 @@
 - **건강 가시화** — `GET /api/quests` 가 `health`(quests·active·recovered·
   last_save_error)를 함께 반환. verify_ghidra_facts 올 그린 유지(산문 차분
   불변식 2장=2장·0.11/0.069 전후 동일 — vault 성장으로 절대값만 이동).
+
+## 🔍 종합 감사 — A→N1+N2 4기준 기계 재감사 + 부채 원장 (v7.3.2)
+일회성 수동 주장이 아니라 두뇌가 **자기 자신을 다시 감사**하는 재생산 가능
+게이트: `tools/audit_brain.py` (**15/15 그린**, exit-code 게이트, 네트워크 없음,
+git 있으면 best-effort·없으면 파일시스템 폴백).
+- **개인정보** — 커밋 텍스트 71장 전수: 하드 시크릿·개인 이메일·사용자
+  홈경로 **0**.
+- **무료** — 비-localhost URL 은 전부 **dormant 수동 다운로더**
+  (`scripts/download_portable_slm.py`, `__main__`+`--tier` 명시) 안에만, 외부
+  호스트는 무료 GGUF(huggingface)뿐(유료 API 0), 그 다운로더를 두뇌가
+  **import 안 함** = 자동 외부흐름 0.
+- **정직** — 환각방어·정직거부 코드 경로 실제 존재(chain_reasoner
+  `known:False`+부분사슬 · slm_bridge "근거 없으면 모름" · craft 일치율 기록 ·
+  quest_ledger 정직 `failed`).
+- **두뇌 소유** — 런타임 상태·무거운 바이너리 git 미유입 · gitignore 커버 ·
+  이식성(하드코딩 `/tmp` 런타임 경로 0·`/home/user` 절대경로 0).
+- **감사 중 고친 실제 결함**: `re_analyzer`·`ghidra_facts_pyghidra`·
+  `verify_ghidra_facts` 가 런타임 스크래치를 `/tmp/…` 에 하드코딩 →
+  Windows(`start_windows.bat` 존재)엔 `/tmp` 없어 Ghidra 경로 파손. 전부
+  `tempfile.gettempdir()` 로 교체(Linux/macOS 행동 동일, Windows `%TEMP%`
+  정상). 수정 후 verify 올 그린·회복력 32/32 유지(회귀 없음).
+- **부채 원장(정직 고지)**: ① Windows 오프라인 이식성 — vendor `jdk4py`·
+  `jpype1` wheel 은 manylinux x86_64 전용(win_amd64 미밴들) ② N·N1+N2 3커밋
+  master 미병합 ③ dependency-submission 워크플로 삭제(admin 403, 복원법 기록)
+  ④ craft 직선 스칼라 가족 한정 ⑤ SLM 브리지 dormant(GGUF 미밴들→grounded
+  폴백) ⑥ 산문 절대값 표류(차분 불변식은 항상 성립 — 설계). 상세
+  `20_Skills/skill_self_audit_4criteria.md`.

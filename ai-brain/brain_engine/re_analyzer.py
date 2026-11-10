@@ -28,6 +28,7 @@ import json
 import os
 import re
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
@@ -46,7 +47,7 @@ def ghidra_headless() -> Optional[Path]:
     env = os.environ.get("GHIDRA_HOME")
     if env:
         cands.append(Path(env) / "support" / "analyzeHeadless")
-    cands += sorted(Path("/tmp/ghidra_dist").glob("ghidra_*/support/analyzeHeadless"))
+    cands += sorted((Path(tempfile.gettempdir()) / "ghidra_dist").glob("ghidra_*/support/analyzeHeadless"))
     for c in cands:
         if c.exists():
             return c
@@ -222,7 +223,7 @@ def ghidra_python() -> Optional[Path]:
     driven in-process through PyGhidra: same analyzers, same decompiler.
     """
     cands = [Path(os.environ.get("GHIDRA_PYTHON", ""))] if os.environ.get("GHIDRA_PYTHON") else []
-    cands += [Path("/tmp/jdkenv/bin/python")]
+    cands += [Path(tempfile.gettempdir()) / "jdkenv" / "bin" / "python"]
     for c in cands:
         if c.exists():
             return c
@@ -236,7 +237,7 @@ def _analyze_ghidra(binary: Path, cap: int, project_dir: Optional[Path]) -> Dict
     py = ghidra_python()
     assert py, "PyGhidra 인터프리터가 없어요 (GHIDRA_PYTHON 또는 /tmp/jdkenv)"
     tool = Path(__file__).resolve().parent.parent / "tools" / "ghidra_facts_pyghidra.py"
-    out_json = Path("/tmp/brain_facts.json")
+    out_json = Path(tempfile.gettempdir()) / "brain_facts.json"
     if out_json.exists():
         out_json.unlink()
     env = _java_env()

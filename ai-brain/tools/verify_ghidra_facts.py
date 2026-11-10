@@ -20,9 +20,12 @@ from __future__ import annotations
 import json
 import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+_TMP = Path(tempfile.gettempdir())   # 이식성: Windows(/tmp 없음)에서도 동작
 
 from brain_engine import re_analyzer  # noqa: E402
 from brain_engine.semantic_memory import CODE_KIND, PROSE_KIND, CorpusChannels, note_kind  # noqa: E402
@@ -30,14 +33,14 @@ from brain_engine.wiki_gardener import WikiGardener  # noqa: E402
 
 # 공유 가변 경로를 믿지 않아요: verify 는 검증용 팩트를 **스스로 뽑아요**
 # (마지막 ingest/craft 가 /tmp/brain_facts.json 을 덮어쓴 사고 실측).
-FACTS = Path("/tmp/verify_facts.json")
+FACTS = _TMP / "verify_facts.json"
 SAMPLE = (Path(__file__).resolve().parent.parent.parent / "GhidraDocs" /
           "GhidraClass" / "ExerciseFiles" / "Advanced" / "globalRegVars.so")
 # 산문 불변의 기준은 /tmp 픽스처가 아니라 **커밋된 vault 산문 노트**예요 —
 # 새 숙주에서도 스스로 재생성돼야 검증이 재현돼요 (소유권 원칙).
 FIXTURE = Path(__file__).resolve().parent.parent / "vault"
-SCRATCH = Path("/tmp/l_ghidra_vault")
-STATE = Path("/tmp/l_ghidra_state")
+SCRATCH = _TMP / "l_ghidra_vault"
+STATE = _TMP / "l_ghidra_state"
 
 ok = True
 
@@ -101,7 +104,7 @@ def main() -> int:
     # 불변식은 낡은 상수가 아니라 **같은 런 안의 차이**예요: 산문만 훈련한
     # 채널과 산문+기계 노트 훈련 채널이 산문에 대해 동일해야 해요.
     # (vault 산문은 시냅스 relink 로 진화하므로 476/4/0.083 은 스냅샷 값일 뿐)
-    STATE2 = Path("/tmp/l_ghidra_state_base")
+    STATE2 = _TMP / "l_ghidra_state_base"
     shutil.rmtree(STATE, ignore_errors=True)
     shutil.rmtree(STATE2, ignore_errors=True)
     base = CorpusChannels(STATE2)

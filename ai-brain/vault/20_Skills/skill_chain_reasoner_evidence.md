@@ -61,3 +61,5 @@ proof 로 남아요 — "답했다"와 "답이 파일로 확인됐다"를 분리
 ## 🔗 연결된 시냅스 (Wiki Links)
 - [[자가 치유 끈기 원장 — kill -9 를 견디는 퀘스트 기억 (quest_ledger)]]
 - [[LLM 위키와 P-Reinforce 자율 정원사]]
+- [[자가 복제 공작 루프 — craft-anything 두뇌 판 (clean-room)]]
+- [[자가 종합 감사 — 4기준 기계 재감사와 부채 원장 (audit_brain)]]

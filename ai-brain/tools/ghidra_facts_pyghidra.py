@@ -28,6 +28,7 @@ def main() -> int:
     cap = int(sys.argv[3]) if len(sys.argv) > 3 else 400
 
     import os
+    import tempfile
 
     import pyghidra
 
@@ -49,7 +50,8 @@ def main() -> int:
     from ghidra.app.decompiler import DecompInterface
 
     facts = {"backend": "analyzeHeadless", "binary": binary.rsplit("/", 1)[-1], "functions": []}
-    with pyghidra.open_program(binary, project_location="/tmp/ghidra_pyproj", analyze=True) as flat:
+    _proj = os.path.join(tempfile.gettempdir(), "ghidra_pyproj")
+    with pyghidra.open_program(binary, project_location=_proj, analyze=True) as flat:
         program = flat.getCurrentProgram()
         fm = program.getFunctionManager()
         listing = program.getListing()

@@ -634,3 +634,246 @@ class SemanticMemory:
         except OSError:
             pass
         return st
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 💡️ Stage L — one meaning space per language the brain speaks.
+#
+# MEASURED REASON (Stage L probes, /tmp/l_probe/why2.py):
+#   a single 500-word budget shared by prose and machine code lets as few as
+#   16 code notes evict 175 discriminative prose words; the survivors are the
+#   common words every prose note shares, so ALL prose cosines inflate
+#   (nonsense pair «LLM 위키↔복어» 0.045 -> 0.333) and the orphan detector
+#   reports "gaps filled" while going blind.  With separate budgets, 300 code
+#   notes change nothing for prose: gaps stay 4/4, nonsense stays 0.083/0.045.
+#
+# MEASURED REASON for NOT using cosine inside the code channel
+#   (/tmp/l_probe/code_thr2.py, ground truth = the call graph objdump prints):
+#   call-connected function pairs cos median 0.796 vs UNRELATED pairs 0.591 —
+#   the distributions overlap so badly that every threshold admits 70-99%
+#   intruders.  Machine code is mostly the same mnemonics, so similarity there
+#   is theater; the graph (who calls whom) is exact truth instead.
+# ─────────────────────────────────────────────────────────────────────────────
+
+CODE_KIND = "code"
+PROSE_KIND = "prose"
+_CODE_HINTS = ("분석결과", "machine-output", "disasm", "headless")
+
+
+def note_kind(n: Dict[str, Any]) -> str:
+    """Which language this memory is written in — prose or machine output.
+
+    The note says so itself (`kind:` in its front matter) when it can; the
+    fallbacks are evidence a writer leaves behind (category / tags), never a
+    guess from the words, because a guess here would silently move a memory
+    into the wrong vocabulary budget.
+    """
+    k = str(n.get("kind") or "").strip().lower()
+    if k in (CODE_KIND, PROSE_KIND):
+        return k
+    cat = str(n.get("category") or "").lower()
+    tags = {str(t).lower() for t in (n.get("tags") or [])}
+    if any(h in cat for h in _CODE_HINTS) or tags & {"machine-output", "objdump", "analyze-headless"}:
+        return CODE_KIND
+    return PROSE_KIND
+
+
+_CROSS_STOP = {"그", "이", "을", "를", "은", "는", "과", "와", "및", "등", "수", "위", "함수",
+               "명령", "구조", "분석", "코드", "사용", "통해", "위한", "없", "있", "the", "of", "and"}
+
+
+def norm_symbol(s: str) -> str:
+    """`PySys_Audit@@Base` / `printf@plt` / `foo+0x10` -> the plain name."""
+    return re.sub(r"[@+].*$", "", str(s)).strip()
+
+
+def _fn_name(n: Dict[str, Any]) -> str:
+    return re.sub(r"\s*\(0x[0-9a-f]+\)\s*$", "", str(n.get("title") or "")).strip()
+
+
+def _fn_refs(n: Dict[str, Any]) -> List[str]:
+    m = re.search(r"참조:\s*(.+)$", str(n.get("body") or ""), flags=re.M)
+    return [norm_symbol(t) for t in (m.group(1).split() if m else [])]
+
+
+def _fn_calls(n: Dict[str, Any]) -> List[str]:
+    out: List[str] = []
+    for ln in str(n.get("body") or "").splitlines():
+        m = re.search(r"\bcall\w*\s+(?:[0-9a-f]+|0x[0-9a-f]+)\s+<([^>]+)>", ln)
+        if m:
+            out.append(norm_symbol(m.group(1)))
+    m2 = re.search(r"^호출:\s*(.+)$", str(n.get("body") or ""), flags=re.M)
+    if m2:
+        out += [norm_symbol(t) for t in m2.group(1).split()]
+    return out
+
+
+class CorpusChannels:
+    """Two meaning spaces that never share a vocabulary budget.
+
+    Every legacy call site keeps working: unknown attributes fall through to
+    the PROSE space, which is exactly what the brain had before Stage L.  The
+    channel-aware methods below route each memory to its own space, and refuse
+    to score a prose memory against a machine one — no shared space exists, so
+    any number there would be invented.
+    """
+
+    def __init__(self, state_dir: Path) -> None:
+        self.state_dir = Path(state_dir)
+        self.spaces: Dict[str, SemanticMemory] = {
+            PROSE_KIND: SemanticMemory(self.state_dir / "sem-prose"),
+            CODE_KIND: SemanticMemory(self.state_dir / "sem-code"),
+        }
+        self.prose = self.spaces[PROSE_KIND]
+        self.code = self.spaces[CODE_KIND]
+
+    def __getattr__(self, name: str) -> Any:  # legacy surface = prose behaviour
+        return getattr(self.__dict__["prose"], name)
+
+    # ── routing ────────────────────────────────────────────────────────────
+    def space_of(self, n: Dict[str, Any]) -> SemanticMemory:
+        return self.spaces[note_kind(n)]
+
+    def split(self, notes: Sequence[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
+        out: Dict[str, List[Dict[str, Any]]] = {PROSE_KIND: [], CODE_KIND: []}
+        for n in notes:
+            out[note_kind(n)].append(n)
+        return out
+
+    # ── training: each language keeps its own words ────────────────────────
+    def train(self, notes: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+        parts = self.split(notes)
+        stats: Dict[str, Any] = {}
+        for kind, ns in parts.items():
+            stats[kind] = (self.spaces[kind].train(ns) if ns
+                           else dict(self.spaces[kind].stats,
+                                     trained=bool(self.spaces[kind].stats.get("trained"))))
+        p = stats[PROSE_KIND]
+        return dict(p, channels=stats, channel_notes={k: len(v) for k, v in parts.items()})
+
+    def ensure_trained(self, notes: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+        parts = self.split(notes)
+        changed = False
+        for kind, ns in parts.items():
+            sp = self.spaces[kind]
+            if ns and sp.fingerprint(ns) != sp.stats.get("fingerprint"):
+                changed = True
+        if not changed:
+            return dict(self.prose.stats, channels={k: dict(v.stats) for k, v in self.spaces.items()},
+                        retrained=False)
+        return self.train(notes)
+
+    # ── channel-aware reading ──────────────────────────────────────────────
+    def similarity(self, query: str, note: Dict[str, Any]) -> float:
+        return self.space_of(note).similarity(query, note)
+
+    def bridges(self, query: str, note: Dict[str, Any], top_k: int = 3) -> List[Dict[str, Any]]:
+        return self.space_of(note).bridges(query, note, top_k=top_k)
+
+    def coverage(self, text: str, kind: str = PROSE_KIND) -> Dict[str, Any]:
+        return self.spaces[kind].coverage(text)
+
+    def note_vector(self, note: Dict[str, Any]) -> List[float]:
+        return self.space_of(note).note_vector(note)
+
+    def pair_similarity(self, a: Dict[str, Any], b: Dict[str, Any]) -> float:
+        if note_kind(a) != note_kind(b):
+            return 0.0  # no shared space: a number here would be invented
+        return self.spaces[note_kind(a)].pair_similarity(a, b)
+
+    def pair_bridges(self, a: Dict[str, Any], b: Dict[str, Any], top_k: int = 3) -> List[Dict[str, Any]]:
+        if note_kind(a) != note_kind(b):
+            return []
+        return self.spaces[note_kind(a)].pair_bridges(a, b, top_k=top_k)
+
+    def cross_evidence(self, a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
+        """The ONLY honest link between channels: symbols both memories name.
+
+        Cosine cannot cross the wall (no shared vocabulary), and pretending it
+        can is the exact theater Stage L removed.  Shared identifiers, tags and
+        [[links]] are evidence a writer left in plain sight.
+        """
+        ta = {t.lower() for t in tokenize(f"{a.get('title','')} {a.get('summary','')} {a.get('body','')}")}
+        tb = {t.lower() for t in tokenize(f"{b.get('title','')} {b.get('summary','')} {b.get('body','')}")}
+        shared = sorted(ta & tb - _CROSS_STOP)
+        tags = {str(t).lower() for t in (a.get("tags") or [])} & {str(t).lower() for t in (b.get("tags") or [])}
+        links = {str(l).lower() for l in (a.get("links") or [])} & {str(l).lower() for l in (b.get("links") or [])}
+        return {"shared_words": shared[:12], "shared_tags": sorted(tags),
+                "shared_links": sorted(links),
+                "n": len(shared) + len(tags) + len(links)}
+
+    def neighbours(self, note: Dict[str, Any], notes: Sequence[Dict[str, Any]],
+                   top_k: int = 3) -> List[Dict[str, Any]]:
+        kind = note_kind(note)
+        same = [n for n in notes if note_kind(n) == kind and n.get("slug") != note.get("slug")]
+        out = self.spaces[kind].neighbours(note, same, top_k=top_k)
+        for r in out:
+            r["channel"] = kind
+        return out
+
+    def orphans(self, notes: Sequence[Dict[str, Any]], cos_min: float = 0.30,
+                top_k: int = 6) -> List[Dict[str, Any]]:
+        """Prose orphans, exactly as Stage K measured them (cos_min 0.45).
+
+        Machine memories are NOT ranked by cosine here: measured, cosine cannot
+        tell call-connected functions from unrelated ones (0.796 vs 0.591
+        medians, overlapping).  See code_orphans() for their honest detector.
+        """
+        prose = [n for n in notes if note_kind(n) == PROSE_KIND]
+        out = self.prose.orphans(prose, cos_min=cos_min, top_k=top_k)
+        for r in out:
+            r["channel"] = PROSE_KIND
+        return out
+
+    def code_orphans(self, notes: Sequence[Dict[str, Any]],
+                     top_k: int = 8) -> List[Dict[str, Any]]:
+        """Machine memories the corpus cannot place — stated as exact facts.
+
+        Two kinds, both read straight off the call graph the disassembler
+        prints (cosine is measured-useless in this channel):
+
+          isolated   nothing connects it — no caller, no callee, no reference
+          no-context it reaches out (calls/references) but NOBODY in the corpus
+                     calls it, so the brain knows what it uses and not why it
+                     exists — the honest machine-channel blind spot
+
+        Weakest-connected first, capped, with the edge counts shown so the
+        master can see the evidence instead of a verdict.
+        """
+        code = [n for n in notes if note_kind(n) == CODE_KIND]
+        if not code:
+            return []
+        names = {_fn_name(n) for n in code}
+        out_edges: Dict[str, Set[str]] = {}
+        ext_calls: Dict[str, Set[str]] = {}
+        in_edges: Dict[str, int] = {nm: 0 for nm in names}
+        for n in code:
+            nm = _fn_name(n)
+            calls = set(_fn_calls(n)) | set(_fn_refs(n))
+            internal = {c for c in calls if c in names and c != nm}
+            out_edges[nm] = internal
+            ext_calls[nm] = {c for c in calls if c not in names}
+            for c in internal:
+                in_edges[c] = in_edges.get(c, 0) + 1
+        gaps: List[Dict[str, Any]] = []
+        for n in code:
+            nm = _fn_name(n)
+            ie = in_edges.get(nm, 0)
+            oe = len(out_edges.get(nm, set()))
+            xe = len(ext_calls.get(nm, set()))
+            if ie == 0 and oe == 0 and xe == 0:
+                reason = "아무 것과도 이어지지 않아요 — 부르는 이도, 부르는 것도, 참조도 없어요"
+            elif ie == 0:
+                reason = (f"이 corpus 안에서 이 함수를 부르는 이가 없어요 "
+                          f"(밖으로 {oe + xe}개 참조) — 무엇의 답인지 몰라요")
+            else:
+                continue
+            gaps.append({"slug": n.get("slug"), "title": n.get("title"), "channel": CODE_KIND,
+                         "reason": reason, "in_edges": ie, "out_edges": oe, "external": xe})
+        gaps.sort(key=lambda g: (g["in_edges"] + g["out_edges"], g["title"] or ""))
+        return gaps[:top_k]
+
+    def status(self) -> Dict[str, Any]:
+        # prose.status(), not prose.stats: status() is where the space adds the
+        # human-facing keys (known_words, ...) that the capsule tests assert.
+        return dict(self.prose.status(), channels={k: dict(v.status()) for k, v in self.spaces.items()})

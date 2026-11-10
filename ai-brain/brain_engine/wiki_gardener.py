@@ -16,7 +16,13 @@ from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 # 💡 Stage J: the vault's own meaning space.  This module has no project
 # dependencies of its own, so importing it here is cycle-free.
-from brain_engine.semantic_memory import SemanticMemory
+from brain_engine.semantic_memory import (
+    CODE_KIND,
+    PROSE_KIND,
+    CorpusChannels,
+    SemanticMemory,
+    note_kind,
+)
 
 # NOTE: the Stage H field helpers live in core_ability_engine, which (via
 # quant_forge) imports `extract_keywords` from THIS module — so they are
@@ -154,7 +160,11 @@ class WikiGardener:
         self._ensure_seeds()
         # 💡 Stage J: the vault's own meaning space, trained from these very
         # notes and cached in the state dir (int8, no external model, no network).
-        self.semantic = SemanticMemory(self.db_path.parent)
+        # 💡 Stage L: TWO meaning spaces behind one handle — prose and machine
+        # output never share a vocabulary budget (measured: 16 code notes in a
+        # shared 500-word budget evict 175 discriminative prose words and every
+        # prose cosine inflates until the orphan detector goes blind).
+        self.semantic = CorpusChannels(self.db_path.parent)
         self.rebuild_index()
 
     def _connect(self) -> sqlite3.Connection:
@@ -240,6 +250,7 @@ class WikiGardener:
         title = md_path.stem.replace("_", " ")
         category = "아이디어·노하우"
         tags: List[str] = []
+        kind = PROSE_KIND  # 💡 Stage L: front matter may say otherwise below
         updated_at = datetime.fromtimestamp(
             md_path.stat().st_mtime, tz=timezone.utc
         ).strftime("%Y-%m-%d %H:%M UTC")
@@ -261,6 +272,12 @@ class WikiGardener:
                 tags = [x.strip().strip('"\'') for x in g_m.group(1).split(",") if x.strip()]
             if d_m:
                 updated_at = d_m.group(1).strip()
+            # 💡 Stage L: a memory says which language it is written in, so it
+            # lands in the right vocabulary budget.  Absent = prose, the default
+            # every earlier note already is.
+            k_m = re.search(r'^kind:\s*"?(.+?)"?\s*$', fm, flags=re.MULTILINE)
+            if k_m:
+                kind = k_m.group(1).strip().lower()
 
         links = list(dict.fromkeys(m.strip() for m in re.findall(r"\[\[([^\]]+)\]\]", body) if m.strip()))
         sum_match = re.search(r"## 💡 핵심 요약\s*\n+(.+?)(?:\n\n|\n## )", body, flags=re.DOTALL)
@@ -275,6 +292,7 @@ class WikiGardener:
             "links": links,
             "rel_path": str(md_path.relative_to(self.vault_dir)),
             "updated_at": updated_at,
+            "kind": kind,
         }
 
     def rebuild_index(self) -> None:
@@ -607,6 +625,42 @@ class WikiGardener:
             out["field"] = muscle
         return out
 
+    def gap_questions(self, notes: List[Dict[str, Any]],
+                      gaps: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
+        """💡 Stage L — turn each blind spot into the question that would fill it.
+
+        A gap alone is a complaint; a question is a plan.  The words quoted are
+        the note's OWN unknown tokens — the channel's coverage says which of
+        its words this brain has never learned — so the master is asked exactly
+        what is missing instead of a generic "tell me more".  The closure
+        instrument stays Stage K's: once the answer lands as a new prose memory,
+        the orphan's nearest-neighbour cosine must climb past the channel
+        threshold (0.222 -> 0.469 in the K growth probe).
+        """
+        if gaps is None:
+            gaps = self.semantic.orphans(notes, cos_min=0.30, top_k=6)
+        by_slug = {n["slug"]: n for n in notes}
+        out: List[Dict[str, Any]] = []
+        for g in gaps:
+            if g.get("channel", PROSE_KIND) != PROSE_KIND:
+                continue
+            n = by_slug.get(g.get("slug"))
+            if not n:
+                continue
+            cov = self.semantic.coverage(n["title"] + " " + n["summary"], PROSE_KIND)
+            unknown = [str(w) for w in cov.get("unknown", [])][:4]
+            q = (f"«{n['title'][:40]}»은(는) 지금 가장 가까운 기억과도 뜻이 "
+                 f"{g.get('best_cos')}밖에 겹치지 않아요.")
+            if unknown:
+                q += " 제가 아직 모르는 단어: " + ", ".join(unknown) + "."
+            q += (" 이 기억이 어떤 문제의 답인지 한 줄만 가르쳐주세요 — "
+                  "답을 받으면 구멍이 정말 메워졌는지 다시 잽니다.")
+            out.append({"slug": n["slug"], "title": n["title"],
+                        "best_cos": g.get("best_cos"), "unknown_words": unknown,
+                        "nearest": g.get("nearest"), "question": q,
+                        "channel": PROSE_KIND})
+        return out
+
     def weave_missing_synapses(self, field: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Scan all Wiki notes and weave missing bidirectional [[links]] between related concepts.
 
@@ -616,6 +670,12 @@ class WikiGardener:
         fewer false pairs and catches more true ones.
         """
         notes = self.list_notes()
+        # 💡 Stage L: machine memories speak a different language.  Measured,
+        # letting them share the shelf inflates EVERY prose cosine (nonsense
+        # pairs 0.045 -> 0.333) until the blind-spot detector reports "gaps
+        # filled" while going blind.  The weaver therefore links PROSE only;
+        # machine memories get their own exact detector (the call graph).
+        prose = [n for n in notes if note_kind(n) == PROSE_KIND]
         kw_map: Dict[str, Set[str]] = {}
         for n in notes:
             kws = set(
@@ -642,7 +702,7 @@ class WikiGardener:
             # is the muscle's own learned weight — not a new hardcoded rule.
             sem_w = field_org_semantic_trust(field)
             self.semantic.ensure_trained(notes)
-            for n in notes:
+            for n in prose:
                 # Same translation the experience lesson uses, so revision
                 # actually transfers to the weaving the muscle does here.
                 # ⚠️ Stage K: [:8] is part of that translation, not a detail —
@@ -660,9 +720,9 @@ class WikiGardener:
         muscle_sims: List[float] = []
         sem_pairs = 0
         sem_examples: List[Dict[str, Any]] = []
-        for i in range(len(notes)):
-            for j in range(i + 1, len(notes)):
-                a, b = notes[i], notes[j]
+        for i in range(len(prose)):
+            for j in range(i + 1, len(prose)):
+                a, b = prose[i], prose[j]
                 already_ab = b["title"] in a["links"]
                 already_ba = a["title"] in b["links"]
                 if already_ab and already_ba:
@@ -717,6 +777,16 @@ class WikiGardener:
                 gaps = self.semantic.orphans(notes, cos_min=0.30, top_k=6)
             except Exception:
                 gaps = []
+            # ⚙️ Stage L: machine memories get their OWN detector — the call
+            # graph, which is exact truth.  Cosine is measured-useless in that
+            # channel (call-connected functions 0.796 vs unrelated 0.591,
+            # overlapping), so a code gap is stated as a structural fact and
+            # never as a threshold guess.
+            try:
+                code_gaps = self.semantic.code_orphans(notes)
+            except Exception:
+                code_gaps = []
+            questions = self.gap_questions(notes, gaps)
             out.update(
                 {
                     "sem_trust": round(sem_w, 3),
@@ -725,6 +795,9 @@ class WikiGardener:
                     "muscle_pairs": muscle_pairs,
                     "gaps": gaps,
                     "gap_count": len(gaps),
+                    "code_gaps": code_gaps,
+                    "code_gap_count": len(code_gaps),
+                    "questions": questions,
                 }
             )
         if field:
@@ -752,7 +825,7 @@ class WikiGardener:
                         # opinion `_org_same_truth` refuses to overrule.
                         "links": list(n.get("links") or []),
                     }
-                    for n in notes
+                    for n in prose
                 ]
                 prob = build_real_org_problem(real_notes, sem=self.semantic)
                 if prob:

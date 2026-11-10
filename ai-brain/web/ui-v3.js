@@ -2615,6 +2615,10 @@ function renderSemantic(data) {
     ["🎯 충실도", eng.cosine_fidelity_pct === null || eng.cosine_fidelity_pct === undefined ? "—" : `${eng.cosine_fidelity_pct}%`],
     ["💡 문맥 근육 신뢰도", trust === null || trust === undefined ? "—" : String(trust)],
     ["🕸️ 정리 근육 신뢰도", orgTrust],
+    // ⚙️ Stage L: two languages, two vocabulary budgets.  Showing both sizes is
+    // the proof that machine memories never ate the prose words.
+    ["📝 산문 어휘", String(((data.channels || {}).prose || {}).vocab_size || (eng.trained ? eng.vocab_size : 0)) + "개"],
+    ["⚙️ 기계 어휘", String(((data.channels || {}).code || {}).vocab_size || 0) + "개"],
   ];
   facts.innerHTML = cells.map((c) => `
     <div class="sem-fact">
@@ -2649,6 +2653,66 @@ function renderSemantic(data) {
           if (s) openNoteBySlug(s);
         });
       });
+    }
+  }
+
+  // 💬 Stage L — a gap alone is a complaint; a question is a plan.  The brain
+  // asks the master for exactly the words it does not know, and when the answer
+  // lands the server re-measures the hole (cos before → after) so nobody has to
+  // take "it learned" on faith.
+  const qEl = document.getElementById("semQuestions");
+  if (qEl) {
+    const qs = data.questions || [];
+    if (!eng.trained || !qs.length) {
+      qEl.innerHTML = "";
+    } else {
+      qEl.innerHTML =
+        `<div class="sq-head">💬 두뇌가 주인님께 여쭙니다 — 구멍 ${qs.length}개를 메울 질문</div>` +
+        qs.map((q) => `
+        <div class="sem-q" data-slug="${escapeHeartHtml(q.slug || "")}">
+          <div class="sq-title">${escapeHeartHtml(q.title || "")}</div>
+          <div class="sq-text">${escapeHeartHtml(q.question || "")}</div>
+          <div class="sq-row">
+            <input class="sq-input" placeholder="한 줄 답을 적어주세요 — 답은 새 기억으로 소화돼요" />
+            <button class="sq-btn" type="button">가르치기</button>
+          </div>
+        </div>`).join("");
+      qEl.querySelectorAll(".sem-q").forEach((el) => {
+        const btn = el.querySelector(".sq-btn");
+        const inp = el.querySelector(".sq-input");
+        btn.addEventListener("click", async () => {
+          const text = (inp.value || "").trim();
+          if (!text) { inp.focus(); return; }
+          btn.disabled = true;
+          try {
+            const r = await apiPost("api/remedy", { action: "answer_gap", slug: el.dataset.slug, text });
+            const row = el.querySelector(".sq-row");
+            if (row && r && r.message) row.outerHTML = `<div class="sq-done">${escapeHeartHtml(r.message)}</div>`;
+            loadSemantic();
+          } catch (err) {
+            btn.disabled = false;
+          }
+        });
+      });
+    }
+  }
+
+  // ⚙️ Stage L — the machine channel states its blind spots as STRUCTURAL facts
+  // (the call graph), because cosine is measured-useless on machine code.
+  const cEl = document.getElementById("semCodeGaps");
+  if (cEl) {
+    const cg = data.code_gaps || [];
+    if (!cg.length) {
+      cEl.innerHTML = "";
+    } else {
+      cEl.innerHTML =
+        `<div class="scg-head">⚙️ 기계 채널의 구멍 ${cg.length}개 — 호출 그래프가 말하는 정확한 사실</div>` +
+        cg.map((g) => `
+        <div class="sem-codegap">
+          <div class="scg-title">${escapeHeartHtml(g.title || "")}</div>
+          <div class="scg-meta">들어온 호출 ${g.in_edges} · 나간 참조 ${g.out_edges} · corpus 밖 ${g.external || 0}</div>
+          <div class="scg-why">${escapeHeartHtml(g.reason || "")}</div>
+        </div>`).join("");
     }
   }
 }
@@ -2891,7 +2955,7 @@ function setupHeartbeat() {
   setInterval(pollHeartbeat, 5000);
 }
 
-const CURRENT_UI_VERSION = "6.9";
+const CURRENT_UI_VERSION = "7.0";
 
 async function init() {
   setupGraphSimulation();

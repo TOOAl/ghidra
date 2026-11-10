@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import mimetypes
+import re
 import sys
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -172,11 +173,18 @@ def make_handler(state: BrainState):
                 # is actually trained; an untrained guess about what the brain
                 # does not know would be worse than silence.
                 gaps = []
+                code_gaps: list = []
+                questions: list = []
                 if engine.get("trained"):
                     try:
                         gaps = state.gardener.semantic.orphans(notes, cos_min=GAP_COS_MIN, top_k=8)
+                        # 💡 Stage L: machine memories get their exact structural
+                        # detector (the call graph), and prose blind spots become
+                        # the questions that would fill them.
+                        code_gaps = state.gardener.semantic.code_orphans(notes)
+                        questions = state.gardener.gap_questions(notes, gaps)
                     except Exception:
-                        gaps = []
+                        gaps = gaps or []
                 self._send_json(
                     {
                         "engine": engine,
@@ -198,8 +206,25 @@ def make_handler(state: BrainState):
                         "notes": len(notes),
                         "gaps": gaps,
                         "gap_cos_min": GAP_COS_MIN,
+                        # 💡 Stage L: two languages, two vocabulary budgets.  The
+                        # prose numbers above are exactly Stage K's; the code
+                        # channel reports blind spots as structural FACTS (who
+                        # calls whom), because cosine is measured-useless there.
+                        "channels": engine.get("channels") or {},
+                        "code_gaps": code_gaps,
+                        "code_gap_count": len(code_gaps),
+                        "questions": questions,
                     }
                 )
+                return
+            if route == "/api/re/backends":
+                from brain_engine import re_analyzer
+                self._send_json({
+                    "backends": re_analyzer.available_backends(),
+                    "ghidra_headless": str(re_analyzer.ghidra_headless() or ""),
+                    "specimens": sorted(q.name for q in (state.root / "specimens").glob("*")
+                                          if q.is_file() and q.suffix in (".elf", ".exe", ".bin", ".so")),
+                })
                 return
             if route == "/api/notes":
                 self._send_json({"notes": state.gardener.list_notes()})
@@ -612,6 +637,15 @@ def make_handler(state: BrainState):
                 self._send_json({"coached": coached, "status": state.full_status()})
                 return
 
+            if route == "/api/re/backends":
+                from brain_engine import re_analyzer
+                self._send_json({
+                    "backends": re_analyzer.available_backends(),
+                    "ghidra_headless": str(re_analyzer.ghidra_headless() or ""),
+                    "specimens": sorted(p.name for p in (state.root / "specimens").glob("*")
+                                          if p.is_file() and p.suffix in (".elf", ".exe", ".bin", ".so")),
+                })
+                return
             if route == "/api/remedy":
                 action = str(body.get("action") or "").strip()
                 if action == "relink_synapses":
@@ -656,6 +690,102 @@ def make_handler(state: BrainState):
                         msg = "모든 노트의 시냅스 교차검증 그물망을 재정비 완료했어요!"
                     state.soul.on_remedy(msg)
                     self._send_json({"remedy": res, "message": msg, "status": state.full_status()})
+                    return
+                if action == "ingest_analysis":
+                    # ⚙️ Stage L: teach the machine channel from REAL bytes.
+                    # objdump today, analyzeHeadless the moment a distribution
+                    # lands — same note shape, same channel, own vocabulary.
+                    from brain_engine import re_analyzer
+                    bin_name = str(body.get("binary") or "").strip()
+                    backend = str(body.get("backend") or "auto").strip()
+                    cand = (state.root / "specimens" / bin_name) if bin_name else None
+                    if cand is None or not cand.exists():
+                        gl = sorted((state.root.parent / "GhidraDocs" / "GhidraClass" /
+                                     "ExerciseFiles" / "Advanced").glob("*.so"))
+                        cand = gl[0] if gl else None
+                    if cand is None or not cand.exists():
+                        self._send_json({"error": "분석할 바이너리가 없어요"}, status=404)
+                        return
+                    facts = re_analyzer.analyze(cand, backend=backend)
+                    notes_new = re_analyzer.build_notes(facts)
+                    re_analyzer.write_code_notes(state.gardener.vault_dir, notes_new)
+                    state.gardener.rebuild_index()
+                    alln = state.gardener.list_notes()
+                    st = state.gardener.semantic.train(alln)
+                    cg = state.gardener.semantic.code_orphans(alln)
+                    edges = re_analyzer.call_edges(alln)
+                    state.abilities.log_deployment(
+                        "coding",
+                        f"⚙️ 기계어 채널 수유 — {cand.name} 를 {facts['backend']} 로 해부해 "
+                        f"기계 기억 {len(notes_new)}장 흡수 (호출 간선 {len(edges)}개)",
+                        {"backend": facts["backend"], "binary": cand.name,
+                         "notes_added": len(notes_new), "call_edges": len(edges),
+                         "code_gaps": len(cg)},
+                    )
+                    self._send_json({
+                        "backend": facts["backend"], "binary": cand.name,
+                        "notes_added": len(notes_new),
+                        "code_notes": int((st.get("channel_notes") or {}).get("code", 0)),
+                        "code_vocab": int(((st.get("channels") or {}).get("code") or {}).get("vocab_size", 0)),
+                        "prose_vocab": int(((st.get("channels") or {}).get("prose") or {}).get("vocab_size", 0)),
+                        "call_edges": len(edges), "code_gaps": cg,
+                        "message": f"⚙️ {cand.name} 에서 기계 기억 {len(notes_new)}장을 배웠어요 — "
+                                     f"산문 어휘 {((st.get('channels') or {}).get('prose') or {}).get('vocab_size', 0)}개는 그대로예요.",
+                    })
+                    return
+                if action == "answer_gap":
+                    # 💡 Stage L: the master answers a blind-spot question, and the
+                    # brain must PROVE the hole closed — nearest-neighbour cosine
+                    # of that orphan before and after the answer lands, the same
+                    # instrument Stage K grew a gap with (0.222 -> 0.469).
+                    slug = str(body.get("slug") or "").strip()
+                    text = str(body.get("text") or "").strip()
+                    if not slug or not text:
+                        self._send_json({"error": "slug 과 text 가 필요해요"}, status=400)
+                        return
+                    notes0 = state.gardener.list_notes()
+                    target = next((n for n in notes0 if n["slug"] == slug), None)
+                    if target is None:
+                        self._send_json({"error": "노트를 못 찾았어요"}, status=404)
+                        return
+                    sem = state.gardener.semantic
+                    sem.ensure_trained(notes0)
+                    g0 = sem.orphans(notes0, cos_min=GAP_COS_MIN, top_k=99)
+                    before = next((g for g in g0 if g.get("slug") == slug), None)
+                    title = str(body.get("title") or f"주인님의 답 — {target['title'][:28]}").strip()
+                    tag0 = (target.get("tags") or ["답"])[0]
+                    safe = re.sub(r"[^\w가-힣.-]", "_", title)[:80]
+                    path = state.gardener.vault_dir / "10_Wiki" / f"{safe}.md"
+                    path.write_text(
+                        "---\n"
+                        f'title: "{title}"\n'
+                        'category: "아이디어·노하우"\n'
+                        f"tags: [주인님의답, {tag0}]\n"
+                        "---\n\n"
+                        f"# {title}\n\n"
+                        f"## 💡 핵심 요약\n{text}\n\n"
+                        "## 🔗 연결된 시냅스 (Wiki Links)\n"
+                        f"- [[{target['title']}]]\n",
+                        encoding="utf-8",
+                    )
+                    state.gardener.rebuild_index()
+                    notes1 = state.gardener.list_notes()
+                    sem.train(notes1)
+                    nb = sem.neighbours(target, notes1, top_k=1)
+                    after_cos = round(nb[0]["cos"], 3) if nb else 0.0
+                    g1 = sem.orphans(notes1, cos_min=GAP_COS_MIN, top_k=99)
+                    still = next((g for g in g1 if g.get("slug") == slug), None)
+                    before_cos = before["best_cos"] if before else None
+                    closed = still is None
+                    msg = (f"주인님의 답을 «{title[:24]}» 로 소화했어요 — "
+                           f"구멍 cos {before_cos} → {after_cos}"
+                           + (", 임계를 넘어 메워졌어요! 🎉" if closed else ", 아직 부족해요. 한 줄 더 주세요."))
+                    state.soul.on_remedy(msg)
+                    self._send_json({
+                        "message": msg, "before_cos": before_cos, "after_cos": after_cos,
+                        "closed": closed, "orphans_left": len(g1),
+                        "note": path.name,
+                    })
                     return
                 if action == "reset_checks":
                     state.soul.data["recent_hallucination_checks"] = []

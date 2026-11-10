@@ -53,9 +53,40 @@ def ghidra_headless() -> Optional[Path]:
     return None
 
 
+def _java_env() -> Dict[str, str]:
+    """JAVA_HOME for PyGhidra — asked from the interpreter that has it.
+
+    Ghidra 12 speaks Python only through PyGhidra, which needs a real JDK
+    home.  The server process runs on system python (no jdk4py module), so
+    when the import fails we ask the PyGhidra interpreter itself where its
+    bundled JDK lives.
+    """
+    env = dict(os.environ)
+    jh = ""
+    try:
+        import jdk4py  # type: ignore
+
+        jh = str(jdk4py.JAVA_HOME)
+    except Exception:
+        py = ghidra_python()
+        if py:
+            try:
+                probe = subprocess.run(
+                    [str(py), "-c", "import jdk4py;print(jdk4py.JAVA_HOME)"],
+                    capture_output=True, text=True, timeout=60, check=False,
+                )
+                jh = probe.stdout.strip()
+            except Exception:
+                jh = ""
+    if jh:
+        env["JAVA_HOME"] = jh
+        env["PATH"] = f"{jh}/bin:" + env.get("PATH", "")
+    return env
+
+
 def available_backends() -> List[str]:
     out = ["objdump"]
-    if ghidra_headless():
+    if ghidra_headless() and ghidra_python():
         out.append("analyzeHeadless")
     return out
 
@@ -116,24 +147,40 @@ def analyze(binary: Path, backend: str = "auto", cap: int = 400,
     return {"backend": "objdump", "binary": binary.name, "functions": funcs}
 
 
+def ghidra_python() -> Optional[Path]:
+    """The interpreter that has PyGhidra — the only Python Ghidra 12 speaks.
+
+    Ghidra 12 dropped Jython, and a .java postScript needs a compiler the
+    allow-list cannot supply (jdk4py ships no jdk.compiler), so the dist is
+    driven in-process through PyGhidra: same analyzers, same decompiler.
+    """
+    cands = [Path(os.environ.get("GHIDRA_PYTHON", ""))] if os.environ.get("GHIDRA_PYTHON") else []
+    cands += [Path("/tmp/jdkenv/bin/python")]
+    for c in cands:
+        if c.exists():
+            return c
+    return None
+
+
 def _analyze_ghidra(binary: Path, cap: int, project_dir: Optional[Path]) -> Dict[str, Any]:
     """The real Ghidra path — identical note shape, richer facts (decompile)."""
     headless = ghidra_headless()
-    assert headless, "analyzeHeadless 가 없어요 (fetch_ghidra_dist.sh 먼저)"
-    script = Path(__file__).resolve().parent.parent / "tools" / "ExportBrainFacts.java"
+    assert headless, "Ghidra dist 가 없어요 (fetch_ghidra_dist.sh 먼저)"
+    py = ghidra_python()
+    assert py, "PyGhidra 인터프리터가 없어요 (GHIDRA_PYTHON 또는 /tmp/jdkenv)"
+    tool = Path(__file__).resolve().parent.parent / "tools" / "ghidra_facts_pyghidra.py"
     out_json = Path("/tmp/brain_facts.json")
-    proj = project_dir or Path("/tmp/ghidra_proj")
-    proj.mkdir(parents=True, exist_ok=True)
     if out_json.exists():
         out_json.unlink()
-    subprocess.run(
-        [str(headless), str(proj), "brain", "-import", str(binary), "-overwrite",
-         "-scriptPath", str(script.parent),
-         "-postScript", script.name, str(out_json)],
-        capture_output=True, text=True, timeout=1800, check=False,
+    env = _java_env()
+    env["GHIDRA_INSTALL_DIR"] = str(headless.parent.parent)
+    proc = subprocess.run(
+        [str(py), str(tool), str(binary), str(out_json), str(cap)],
+        capture_output=True, text=True, timeout=1800, check=False, env=env,
     )
     if not out_json.exists():
-        raise RuntimeError("Ghidra 가 사실 파일을 내놓지 않았어요 — 로그를 보세요")
+        tail = ((proc.stderr or "") + (proc.stdout or "")).strip()[-600:]
+        raise RuntimeError(f"Ghidra 가 사실 파일을 내놓지 않았어요: {tail}")
     raw = json.loads(out_json.read_text(encoding="utf-8"))
     return {"backend": "analyzeHeadless", "binary": binary.name,
             "functions": raw.get("functions", [])[:cap]}

@@ -15,6 +15,8 @@
 #
 # Usage:  bash ai-brain/tools/fetch_ghidra_dist.sh [branch] [repo]
 set -euo pipefail
+# resolve BEFORE any cd below changes the working directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 BRANCH="${1:-ghidra-dist}"
 REPO="${2:-TOOAl/ghidra}"
@@ -60,30 +62,50 @@ VENV=/tmp/jdkenv
 if [ ! -x "$VENV/bin/python" ]; then
   echo "  ☕ JDK 설치 중 (jdk4py → Temurin 25) …"
   python3 -m venv "$VENV"
-  "$VENV/bin/pip" install -q jdk4py
+  "$VENV/bin/pip" install -q jdk4py pyghidra
 fi
 export JAVA_HOME="$("$VENV/bin/python" -c 'import jdk4py;print(jdk4py.JAVA_HOME)')"
 export PATH="$JAVA_HOME/bin:$PATH"
 echo "  ☕ $(java -version 2>&1 | head -1)"
-
-# ── Smoke test: run the real analyzeHeadless on a real binary that ships in
-#    this repository, and print what the brain would be taught from it.
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Ghidra 12 dropped Jython and jdk4py ships no javac, so the fact exporter
+# runs through PyGhidra (same dist, same analyzers, in-process).  The CLI
+# still gets its own proof: a plain import+analyze with no script at all.
 HEADLESS="$ROOT/support/analyzeHeadless"
 if [ ! -f "$HEADLESS" ]; then
   echo "  ❌ analyzeHeadless 를 찾을 수 없어요: $HEADLESS"; exit 5
 fi
 chmod +x "$HEADLESS" "$ROOT/support/"*.sh 2>/dev/null || true
+
+# 🛠 숙주가 스스로 도구를 주조한다: 배달된 네이티브 decompiler 는
+#    ubuntu-24 에서 구워져 GLIBC_2.38 을 요구해요.  이 숙주의 glibc 가
+#    더 늙었다면, 저장소 자신의 C++ 소스로 다시 굽습니다 — 공식
+#    바이너리와 동일한 구성(ghidra_opt 타겟, BFD 불필요)이에요.
+DECOMP="$ROOT/Ghidra/Features/Decompiler/os/linux_x86_64/decompile"
+if [ -x "$DECOMP" ] && ldd "$DECOMP" 2>&1 | grep -q "not found"; then
+  echo "  🛠 decompile 이 이 숙주 glibc 와 안 맞음 → 소스에서 재주조"
+  if command -v g++ >/dev/null 2>&1 && command -v make >/dev/null 2>&1; then
+    CPP="$(cd "$SCRIPT_DIR/../.." && pwd)/Ghidra/Features/Decompiler/src/decompile/cpp"
+    if make -C "$CPP" -j"$(nproc 2>/dev/null || echo 2)" ghidra_opt >/tmp/decomp_build.log 2>&1; then
+      cp "$CPP/ghidra_opt" "$DECOMP" && chmod +x "$DECOMP"
+      echo "  ✅ 재주조 완료 (ghidra_opt → decompile)"
+    else
+      echo "  ❌ 재주조 실패 — /tmp/decomp_build.log 를 보세요"; exit 7
+    fi
+  else
+    echo "  ❌ g++/make 가 없어 decompiler 를 고칠 수 없어요"; exit 7
+  fi
+fi
+
 SAMPLE="$(cd "$SCRIPT_DIR/../.." && pwd)/GhidraDocs/GhidraClass/ExerciseFiles/Advanced/globalRegVars.so"
-echo "  🔬 스모크 테스트: $(basename "$SAMPLE")"
+echo "  🔬 analyzeHeadless CLI 증명 (스크립트 없이 import+analyze)"
 rm -rf /tmp/ghidra_proj && mkdir -p /tmp/ghidra_proj
-"$HEADLESS" /tmp/ghidra_proj smoke -import "$SAMPLE" -overwrite \
-    -scriptPath "$SCRIPT_DIR" \
-    -postScript ExportBrainFacts.java /tmp/ghidra_facts.json 2>&1 | tail -15 || true
+"$HEADLESS" /tmp/ghidra_proj smoke -import "$SAMPLE" -overwrite 2>&1 | grep -E "REPORT: (Import|Post-analysis)" | tail -3 || true
+echo "  🔬 PyGhidra 사실 추출"
+GHIDRA_INSTALL_DIR="$ROOT" "$VENV/bin/python" "$SCRIPT_DIR/ghidra_facts_pyghidra.py" "$SAMPLE" /tmp/brain_facts.json 400 || true
 
 # 🚚 그리고 숫자로 증명: 이게 진짜 Ghidra 출력인지, 디컴파일된 C가 있는지,
 #    산문 채널이 그대로인지.  0 이 아니면 배달을 믿지 않아요.
-if [ -f /tmp/ghidra_facts.json ]; then
+if [ -f /tmp/brain_facts.json ]; then
   "$VENV/bin/python" "$SCRIPT_DIR/verify_ghidra_facts.py" || exit 6
 fi
 echo "── 배달 완료. ROOT=$ROOT ──"

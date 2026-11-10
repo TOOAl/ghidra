@@ -57,7 +57,7 @@ def main() -> int:
         first = dec[0]["decompile"].strip().splitlines()
         print("     예:", first[0][:80] if first else "-")
     print("── 3) 사실 → 기계 기억 → vault 왕복 ──")
-    notes = re_analyzer.build_notes({"binary": raw.get("binary", "ghidra"), "functions": funcs})
+    notes = re_analyzer.build_notes({"backend": raw.get("backend", "analyzeHeadless"), "binary": raw.get("binary", "ghidra"), "functions": funcs})
     check("kind=code 부여", all(note_kind(n) == CODE_KIND for n in notes), f"{len(notes)}장")
     shutil.rmtree(SCRATCH, ignore_errors=True)
     (SCRATCH / "30_Ghidra").mkdir(parents=True, exist_ok=True)

@@ -38,3 +38,5 @@ def compress_rle_safe(stream):
 ## 🔗 연결된 시냅스 (Wiki Links)
 - [[역공학 해부 도감 — 🐡 복어 독(위험 명령) 혼입 압축기 (보안 제거 실습)]]
 - [[다수 작은 심판 합의형 CPU 강화학습 (Good Judges)]]
+- [[자가 진화 스킬 카트리지 — transform_payload]]
+- [[역공학 해부 도감 — 🔐 XOR-회전 금고 해독기 (ELF64 x86-64)]]

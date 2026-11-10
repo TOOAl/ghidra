@@ -205,3 +205,31 @@ v7.3.2 종합감사가 남긴 유일한 실질 부채(Windows 오프라인 Ghidr
   `TEXT_EXT` 에 `.ps1` 추가 — 새 부트스트랩도 개인정보 스캔 대상(무료·`/tmp`
   검사는 `.py` 한정이라 shell/ps1 부트스트랩의 배달 URL 은 dormancy 규칙과
   무관하게 허용, `fetch_ghidra_dist.sh` 와 동일 대우).
+
+## 🧪 Windows 부트스트랩 검증 강화 — 부채① 잔여 좁히기 (v7.3.4)
+v7.3.3 의 `.ps1` 은 썼지만 이 Linux 샌드박스엔 **실제 Windows 호스트도 pwsh 도
+없어요** — PowerShell 릴리스가 allow-list 밖 `objects.githubusercontent.com` 으로
+리다이렉트되어 바이너리를 받을 수 없고, PyPI 에 PowerShell 파서도 없어요. 그래서
+"눈으로 봤다" 대신 **돌릴 수 있는 것은 실제로 돌려** 기계 증거로 남기는 재생산
+가능 게이트 `tools/verify_windows_bootstrap.py`(**49/49 그린**, exit-code 게이트,
+네트워크 없음)를 추가했어요.
+- **오프라인 설치 가능성 증명(핵심)** — vendor 휠 태그(PEP425) + 의존 그래프
+  (METADATA `Requires-Dist`)를 풀어, **Windows/cp311·Linux/cp311 양쪽**에서
+  `pip --no-index --find-links vendor jdk4py pyghidra jpype1` 의 의존 폐포
+  (pyghidra→jpype1`>=1.5.2,!=1.6.0,!=1.7.0`·typing_extensions`~=4.16`·packaging)가
+  전부 호환 휠 + 버전 제약으로 만족됨을 기계 증명.
+- **이진 재조립 알고리즘 실행** — `.ps1` 가 쓰는 "이름순 정렬 + FileStream 바이너리
+  연결 + SHA256" 을 합성 픽스처(0바이트 포함 300KB)로 **실제 실행**해 비트복원·
+  체크섬 일치 증명(`Get-Content -Raw` 가 바이너리를 깨는 함정 회피 확인).
+- **`.ps1` 구조 불변식** — `$env:TEMP`(코드에 `/tmp` 0)·`Scripts\python.exe`·
+  `analyzeHeadless.bat`·`--no-index` 오프라인+PyPI 정직 폴백·`Get-FileHash` 체크섬·
+  `$ErrorActionPreference=Stop`·`$LASTEXITCODE`+nonzero exit 13곳(조용한 통과 없음)·
+  주석/문자열 접은 **코드** 중괄호·괄호 균형·외부 호스트 = 무료 allow-list
+  (codeload.github.com·github.com)뿐.
+- **`.ps1` ↔ `.sh` 단계 패리티 11종** + `.bat` 래퍼(Bypass·exitcode 전파·CRLF)·
+  `start_windows.bat` 사전점검이 `.ps1` 와 같은 venv 경로(`%TEMP%\jdkenv`) 사용.
+- **정직 범위** — 이 게이트는 정적 구조·알고리즘·오프라인 해결을 증명하지만,
+  **실 Windows 호스트 end-to-end 실행은 여전히 미목격**(호스트·pwsh 없음). 첫
+  Windows 실행이 마지막 잔여로 부채원장에 남아요. `audit_brain.py` 는 이 게이트
+  `.py` 도 개인정보 스캔(82파일)하며, 게이트 속 검사 needle(`/tmp`·`c:\users`·`://`)은
+  자가오염 0(HOME_RE·TMP_RUNTIME_RE·URL_RE 어느 것도 안 걸림).

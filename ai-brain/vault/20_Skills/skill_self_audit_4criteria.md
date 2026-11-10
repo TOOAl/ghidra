@@ -47,12 +47,18 @@ created: ""
    `analyzeHeadless.bat`, 기본값은 Linux/macOS 행동 그대로) + Windows 부트스트랩
    `tools/fetch_ghidra_dist.ps1`(+`.bat` 래퍼 — vendor 휠 `--no-index` 오프라인
    설치, 안 맞으면 PyPI 무료 폴백) + `start_windows.bat` 논블로킹 사전점검.
-   **잔여(정직 고지):** ⑴ 이 Linux 샌드박스엔 실제 Windows 호스트가 없어
-   라이브 미검증 — wheel 구조(java.exe·_jpype.pyd)·정적 검토·Linux 회귀
-   그린으로 대리 증명 ⑵ jpype1 벤더 휠은 cp311 태그라 Python 3.11 에서만
+   **잔여(정직 고지):** ⑴ 이 Linux 샌드박스엔 실제 Windows 호스트·pwsh 가
+   없어(PowerShell 릴리스가 allow-list 밖 `objects.githubusercontent.com` 으로
+   리다이렉트 → 바이너리 불가) .ps1 end-to-end 라이브 미검증 — 대신
+   `tools/verify_windows_bootstrap.py`(**49/49 그린**, exit 게이트, v7.3.4)가
+   오프라인 설치 가능성(vendor 휠 태그+의존 폐포를 Windows/cp311·Linux/cp311
+   양쪽 기계 증명)·이진 재조립 알고리즘(합성 픽스처 실제 실행)·.ps1 구조
+   불변식·.sh 단계 패리티를 재생산 가능하게 증명 → **첫 Windows 실행만이
+   마지막 미목격 단계** ⑵ jpype1 벤더 휠은 cp311 태그라 Python 3.11 에서만
    오프라인 설치, 다른 파이썬은 PyPI(무료) 폴백.
-2. **master 미병합** — N·N1+N2·N1+N2 심화 3커밋(`6df25860`·`e1c57b38`·
-   `cc3f32f8`)이 arena 브랜치에 있고 master 미병합(PR#2 는 M단계까지).
+2. **master 미병합** — N·N1+N2·심화·종합감사·Windows 이식성·검증강화 6커밋
+   (`6df25860`·`e1c57b38`·`cc3f32f8`·`8f0d857c`·`3555921f`·+v7.3.4)이 arena
+   브랜치에 있고 master 미병합(PR#2 는 M단계까지).
 3. **dependency-submission 워크플로 삭제** — dep-graph 는 repo admin 전용
    설정(PATCH 403, admin 없음). 복원법: Settings→Dependency graph 활성화 후
    `d4a629a8` yml 복구.

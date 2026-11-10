@@ -89,11 +89,46 @@ def _craft(led, q: Dict[str, Any], step: str) -> None:
                        "record")
 
 
+@runner("garden")
+def _garden(led, q: Dict[str, Any], step: str) -> None:
+    """정원 가꾸기를 원장으로 — reindex → semantic train → report.
+
+    러너는 자가완결: payload 의 경로로 WikiGardener 를 재구성해요
+    (원장은 JSON 이라 라이브 객체를 못 실어요). 각 스텝은 멱등 —
+    다시 돌려도 같은 인덱스/의미공간으로 수렴.
+    """
+    from brain_engine.wiki_gardener import WikiGardener
+    p = q["payload"]
+    g = WikiGardener(Path(p["vault"]), Path(p["db"]))
+    if step == "reindex":
+        g.rebuild_index()
+        n = len(g.list_notes())
+        led.checkpoint(q["id"], 1, {"notes": n}, f"reindexed {n} notes")
+    elif step == "train":
+        st = g.semantic.train(g.list_notes())
+        led.checkpoint(q["id"], 2,
+                       {"vocab": st.get("vocab_size", 0),
+                        "trained": bool(st.get("trained"))},
+                       f"trained vocab={st.get('vocab_size', 0)}")
+    elif step == "report":
+        cp = q["checkpoint"]
+        st = g.semantic.status()
+        led.checkpoint(q["id"], 3,
+                       {"proof": {"notes": cp.get("notes"),
+                                  "vocab": cp.get("vocab"),
+                                  "trained": cp.get("trained"),
+                                  "cosine_fidelity_pct":
+                                      st.get("cosine_fidelity_pct"),
+                                  "cache_kb": st.get("cache_kb")}},
+                       "garden report")
+
+
 @runner("chain")
 def _chain(led, q: Dict[str, Any], step: str) -> None:
     notes = q["payload"]["notes"]
     if step == "reason":
-        res = chain_reasoner.reason(q["payload"]["question"], notes)
+        res = chain_reasoner.reason(q["payload"]["question"], notes,
+                                    max_hops=int(q["payload"].get("max_hops", 3)))
         led.checkpoint(q["id"], 1, {"result": res}, "reasoned")
     elif step == "audit":
         res = cp_result = q["checkpoint"].get("result") or {}

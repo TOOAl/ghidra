@@ -227,6 +227,7 @@ def make_handler(state: BrainState):
                                 ("id", "kind", "title", "status", "step_index", "steps")}
                                for q in qs],
                     "active": len(state.ledger.active()),
+                    "health": state.ledger.health(),
                 })
                 return
             if route == "/api/re/backends":
@@ -676,9 +677,15 @@ def make_handler(state: BrainState):
                         return
                     payload = {"question": question,
                                "notes": state.gardener.list_notes(),
-                               "root": str(state.root)}
+                               "root": str(state.root),
+                               "max_hops": int(body.get("max_hops") or 3)}
                     steps = ["reason", "audit"]
                     title = f"chain — {question[:40]}"
+                elif kind == "garden":
+                    payload = {"vault": str(state.root / "vault"),
+                               "db": str(state.root / "state" / "wiki_index.db")}
+                    steps = ["reindex", "train", "report"]
+                    title = "garden — 정원 가꾸기 (reindex·train·report)"
                 else:
                     self._send_json({"error": f"모르는 kind: {kind}"}, status=400)
                     return
@@ -696,8 +703,9 @@ def make_handler(state: BrainState):
                 if not question:
                     self._send_json({"error": "질문을 입력해 주세요"}, status=400)
                     return
-                self._send_json(chain_reasoner.reason(question,
-                                                      state.gardener.list_notes()))
+                self._send_json(chain_reasoner.reason(
+                    question, state.gardener.list_notes(),
+                    max_hops=int(body.get("max_hops") or 3)))
                 return
             if route == "/api/re/backends":
                 from brain_engine import re_analyzer

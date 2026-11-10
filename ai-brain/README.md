@@ -129,3 +129,26 @@
   (`state/.gitignore`) — 끈기는 "같은 두뇌가 다시 켜질 때"의 것, git 복제가 아님.
   비밀 0·유료 0·외부 흐름 0. 스킬 노트
   `20_Skills/skill_quest_ledger_persistence.md`·`skill_chain_reasoner_evidence.md`.
+
+### N1+N2 심화 — 🛡 회복력: kill -9 너머의 세 적(敵) (v7.3.1)
+`tools/test_quest_resilience.py` (자가완결·멱등, **32/32 그린**, exit-code 게이트)로
+기계 증명. 임시 디렉터리만 써서 라이브 state/vault 불변.
+- **concurrent** — `resume_all` 스레드 + POST 퀘스트 스레드가 같은 tmp 를 찢지
+  않도록 `_save` 를 `RLock` 으로 직렬화, `begin` qid 를 같은-ms 충돌까지 유일
+  보장. 실측: 12 스레드 × 5 체크포인트 → 오류 0·qid 충돌 0·log 유실 0.
+- **corrupt** — 훼손 원장을 **지우지 않고 격리**(`quests.corrupt-<ts>.json`) 후
+  `recovered` 기록과 함께 빈 상태로 정직 재기동 (증거 없는 조용한 초기화 금지).
+- **disk-full** — `_save` = tmp 쓰기 + `fsync` + `os.replace`(원자·내구). ENOSPC
+  주입 시 `SaveError` 표면화·tmp 청소·본파일은 마지막 좋은 상태 보존. 크래시
+  잔재 tmp 는 다음 `_load` 가 자동 청소.
+- **N2 심화** — `max_hops` 요청 가능(기본 3, 상한 8 = 경로 폭발 방지). 도달
+  실패 시 flat 거부 대신 **부분 사슬** 보고(몇 홉·몇 기억 도달, 도착과 토큰이
+  가장 겹치는 프런티어). 그래도 `known:False` — 사슬을 지어내지 않아요.
+  실측: 5-링크 사슬 `max_hops=3` 부분실패 / `=6` `hops=5` 완성 · 라이브
+  `{"max_hops":5}` → 끈기원장↔양자화멘토단 **4홉** + chain 퀘스트 `audit_ok:True`.
+- **garden 퀘스트** — 정원 가꾸기(reindex→semantic train→report)도 같은 끈기
+  원장으로. 러너 자가완결(payload 경로로 `WikiGardener` 재구성). 라이브
+  `POST /api/quests {"kind":"garden"}` → 35 노트·vocab 500·fidelity 99.996%.
+- **건강 가시화** — `GET /api/quests` 가 `health`(quests·active·recovered·
+  last_save_error)를 함께 반환. verify_ghidra_facts 올 그린 유지(산문 차분
+  불변식 2장=2장·0.11/0.069 전후 동일 — vault 성장으로 절대값만 이동).

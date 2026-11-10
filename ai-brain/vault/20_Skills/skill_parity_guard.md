@@ -30,3 +30,10 @@ def parity_guard(bytes_in):
 ## 🔗 연결된 시냅스 (Wiki Links)
 - [[역공학 해부 도감 — 🛰️ 수 패리티 수호기]]
 - [[다수 작은 심판 합의형 CPU 강화학습 (Good Judges)]]
+- [[자가 진화 스킬 카트리지 — pack_nibbles]]
+- [[자가 진화 스킬 카트리지 — compress_rle_safe]]
+- [[자가 진화 스킬 카트리지 — transform_payload]]
+- [[역공학 해부 도감 — 🔁 델타 흐름 압축기]]
+- [[자가 진화 스킬 카트리지 — delta_encode]]
+- [[역공학 해부 도감 — 🧩 니블 팩커 (4비트 쌍수납 저장소)]]
+- [[역공학 해부 도감 — 🔐 XOR-회전 금고 해독기 (ELF64 x86-64)]]

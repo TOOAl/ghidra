@@ -97,6 +97,7 @@ def reason(question: str, notes: Sequence[Dict[str, Any]],
                           f"없어요{hint}.",
                 "chain": [], "evidence": [], "hops": 0, "known": False}
     a, b = matched
+    max_hops = max(1, min(int(max_hops), 8))   # 폭발 방지 상한
     edges = edges_of(notes)
     prev: Dict[str, Optional[tuple]] = {a["slug"]: None}
     dq = deque([a["slug"]])
@@ -114,10 +115,7 @@ def reason(question: str, notes: Sequence[Dict[str, Any]],
                 break
             dq.append(nxt)
     if not found:
-        return {"answer": "증거로 이을 수 없어요 — 두 초점 기억 사이에 사슬이 "
-                          "닿지 않아요 (구멍 보고).",
-                "chain": [a["slug"], b["slug"]], "evidence": [], "hops": 0,
-                "known": False}
+        return _partial(a, b, prev, notes, max_hops)
     chain: List[str] = []
     ev: List[Dict[str, str]] = []
     cur = b["slug"]
@@ -148,6 +146,37 @@ def _depth(seen: Dict[str, Any], slug: str) -> int:
         cur = par[0]
         d += 1
     return d
+
+
+def _partial(a: Dict[str, Any], b: Dict[str, Any],
+             prev: Dict[str, Any], notes: Sequence[Dict[str, Any]],
+             max_hops: int) -> Dict[str, Any]:
+    """도달 실패 시 가장 가까운 접근을 정직하게 보고 (발명 금지)."""
+    by_slug = {n["slug"]: n for n in notes}
+    reached = [s for s in prev if s != a["slug"]]
+    if not reached:
+        return {"answer": "증거로 이을 수 없어요 — 출발 기억에서 증거 간선이 "
+                          "한 발도 나가지 않아요 (구멍 보고).",
+                "chain": [a["slug"], b["slug"]], "evidence": [], "hops": 0,
+                "known": False, "partial": {"max_depth": 0, "reached": 0,
+                                            "nearest": None, "overlap": 0}}
+    btok = _tokens(b)
+    depths = {s: _depth(prev, s) for s in reached}
+    max_depth = max(depths.values())
+    nearest = max(reached, key=lambda s: (len(btok & _tokens(by_slug[s])),
+                                          -depths[s]))
+    overlap = len(btok & _tokens(by_slug[nearest]))
+    return {"answer": f"증거로 끝까지 이을 수 없어요 — {max_hops}홉 안에 "
+                      f"{max_depth}홉까지 {len(reached)}개 기억을 닿았지만 도착 "
+                      f"기억에 안 닿아요. 가장 가까운 접근: "
+                      f"'{by_slug[nearest].get('title', nearest)[:40]}' "
+                      f"(도착과 공유 토큰 {overlap}, {depths[nearest]}홉). "
+                      f"구멍 보고 — 사슬을 지어내지 않아요.",
+            "chain": [a["slug"], b["slug"]], "evidence": [], "hops": 0,
+            "known": False,
+            "partial": {"max_depth": max_depth, "reached": len(reached),
+                        "nearest": nearest, "overlap": overlap,
+                        "max_hops": max_hops}}
 
 
 def hop_benchmark(notes: Sequence[Dict[str, Any]]) -> Dict[str, Any]:

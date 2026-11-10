@@ -33,3 +33,8 @@ def pack_nibbles(vals):
 - [[다수 작은 심판 합의형 CPU 강화학습 (Good Judges)]]
 - [[자가 진화 스킬 카트리지 — compress_rle_safe]]
 - [[자가 진화 스킬 카트리지 — transform_payload]]
+- [[자가 진화 스킬 카트리지 — parity_guard]]
+- [[역공학 해부 도감 — 🔁 델타 흐름 압축기]]
+- [[자가 진화 스킬 카트리지 — delta_encode]]
+- [[역공학 해부 도감 — 🛰️ 수 패리티 수호기]]
+- [[역공학 해부 도감 — 🔐 XOR-회전 금고 해독기 (ELF64 x86-64)]]

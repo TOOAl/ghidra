@@ -34,3 +34,4 @@ created: ""
 ## 🔗 연결된 시냅스 (Wiki Links)
 - [[Ghidra 헤드리스와 로컬 AI 역공학 결합]]
 - [[역공학 해부 도감 — 🔐 XOR-회전 금고 해독기 (ELF64 x86-64)]]
+- [[자가 치유 끈기 원장 — kill -9 를 견디는 퀘스트 기억 (quest_ledger)]]

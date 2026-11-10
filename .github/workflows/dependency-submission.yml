@@ -2,14 +2,15 @@ name: Dependency Submission
 
 on:
   push:
-    branches: [ master ]
+    # 임시: 수정 검증 동안 세션 브랜치에서도 돌림 (녹색 확인 후 master 로 환원)
+    branches: [ master, arena/cb3eaa9d-ghidra ]
 
 permissions:
   contents: write
 
 jobs:
   dependency-submission:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
 
       - name: Checkout repository
@@ -29,5 +30,5 @@ jobs:
 
       - name: Generate and submit dependency graph
         uses: gradle/actions/dependency-submission@v6
-        with:
-          gradle-version: '9.5.1'
+        # gradle-version 핀 제거: 저장소의 커스텀 gradlew 가 래퍼 폴백과
+        # Gradle 9.8.0 디스트 핀을 책임져요 (Fetch Dependencies 성공 경로와 동일).

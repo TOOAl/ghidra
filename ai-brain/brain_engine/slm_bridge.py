@@ -10,11 +10,63 @@ Graph-Memory Synthesizer fallback when no local GGUF engine is currently running
 
 from __future__ import annotations
 
+import ast
 import json
+import re
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+
+
+_CODE_FENCE = re.compile(r"```(?:python|py)?\s*\n(.*?)```", re.S)
+
+
+def _extract_func_src(reply: str) -> Optional[str]:
+    """LLM 응답에서 `def fn(x): ...` 파이썬 소스를 추출(코드펜스优先)."""
+    cand = None
+    m = _CODE_FENCE.search(reply or "")
+    if m:
+        cand = m.group(1)
+    else:
+        i = (reply or "").find("def fn(")
+        if i != -1:
+            cand = reply[i:]
+    if not cand:
+        return None
+    # 첫 'def fn(' 부터 잘라 들여쓰기 일관성 확보
+    i = cand.find("def fn(")
+    if i == -1:
+        return None
+    return cand[i:].strip()
+
+
+def safe_synth_source(src: Optional[str]) -> bool:
+    """LLM 이 준 소스가 안전한 단일 `def fn(x)` 인지 정적 검증.
+
+    신뢰 경계: exec 는 빌트인 없는 네임스페이스에서 일어나고 최종 진실은
+    차분 검증(원본 바이트 oracle 과 대조)이지만, 그 전에 import/던더/호출 등
+    명백히 위험하거나 규칙 밖인 형태는 여기서 정직하게 거부해요.
+    """
+    if not src:
+        return False
+    try:
+        tree = ast.parse(src)
+    except SyntaxError:
+        return False
+    if len(tree.body) != 1 or not isinstance(tree.body[0], ast.FunctionDef):
+        return False
+    fn = tree.body[0]
+    if fn.name != "fn" or [a.arg for a in fn.args.args] != ["x"]:
+        return False
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Import, ast.ImportFrom, ast.Global, ast.Nonlocal)):
+            return False
+        if isinstance(node, ast.Attribute) and node.attr.startswith("__"):
+            return False
+        if isinstance(node, ast.Name) and node.id.startswith("__"):
+            return False
+    return True
 
 
 ENDPOINTS = [
@@ -173,3 +225,53 @@ class PortableSLMBridge:
             answer = "\n".join(lines)
 
         return {"answer": answer, "engine": engine}
+
+    # ── Stage N3: 코드 합성 oracle hook (부채⑤ — dormant SLM 에 실제 역할 부여) ──
+    def synthesize_python(self, c_text: str, sig_hint: str = "") -> Dict[str, Any]:
+        """디컴파일 C → clean-room 파이썬 `def fn(x): ...` 합성 시도.
+
+        online  : 로컬 LLM 에게 동등 함수를 요청 → 코드펜스 추출 → 정적 안전検証.
+                  (최종 진실은 craft 의 차분 검증: 원본 바이트 oracle 과 100% 일치만 기록)
+        offline : **grounded 폴백** — 코드를 발명하지 않고 정직하게 source=None 을
+                  돌려줘 craft 가 규칙 기반 합성기(c_synthesize)를 쓰게 해요.
+                  SLM 이 dormant 여도 환각으로 vault 를 오염시키지 않는 것이 핵심.
+        """
+        engine = self.detect_active_engine()
+        if not engine.get("online"):
+            return {"source": None, "via": "grounded-fallback", "engine": engine,
+                    "reason": "SLM dormant — 환각 방지: 코드 발명 거부, 규칙 기반 합성 사용"}
+        sys_prompt = (
+            "You are a precise reverse-engineering assistant. Rewrite the given Ghidra "
+            "decompiled C function as ONE clean-room Python function named exactly "
+            "`fn` taking a single integer argument `x`. Rules: integer arithmetic only; "
+            "no imports, no calls to builtins, no I/O; replicate C integer width/signedness "
+            "and operator semantics faithfully; the first C parameter maps to `x`. "
+            "Return ONLY a single ```python fenced block."
+        )
+        user_prompt = (
+            (f"Signature hint: {sig_hint}\n" if sig_hint else "")
+            + "Decompiled C:\n" + (c_text or "").strip()
+        )
+        try:
+            if engine["kind"] == "ollama":
+                resp = _http_post_json(
+                    f"{engine['base_url']}/api/chat",
+                    {"model": engine["active_model"], "stream": False,
+                     "messages": [{"role": "system", "content": sys_prompt},
+                                  {"role": "user", "content": user_prompt}]})
+                reply = resp.get("message", {}).get("content", "")
+            else:
+                resp = _http_post_json(
+                    f"{engine['base_url']}/v1/chat/completions",
+                    {"model": engine["active_model"], "temperature": 0.0,
+                     "messages": [{"role": "system", "content": sys_prompt},
+                                  {"role": "user", "content": user_prompt}]})
+                reply = resp["choices"][0]["message"]["content"]
+            src = _extract_func_src(reply)
+            if safe_synth_source(src):
+                return {"source": src, "via": "llm", "engine": engine}
+            return {"source": None, "via": "llm-rejected", "engine": engine,
+                    "reason": "LLM 출력이 안전/형식 검증 통과 못 함(정직 거부)"}
+        except Exception as exc:  # noqa: BLE001 — LLM 실패는 grounded 폴백으로
+            return {"source": None, "via": "llm-error", "engine": engine,
+                    "reason": f"LLM 호출 실패: {type(exc).__name__}"}

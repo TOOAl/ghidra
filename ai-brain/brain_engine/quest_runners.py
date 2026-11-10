@@ -38,14 +38,17 @@ def _craft(led, q: Dict[str, Any], step: str) -> None:
     elif step == "build":
         facts = cp["facts"]
         is_pe = binary.read_bytes()[:2] == b"MZ"
-        built: Dict[str, str] = {}
+        built: Dict[str, Any] = {}
         for f in facts["functions"]:
             raw = f.get("insns") or []
             ins = raw.splitlines() if isinstance(raw, str) else list(raw)
-            expr = craft_engine._c_to_lambda(f.get("decompile") or "",
-                                             craft_engine.ident_map(ins, is_pe))
-            if expr:
-                built[f["name"]] = expr
+            dec = (f.get("decompile") or "").strip()
+            if not dec or not ins:
+                continue
+            # Stage N3: 직선 스칼라 + 제어흐름·메모리 모두 synth_for 한 경로로
+            synth = craft_engine.synth_for(dec, ins, is_pe)
+            if synth:
+                built[f["name"]] = synth
         led.checkpoint(q["id"], 2, {"built": built}, "synthesized")
     elif step == "compare":
         facts = cp["facts"]
@@ -57,27 +60,19 @@ def _craft(led, q: Dict[str, Any], step: str) -> None:
                 continue
             raw = f.get("insns") or []
             ins = raw.splitlines() if isinstance(raw, str) else list(raw)
+            synth = built[name]
+            if isinstance(synth, str):           # 옛 체크포인트 하위 호환
+                synth = {"kind": "straight", "src": synth}
             try:
-                o0, owid, uns = craft_engine.emulate(ins, 0)
+                diff = craft_engine.differential(ins, synth)
             except Exception as exc:  # noqa: BLE001
-                results.append({"name": name, "why": f"emul {exc}"})
+                results.append({"name": name, "why": f"diff {exc}"})
                 continue
-            if uns:
-                results.append({"name": name, "why": f"unsupported {uns[:2]}"})
+            if synth.get("kind") == "cf" and diff["vectors"] < craft_engine._MIN_CF_COMPARABLE:
+                results.append({"name": name, "why": "cf 비교가능 벡터 부족"})
                 continue
-            fn = craft_engine.build_python(built[name],
-                                           craft_engine.input_width(ins))
-            mask = (1 << owid) - 1
-            vecs = list(range(256)) if owid <= 8 else \
-                [__import__("random").Random(7).randrange(1, 1 << min(owid, 32))
-                 for _ in range(512)]
-            bad = 0
-            for v in vecs:
-                o, _, uns2 = craft_engine.emulate(ins, v)
-                if uns2 or (o & mask) != (fn(v) & mask):
-                    bad += 1
-            results.append({"name": name, "vectors": len(vecs),
-                            "match_pct": round(100.0 * (len(vecs) - bad) / len(vecs), 2)})
+            results.append({"name": name, "kind": synth.get("kind"),
+                            "vectors": diff["vectors"], "match_pct": diff["match_pct"]})
         led.checkpoint(q["id"], 3, {"results": results}, "differential test")
     elif step == "record":
         results = cp["results"]

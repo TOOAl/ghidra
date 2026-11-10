@@ -68,14 +68,22 @@ echo "  ☕ $(java -version 2>&1 | head -1)"
 
 # ── Smoke test: run the real analyzeHeadless on a real binary that ships in
 #    this repository, and print what the brain would be taught from it.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HEADLESS="$ROOT/support/analyzeHeadless"
 if [ ! -f "$HEADLESS" ]; then
   echo "  ❌ analyzeHeadless 를 찾을 수 없어요: $HEADLESS"; exit 5
 fi
 chmod +x "$HEADLESS" "$ROOT/support/"*.sh 2>/dev/null || true
-SAMPLE="$(cd "$(dirname "$0")/../.." && pwd)/GhidraDocs/GhidraClass/ExerciseFiles/Advanced/globalRegVars.so"
+SAMPLE="$(cd "$SCRIPT_DIR/../.." && pwd)/GhidraDocs/GhidraClass/ExerciseFiles/Advanced/globalRegVars.so"
 echo "  🔬 스모크 테스트: $(basename "$SAMPLE")"
 rm -rf /tmp/ghidra_proj && mkdir -p /tmp/ghidra_proj
 "$HEADLESS" /tmp/ghidra_proj smoke -import "$SAMPLE" -overwrite \
+    -scriptPath "$SCRIPT_DIR" \
     -postScript ExportBrainFacts.java /tmp/ghidra_facts.json 2>&1 | tail -15 || true
+
+# 🚚 그리고 숫자로 증명: 이게 진짜 Ghidra 출력인지, 디컴파일된 C가 있는지,
+#    산문 채널이 그대로인지.  0 이 아니면 배달을 믿지 않아요.
+if [ -f /tmp/ghidra_facts.json ]; then
+  "$VENV/bin/python" "$SCRIPT_DIR/verify_ghidra_facts.py" || exit 6
+fi
 echo "── 배달 완료. ROOT=$ROOT ──"

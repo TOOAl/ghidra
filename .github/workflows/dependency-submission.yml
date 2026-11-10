@@ -30,5 +30,10 @@ jobs:
 
       - name: Generate and submit dependency graph
         uses: gradle/actions/dependency-submission@v6
-        # gradle-version 핀 제거: 저장소의 커스텀 gradlew 가 래퍼 폴백과
-        # Gradle 9.8.0 디스트 핀을 책임져요 (Fetch Dependencies 성공 경로와 동일).
+        with:
+          # 이 저장소엔 gradle/wrapper 가 없어요 (Ghidra 는 커스텀 gradlew +
+          # RuntimeScripts 래퍼 폴백). 액션은 래퍼가 없으면 버전을 지정해야
+          # 해요 (실측 오류 메시지가 그대로 가르쳐줌). 값은 저장소의 실제
+          # Gradle = 9.8.0 (커스텀 gradlew 의 GRADLE_DIST_DIR 핀과 동일;
+          # 9.5.1 은 근거 없는 제 추측이었어요).
+          gradle-version: '9.8.0'

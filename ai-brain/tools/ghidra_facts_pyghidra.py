@@ -27,9 +27,25 @@ def main() -> int:
     binary, out = sys.argv[1], sys.argv[2]
     cap = int(sys.argv[3]) if len(sys.argv) > 3 else 400
 
+    import os
+
     import pyghidra
 
-    pyghidra.start()
+    # LaunchSupport insists on a full JDK; jdk4py is an honest JRE and we
+    # never compile Java here, so when JAVA_HOME is known we hand it to the
+    # launcher directly (its setter skips the probe) instead of faking a
+    # javac.  Without JAVA_HOME, fall back to PyGhidra's own discovery.
+    java_home = os.environ.get("JAVA_HOME", "")
+    if java_home and os.path.isdir(java_home):
+        from pathlib import Path
+
+        from pyghidra.launcher import HeadlessPyGhidraLauncher
+
+        launcher = HeadlessPyGhidraLauncher()
+        launcher.java_home = Path(java_home)
+        launcher.start()
+    else:
+        pyghidra.start()
     from ghidra.app.decompiler import DecompInterface
 
     facts = {"backend": "analyzeHeadless", "binary": binary.rsplit("/", 1)[-1], "functions": []}

@@ -1,7 +1,8 @@
 """🚚 Stage L — end-to-end verification of a delivered Ghidra distribution.
 
 Run AFTER tools/fetch_ghidra_dist.sh has unpacked a dist and its smoke test has
-written /tmp/brain_facts.json through ExportBrainFacts.java.  This script then
+written /tmp/brain_facts.json through ghidra_facts_pyghidra.py (PyGhidra,
+in-process — Ghidra 12 has no Jython and no javac is available).  This script then
 proves, with numbers, that the REAL Ghidra (not objdump) now feeds the machine
 channel without touching the prose channel:
 

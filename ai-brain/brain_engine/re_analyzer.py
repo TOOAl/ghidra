@@ -84,6 +84,65 @@ def _java_env() -> Dict[str, str]:
     return env
 
 
+def health() -> Dict[str, Any]:
+    """정직한 자가 점검 — Ghidra 사슬의 각 고리를 지금 실제로 검증해요.
+
+    조용한 가정 금지: 각 부품이 ✓/✗ 와 이유를 보고해서, 두뇌가 지금
+    실제로 가진 능력만을 주장하게 해요.  경로 존재 여부(available_backends)
+    와 달리 여기서는 subprocess 로 진짜 임포트·glibc 호환까지 봐요.
+    """
+    out: Dict[str, Any] = {}
+    tools_dir = Path(__file__).resolve().parent.parent / "tools"
+    headless = ghidra_headless()
+    out["dist"] = {"ok": bool(headless),
+                   "detail": str(headless) if headless else "dist 없음 — tools/fetch_ghidra_dist.sh 실행 필요"}
+    if headless:
+        decomp = headless.parent.parent / "Ghidra" / "Features" / "Decompiler" / "os" / "linux_x86_64" / "decompile"
+        if decomp.exists():
+            try:
+                ldd = subprocess.run(["ldd", str(decomp)], capture_output=True,
+                                     text=True, timeout=30, check=False)
+                missing = [ln.strip() for ln in ldd.stdout.splitlines() if "not found" in ln]
+                out["decompiler"] = {"ok": not missing,
+                                     "detail": "네이티브 decompile — 이 숙주 glibc 와 호환" if not missing
+                                     else f"재주조 필요(fetch 스크립트가 자동): {missing[0][:90]}"}
+            except Exception as exc:  # ldd itself missing etc.
+                out["decompiler"] = {"ok": False, "detail": f"점검 불가: {exc}"}
+        else:
+            out["decompiler"] = {"ok": False, "detail": "decompile 바이너리가 dist 에 없음"}
+    else:
+        out["decompiler"] = {"ok": False, "detail": "dist 없음"}
+    py = ghidra_python()
+    out["pyghidra_python"] = {"ok": bool(py),
+                              "detail": str(py) if py else "PyGhidra 인터프리터 없음 (GHIDRA_PYTHON 또는 /tmp/jdkenv)"}
+    if py:
+        try:
+            probe = subprocess.run(
+                [str(py), "-c", "import jdk4py, pyghidra; print(jdk4py.JAVA_HOME)"],
+                capture_output=True, text=True, timeout=180, check=False)
+            ok = probe.returncode == 0 and bool(probe.stdout.strip())
+            out["jvm_and_bridge"] = {
+                "ok": ok,
+                "detail": (f"JVM(JRE) = {probe.stdout.strip()[:100]} · pyghidra 임포트 성공"
+                           if ok else f"프로브 실패: {((probe.stderr or '').strip()[-200:])}")}
+        except Exception as exc:
+            out["jvm_and_bridge"] = {"ok": False, "detail": f"프로브 예외: {exc}"}
+    else:
+        out["jvm_and_bridge"] = {"ok": False, "detail": "인터프리터 없음"}
+    vendor = Path(__file__).resolve().parent.parent / "vendor"
+    wheels = sorted(q.name for q in vendor.glob("*.whl")) if vendor.exists() else []
+    out["vendor_wheels"] = {
+        "ok": any(w.startswith("jdk4py") for w in wheels) and any(w.startswith("pyghidra") for w in wheels),
+        "detail": (f"{len(wheels)}개 휠을 저장소가 소유 — 오프라인 재구성 가능 (linux x86_64·cp311)"
+                   if wheels else "vendor 없음 — 재구성에 PyPI 연결 필요")}
+    tools = ["ghidra_facts_pyghidra.py", "verify_ghidra_facts.py", "fetch_ghidra_dist.sh"]
+    miss = [t for t in tools if not (tools_dir / t).exists()]
+    out["tools"] = {"ok": not miss,
+                    "detail": "팩트 추출·검증·배달 스크립트 모두 존재" if not miss else f"빠진 도구: {miss}"}
+    out["all_ok"] = all(v.get("ok") for k, v in out.items() if isinstance(v, dict))
+    return out
+
+
 def available_backends() -> List[str]:
     out = ["objdump"]
     if ghidra_headless() and ghidra_python():
@@ -133,7 +192,15 @@ def analyze(binary: Path, backend: str = "auto", cap: int = 400,
     if not binary.exists():
         raise FileNotFoundError(f"바이너리가 없어요: {binary}")
     if backend == "auto":
-        backend = "analyzeHeadless" if ghidra_headless() else "objdump"
+        # 정직한 라우팅: Ghidra 는 형식(ELF/PE)이 있어야 읽어요.  헤더 없는
+        # raw 바이트는 Ghidra 가 짐작할 수 없으니(거짓 언어를 발명하지 않아요)
+        # objdump 채널로 보내고, 노트 tags 에 백엔드가 사실대로 기록돼요.
+        with binary.open("rb") as fh:
+            magic = fh.read(4)
+        formatted = magic.startswith(b"\x7fELF") or magic.startswith(b"MZ")
+        backend = ("analyzeHeadless"
+                   if formatted and ghidra_headless() and ghidra_python()
+                   else "objdump")
 
     if backend == "analyzeHeadless":
         return _analyze_ghidra(binary, cap, project_dir)

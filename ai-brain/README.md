@@ -69,3 +69,14 @@
 - **기계 채널 수유**: `re_analyzer` 는 지금 `objdump`(진짜 바이트→진짜 명령)로 먹이고, `analyzeHeadless` 는 같은 노트 형태로 꽂히게 빼뒀습니다(릴리스 자산은 차단 호스트라 sandbox 가 못 받고, 커밋된 파일만 codeload 로 받으므로 `tools/dist-to-repo.workflow.yml` + `tools/fetch_ghidra_dist.sh` 가 그 배달을 담당; JDK 는 PyPI `jdk4py` = Temurin 25.0.2 로 이미 해결, Ghidra 12.3 요구 `application.java.min=25` 와 일치).
 - UI v7.0: 💬 두뇌가 주인님께 여쭙는 질문 카드(입력창+가르치기 버튼, 답 뒤 cos 전후 표시) · ⚙️ 기계 채널 구멍(간선 증거 포함) · 💡 카드에 산문/기계 어휘 두 개(코드가 산문 단어를 못 먹었는지 눈으로 보이는 증거).
 - 검증: 채널 인수 16검사(산문 불변·교차 거절·구조 구멍·레거시 표면) · RE 왕복 테스트 · 라이브 E2E(수유 9장·산문 476→476·구멍 7개·답 소화 0.259→0.628·J 채팅 회귀 없음) · 렌더 12검사 · 회귀 없음(K weave/gap, J 인수·성장·채점, I 경험 루프, 4근육 3티어).
+
+## M — 🚚 실제 Ghidra 종단 직결: 배달·자가 주조·흡수, 그리고 소유 원장 (v7.1)
+- **배달 수신**: `ghidra-dist` 브랜치(청크 4개·319M) → sha256 `75fda397…2aa72b` 일치 → 473M 전개. GitHub Actions run #2 Success(`a7f7c278` v2 워크플로 — run #1 exit 128 은 제 스크립트 버그 2종이었어요: 들여쓴 heredoc 종료자가 push를 삼킴 + init 전 git config).
+- **Ghidra 12 의 세 벽과 정직한 해법**: ① Jython 제거 → `.py` postScript 사망 ② `jdk4py` 는 정직한 JRE(javac 없음) → `.java` postScript 사망 ③ 배달된 네이티브 `decompile` 은 ubuntu-24 산(GLIBC_2.38 요구) → 이 숙주(glibc 2.36)에서 사망. 해법: ①② 는 **PyGhidra 인프로세스**(`tools/ghidra_facts_pyghidra.py` — JAVA_HOME 을 launcher setter 에 직접 주어 LaunchSupport 탐침도 건너뛰어요. 가짜 javac shim 같은 속임수는 제거했습니다), ③ 은 **저장소 자신의 C++ 소스로 재주조**(공식 구성 `ghidra_opt` 타겟, BFD 불필요 — fetch 스크립트가 ldd 로 감지해 자동 실행).
+- **소유 원장 (무엇이 진짜 우리 것이고 무엇이 아직 외부인지)**:
+  - ✅ **소유**: vault 노트 13장(디컴파일 C 포함 — objdump 는 결코 못 주는 것) · 코드 채널(재훈련은 git 소유 vault 에서 결정적으로 재현, 캐시(`state/sem-*`)는 무시돼도 괜찮아요) · 도구 3종(추출·검증·배달) · **벤더 휠 5개 35M**(`vendor/` — jdk4py·pyghidra·jpype1·packaging·typing_extensions, linux x86_64·cp311; **오프라인 재구성 가능**) · dist 원본(우리 `ghidra-dist` 브랜치) · 디컴파일러 소스+주조법.
+  - ⚠️ **외부(정직 고지)**: dist 청크 수신 = 우리 GitHub 저장소(네트워크 필요) · 다른 플랫폼/파이썬에서는 벤더 휠이 안 맞아 PyPI 폴백 · 숙주 도구(g++·make·python3·git)는 OS 것.
+  - ❌ **의존 안 함**: 데이터센터·외부 모델·API 키·비용.
+- **콜드스타트 증명**: `/tmp` 전부 삭제 → fetch 스크립트 한 방 → "📦 벤더 휠로 설치 완료 (외부 연결 없음)" → 재주조 자동 발동 → verify 5단계(함수 6·디컴파일 C 6/6·vault 왕복 kind 6/6·산문 불변 476/4/0.083/0.045·구조 구멍 4) → exit 0. 그리고 이제 **조용한 통과가 없어요**: 팩트 추출 실패 = 즉각 exit 6, CLI 스모크처럼 실패해도 `|| true` 로 삼켜지던 경로 삭제.
+- **정직 배선 3종**: `re_analyzer.health()` = 사슬 6고리(dist·decompiler glibc·PyGhidra 인터프리터·JVM+브리지 실임포트·벤더 휠·도구)를 지금 실제로 점검해 `/api/re/backends` 의 `ghidra_health` 로 ✓/✗ 보고 · `analyze(auto)` 는 매직바이트로 라우팅(ELF/PE→Ghidra, 무형식 raw→objdump — Ghidra 에 거짓 언어를 발명시키지 않아요) · 핸들러는 실패 시 빈 연결끊김 대신 사실대로 JSON 502.
+- **흡수 실측(라이브)**: 표본 4종 수유 — `xor_vault.elf` 노트 2 · `crc16_packet.exe` 노트 1 · `puffer_dropper.elf` 노트 2 (전부 backend=analyzeHeadless), `sliding_quant.bin` 은 raw 라 objdump 라우팅·노트 0(정직). 코드 채널 어휘 **134→166**·노트 6→11장, 산문 채널 **476 불변**, 구조 구멍 8개 보고, health ALL_OK.

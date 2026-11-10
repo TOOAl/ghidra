@@ -62,14 +62,26 @@ VENV=/tmp/jdkenv
 if [ ! -x "$VENV/bin/python" ]; then
   echo "  ☕ JDK 설치 중 (jdk4py → Temurin 25) …"
   python3 -m venv "$VENV"
-  "$VENV/bin/pip" install -q jdk4py pyghidra
+  # 📦 먼저 우리 자신의 벤더 휠(ai-brain/vendor, linux x86_64·cp311)로 설치 —
+  #    네트워크 없이.  다른 플랫폼/파이썬이면 정직하게 PyPI 로 폴백.
+  if "$VENV/bin/pip" install -q --no-index --find-links "$SCRIPT_DIR/../vendor" jdk4py pyghidra 2>/dev/null; then
+    echo "  📦 벤더 휠로 설치 완료 (외부 연결 없음)"
+  else
+    echo "  📦 벤더 휠이 이 플랫폼과 안 맞음 → PyPI 폴백"
+    "$VENV/bin/pip" install -q jdk4py pyghidra
+  fi
 fi
 export JAVA_HOME="$("$VENV/bin/python" -c 'import jdk4py;print(jdk4py.JAVA_HOME)')"
 export PATH="$JAVA_HOME/bin:$PATH"
 echo "  ☕ $(java -version 2>&1 | head -1)"
-# Ghidra 12 dropped Jython and jdk4py ships no javac, so the fact exporter
-# runs through PyGhidra (same dist, same analyzers, in-process).  The CLI
-# still gets its own proof: a plain import+analyze with no script at all.
+# Ghidra 12 dropped Jython, and jdk4py is an honest JRE (no javac), so:
+#   * .py postScript  → dead (no Jython)
+#   * .java postScript → dead (nothing can compile it here)
+#   * launch.sh CLI    → dead (LaunchSupport demands a JDK it will not find)
+# The living path is PyGhidra in-process: the tool hands JAVA_HOME straight
+# to the launcher (skipping LaunchSupport) and runs the same analyzers and
+# decompiler that the GUI would.  That run IS the smoke test — no separate
+# CLI probe that could fail silently.
 HEADLESS="$ROOT/support/analyzeHeadless"
 if [ ! -f "$HEADLESS" ]; then
   echo "  ❌ analyzeHeadless 를 찾을 수 없어요: $HEADLESS"; exit 5
@@ -97,15 +109,13 @@ if [ -x "$DECOMP" ] && ldd "$DECOMP" 2>&1 | grep -q "not found"; then
 fi
 
 SAMPLE="$(cd "$SCRIPT_DIR/../.." && pwd)/GhidraDocs/GhidraClass/ExerciseFiles/Advanced/globalRegVars.so"
-echo "  🔬 analyzeHeadless CLI 증명 (스크립트 없이 import+analyze)"
-rm -rf /tmp/ghidra_proj && mkdir -p /tmp/ghidra_proj
-"$HEADLESS" /tmp/ghidra_proj smoke -import "$SAMPLE" -overwrite 2>&1 | grep -E "REPORT: (Import|Post-analysis)" | tail -3 || true
-echo "  🔬 PyGhidra 사실 추출"
-GHIDRA_INSTALL_DIR="$ROOT" "$VENV/bin/python" "$SCRIPT_DIR/ghidra_facts_pyghidra.py" "$SAMPLE" /tmp/brain_facts.json 400 || true
+echo "  🔬 PyGhidra 사실 추출 (실패하면 여기서 멈춰요 — 조용한 통과 없음)"
+rm -f /tmp/brain_facts.json
+GHIDRA_INSTALL_DIR="$ROOT" "$VENV/bin/python" "$SCRIPT_DIR/ghidra_facts_pyghidra.py" "$SAMPLE" /tmp/brain_facts.json 400 || {
+  echo "  ❌ PyGhidra 팩트 추출 실패 — 배달을 신뢰할 수 없어요"; exit 6;
+}
 
 # 🚚 그리고 숫자로 증명: 이게 진짜 Ghidra 출력인지, 디컴파일된 C가 있는지,
 #    산문 채널이 그대로인지.  0 이 아니면 배달을 믿지 않아요.
-if [ -f /tmp/brain_facts.json ]; then
-  "$VENV/bin/python" "$SCRIPT_DIR/verify_ghidra_facts.py" || exit 6
-fi
+"$VENV/bin/python" "$SCRIPT_DIR/verify_ghidra_facts.py" || exit 6
 echo "── 배달 완료. ROOT=$ROOT ──"

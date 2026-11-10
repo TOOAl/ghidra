@@ -221,6 +221,7 @@ def make_handler(state: BrainState):
                 from brain_engine import re_analyzer
                 self._send_json({
                     "backends": re_analyzer.available_backends(),
+                    "ghidra_health": re_analyzer.health(),
                     "ghidra_headless": str(re_analyzer.ghidra_headless() or ""),
                     "specimens": sorted(q.name for q in (state.root / "specimens").glob("*")
                                           if q.is_file() and q.suffix in (".elf", ".exe", ".bin", ".so")),
@@ -641,6 +642,7 @@ def make_handler(state: BrainState):
                 from brain_engine import re_analyzer
                 self._send_json({
                     "backends": re_analyzer.available_backends(),
+                    "ghidra_health": re_analyzer.health(),
                     "ghidra_headless": str(re_analyzer.ghidra_headless() or ""),
                     "specimens": sorted(p.name for p in (state.root / "specimens").glob("*")
                                           if p.is_file() and p.suffix in (".elf", ".exe", ".bin", ".so")),
@@ -706,7 +708,15 @@ def make_handler(state: BrainState):
                     if cand is None or not cand.exists():
                         self._send_json({"error": "분석할 바이너리가 없어요"}, status=404)
                         return
-                    facts = re_analyzer.analyze(cand, backend=backend)
+                    try:
+                        facts = re_analyzer.analyze(cand, backend=backend)
+                    except Exception as exc:
+                        # 빈 응답·연결 끊김 대신 사실대로 JSON 오류를 돌려줘요.
+                        self._send_json({
+                            "error": f"분석 실패 — {cand.name}: {str(exc)[:400]}",
+                            "binary": cand.name, "backend": backend,
+                        }, status=502)
+                        return
                     notes_new = re_analyzer.build_notes(facts)
                     re_analyzer.write_code_notes(state.gardener.vault_dir, notes_new)
                     state.gardener.rebuild_index()

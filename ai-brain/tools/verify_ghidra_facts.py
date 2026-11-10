@@ -20,18 +20,27 @@ from __future__ import annotations
 import json
 import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+_TMP = Path(tempfile.gettempdir())   # 이식성: Windows(/tmp 없음)에서도 동작
+
 from brain_engine import re_analyzer  # noqa: E402
-from brain_engine.semantic_memory import CODE_KIND, CorpusChannels, note_kind  # noqa: E402
+from brain_engine.semantic_memory import CODE_KIND, PROSE_KIND, CorpusChannels, note_kind  # noqa: E402
 from brain_engine.wiki_gardener import WikiGardener  # noqa: E402
 
-FACTS = Path("/tmp/brain_facts.json")
-FIXTURE = Path("/tmp/k_fixture/vault")
-SCRATCH = Path("/tmp/l_ghidra_vault")
-STATE = Path("/tmp/l_ghidra_state")
+# 공유 가변 경로를 믿지 않아요: verify 는 검증용 팩트를 **스스로 뽑아요**
+# (마지막 ingest/craft 가 /tmp/brain_facts.json 을 덮어쓴 사고 실측).
+FACTS = _TMP / "verify_facts.json"
+SAMPLE = (Path(__file__).resolve().parent.parent.parent / "GhidraDocs" /
+          "GhidraClass" / "ExerciseFiles" / "Advanced" / "globalRegVars.so")
+# 산문 불변의 기준은 /tmp 픽스처가 아니라 **커밋된 vault 산문 노트**예요 —
+# 새 숙주에서도 스스로 재생성돼야 검증이 재현돼요 (소유권 원칙).
+FIXTURE = Path(__file__).resolve().parent.parent / "vault"
+SCRATCH = _TMP / "l_ghidra_vault"
+STATE = _TMP / "l_ghidra_state"
 
 ok = True
 
@@ -43,8 +52,21 @@ def check(label: str, cond: bool, detail: str = "") -> None:
 
 
 def main() -> int:
+    import os
+    import subprocess
+
+    headless = re_analyzer.ghidra_headless()
+    if not headless or not SAMPLE.exists():
+        print("❌ dist 또는 표본이 없어요 — fetch_ghidra_dist.sh 를 먼저.")
+        return 3
+    env = re_analyzer._java_env()
+    env["GHIDRA_INSTALL_DIR"] = str(headless.parent.parent)
+    tool = Path(__file__).resolve().parent / "ghidra_facts_pyghidra.py"
+    proc = subprocess.run([sys.executable, str(tool), str(SAMPLE), str(FACTS), "400"],
+                          capture_output=True, text=True, timeout=1200,
+                          check=False, env=env)
     if not FACTS.exists():
-        print("❌ /tmp/brain_facts.json 이 없어요 — fetch_ghidra_dist.sh 를 먼저.")
+        print("❌ 팩트 자가 추출 실패:", (proc.stderr or proc.stdout)[-300:])
         return 3
     raw = json.loads(FACTS.read_text(encoding="utf-8"))
     funcs = raw.get("functions") or []
@@ -76,22 +98,42 @@ def main() -> int:
     class _S2:
         vault_dir = FIXTURE
 
-    prose = [WikiGardener._parse_markdown(_S2(), f) for f in sorted(FIXTURE.rglob("*.md"))]
+    prose = [WikiGardener._parse_markdown(_S2(), f)
+             for f in sorted(FIXTURE.rglob("*.md"))
+             if 'kind: "code"' not in f.read_text(encoding="utf-8")]
+    # 불변식은 낡은 상수가 아니라 **같은 런 안의 차이**예요: 산문만 훈련한
+    # 채널과 산문+기계 노트 훈련 채널이 산문에 대해 동일해야 해요.
+    # (vault 산문은 시냅스 relink 로 진화하므로 476/4/0.083 은 스냅샷 값일 뿐)
+    STATE2 = _TMP / "l_ghidra_state_base"
     shutil.rmtree(STATE, ignore_errors=True)
+    shutil.rmtree(STATE2, ignore_errors=True)
+    base = CorpusChannels(STATE2)
+    st0 = base.train(prose)
     ch = CorpusChannels(STATE)
     st = ch.train(prose + back)
+    pro0 = (st0.get("channels") or {}).get("prose") or {}
     pro = (st.get("channels") or {}).get("prose") or {}
-    check("산문 어휘 476 그대로", pro.get("vocab_size") == 476, f"= {pro.get('vocab_size')}")
-    orp = ch.orphans(prose + back, cos_min=0.45, top_k=99)
-    check("산문 구멍 4장 그대로", len(orp) == 4, f"= {len(orp)}")
+    check("산문 어휘: 코드 수유 전후 동일",
+          pro0.get("vocab_size") == pro.get("vocab_size"),
+          f"= {pro0.get('vocab_size')} vs {pro.get('vocab_size')}")
+    orp0 = [g["slug"] for g in base.orphans(prose, cos_min=0.45, top_k=99)]
+    orp = [g["slug"] for g in ch.orphans(prose + back, cos_min=0.45, top_k=99)
+           if note_kind(next(n for n in prose + back if n["slug"] == g["slug"])) == PROSE_KIND]
+    check("산문 구멍 목록: 코드 수유 전후 동일", orp0 == orp,
+          f"= {len(orp)}장 {orp if len(orp) <= 5 else ''}")
 
     def byt(ns, k):
         return next(n for n in ns if k in n["title"])
 
+    a1 = base.pair_similarity(byt(prose, "스킬 카트리지"), byt(prose, "성좌 원탁 담론"))
+    a2 = base.pair_similarity(byt(prose, "LLM 위키"), byt(prose, "복어"))
     n1 = ch.pair_similarity(byt(prose, "스킬 카트리지"), byt(prose, "성좌 원탁 담론"))
     n2 = ch.pair_similarity(byt(prose, "LLM 위키"), byt(prose, "복어"))
-    check("엉터리 쌍 낮음", abs(n1 - 0.083) < 0.02 and abs(n2 - 0.045) < 0.02,
-          f"= {round(n1, 3)}/{round(n2, 3)}")
+    check("산문 쌍 코사인: 코드 수유 전후 동일",
+          abs(a1 - n1) < 1e-9 and abs(a2 - n2) < 1e-9,
+          f"= {round(n1, 3)}/{round(n2, 3)} (전 {round(a1, 3)}/{round(a2, 3)})")
+    check("엉터리 쌍은 낮음(절대 sanity)", max(n1, n2) < 0.2,
+          f"= max {round(max(n1, n2), 3)}")
     print("── 5) 기계 채널의 구조적 구멍 ──")
     cg = ch.code_orphans(prose + back)
     check("구조적 구멍 보고", isinstance(cg, list) and all("in_edges" in g for g in cg),

@@ -80,3 +80,156 @@
 - **콜드스타트 증명**: `/tmp` 전부 삭제 → fetch 스크립트 한 방 → "📦 벤더 휠로 설치 완료 (외부 연결 없음)" → 재주조 자동 발동 → verify 5단계(함수 6·디컴파일 C 6/6·vault 왕복 kind 6/6·산문 불변 476/4/0.083/0.045·구조 구멍 4) → exit 0. 그리고 이제 **조용한 통과가 없어요**: 팩트 추출 실패 = 즉각 exit 6, CLI 스모크처럼 실패해도 `|| true` 로 삼켜지던 경로 삭제.
 - **정직 배선 3종**: `re_analyzer.health()` = 사슬 6고리(dist·decompiler glibc·PyGhidra 인터프리터·JVM+브리지 실임포트·벤더 휠·도구)를 지금 실제로 점검해 `/api/re/backends` 의 `ghidra_health` 로 ✓/✗ 보고 · `analyze(auto)` 는 매직바이트로 라우팅(ELF/PE→Ghidra, 무형식 raw→objdump — Ghidra 에 거짓 언어를 발명시키지 않아요) · 핸들러는 실패 시 빈 연결끊김 대신 사실대로 JSON 502.
 - **흡수 실측(라이브)**: 표본 4종 수유 — `xor_vault.elf` 노트 2 · `crc16_packet.exe` 노트 1 · `puffer_dropper.elf` 노트 2 (전부 backend=analyzeHeadless), `sliding_quant.bin` 은 raw 라 objdump 라우팅·노트 0(정직). 코드 채널 어휘 **134→166**·노트 6→11장, 산문 채널 **476 불변**, 구조 구멍 8개 보고, health ALL_OK.
+
+## N — 🛠 craft-anything 흡수: 검사→제작→비교 루프의 두뇌 판 (v7.2)
+- **원본**: storytold/craft-anything (★25k, **MIT OR Apache-2.0**) — "실제 검사
+  도구로 원본을 분석하고, 나만의 버전을 만들고, 원본과 비교하며 다듬는다".
+  그들의 빌더는 외부 코딩 에이전트(Rust 엔진) — 이 숙주엔 rust 툴체인도,
+  crates.io 허용도 없으므로 **바이너리 흡수는 불가능·불필요**: 루프의
+  *방법*만을 두뇌 소유 부품으로 재주조했어요 (`brain_engine/craft_engine.py`).
+- **세 단계 전부 소유**: 검사 = Ghidra(PyGhidra) 디컴파일 C · 제작 = C 반환식의
+  폭-감싼 산술 파싱→파이썬 합성 · 비교 = **원본 바이트를 실행하는 소형 x86-64
+  에뮬레이터**와의 차분 테스트. 바이트 함수는 256 **전수**, 그 외 1024 벡터.
+- **정직 배선**: 100% 일치만 vault 기록(`record`), 미달성은 match%+불일치 목록
+  보고 · 루프/메모리/점프는 "지원 밖"으로 skip (발명 금지) · 채널 규약
+  (`machine-output` 태그) 준수 —craft 노트 3장이 코드 채널로 흡수됨
+  (code vocab 166→215·notes 14, **prose 476/12 불변**).
+- **실측**: xor_vault 2함수 256 전수 100% · crc16 1024 벡터 100% · 라이브
+  `POST /api/remedy {"action":"craft"}` 동작 · 스킬 노트
+  `20_Skills/skill_craft_anything_cleanroom.md`.
+- **새 숙주 복기에서 고친 것**: verify_ghidra_facts 가 /tmp 픽스처에 의존하던
+  재생산 부채 → 커밋된 vault 산문에서 자가 재생성 + 불변식을 **같은 런 안의
+  전후 차이**(산문만 vs 산문+코드)로 재정의 (낡은 상수 476/4/0.083 은 스냅샷
+  값이었음을 실측으로 확인).
+
+## N1+N2 — 🧭🔗 끈기 원장 + 증거 사슬 추론: Fable 의 로컬 등가물 (v7.3)
+사용자가 "N1+N2 결합"을 직접 선택 — 장기 에이전트의 **끈기**(N1)와 고도
+추론의 **증거 사슬**(N2)을 외부 모델·비용·데이터센터 없이 두뇌 소유 부품으로.
+- **N1 🧭 영속 퀘스트 원장** (`brain_engine/quest_ledger.py` · `quest_runners.py`):
+  스텝 = *멱등 효과 → `checkpoint(next_index)`* 순서로 `state/quests.json` 에
+  **원자 기록**(tmp + `os.replace`). `kill -9` 로 죽어도 원장은 남고, 기동 시
+  `resume_all()` 이 `active` 퀘스트를 **멈춘 인덱스부터** 이어요. 러너는
+  `@runner("kind")` 레지스트리(markers·craft·chain), 예외 시 좀비 대신 정직
+  `failed`+proof. — **기계 증명**: markers(4스텝·스텝당 4초)를 step 2/4 에서
+  `kill -9` → 동결(`active·index=2`, markers.log `s1,s2`) → 재기동 → `done·4/4`,
+  markers.log `s1,s2,s3,s4` **각 정확히 1회**(중복 0).
+- **N2 🔗 증거 사슬 다홉 추론** (`brain_engine/chain_reasoner.py`): 질문을
+  `'A 와 B'` 두 초점으로 쪼개 각 초점을 vault 노트에 대응시킨 뒤, **실제 증거
+  3종**(`[[링크]]`·공유 태그·기계 식별자 `호출/참조`)으로만 놓인 간선을 BFS
+  ≤3홉으로 탐색. 답은 사슬 노트의 제목·요약 + 다리 증거로만 조립(새 주장 금지),
+  **한쪽 초점이라도 vault 에 없거나 사슬이 닿지 않으면 발명 대신 "증거로 이을 수
+  없어요"**(구멍 보고). chain 퀘스트의 `audit` 스텝은 각 엣지를 **노트 파일과
+  대조**(link=`[[제목]]` 존재, tag·ident=다리 토큰이 두 파일에, 대소문자 무시)해
+  `audit_ok` 를 proof 로 남김. — **실측**: 2-홉 양성 벤치마크 6/6 · 고립/한쪽-결측
+  질문 `known:False` 발명 거부 · 라이브 `/api/reason` + chain 퀘스트 `audit_ok:True`.
+- **배선**: `GET/POST /api/quests`(kind=markers·craft·chain, 기동 시 `resume_all`),
+  `POST /api/reason`. craft 퀘스트는 같은 원장으로 end-to-end(inspect→build→
+  compare→record) — xor_vault 두 함수 256 전수 100%.
+- **정직·프라이버시**: quests.json·quest_markers 는 **이 드라이브의 런타임 상태**
+  (`state/.gitignore`) — 끈기는 "같은 두뇌가 다시 켜질 때"의 것, git 복제가 아님.
+  비밀 0·유료 0·외부 흐름 0. 스킬 노트
+  `20_Skills/skill_quest_ledger_persistence.md`·`skill_chain_reasoner_evidence.md`.
+
+### N1+N2 심화 — 🛡 회복력: kill -9 너머의 세 적(敵) (v7.3.1)
+`tools/test_quest_resilience.py` (자가완결·멱등, **32/32 그린**, exit-code 게이트)로
+기계 증명. 임시 디렉터리만 써서 라이브 state/vault 불변.
+- **concurrent** — `resume_all` 스레드 + POST 퀘스트 스레드가 같은 tmp 를 찢지
+  않도록 `_save` 를 `RLock` 으로 직렬화, `begin` qid 를 같은-ms 충돌까지 유일
+  보장. 실측: 12 스레드 × 5 체크포인트 → 오류 0·qid 충돌 0·log 유실 0.
+- **corrupt** — 훼손 원장을 **지우지 않고 격리**(`quests.corrupt-<ts>.json`) 후
+  `recovered` 기록과 함께 빈 상태로 정직 재기동 (증거 없는 조용한 초기화 금지).
+- **disk-full** — `_save` = tmp 쓰기 + `fsync` + `os.replace`(원자·내구). ENOSPC
+  주입 시 `SaveError` 표면화·tmp 청소·본파일은 마지막 좋은 상태 보존. 크래시
+  잔재 tmp 는 다음 `_load` 가 자동 청소.
+- **N2 심화** — `max_hops` 요청 가능(기본 3, 상한 8 = 경로 폭발 방지). 도달
+  실패 시 flat 거부 대신 **부분 사슬** 보고(몇 홉·몇 기억 도달, 도착과 토큰이
+  가장 겹치는 프런티어). 그래도 `known:False` — 사슬을 지어내지 않아요.
+  실측: 5-링크 사슬 `max_hops=3` 부분실패 / `=6` `hops=5` 완성 · 라이브
+  `{"max_hops":5}` → 끈기원장↔양자화멘토단 **4홉** + chain 퀘스트 `audit_ok:True`.
+- **garden 퀘스트** — 정원 가꾸기(reindex→semantic train→report)도 같은 끈기
+  원장으로. 러너 자가완결(payload 경로로 `WikiGardener` 재구성). 라이브
+  `POST /api/quests {"kind":"garden"}` → 35 노트·vocab 500·fidelity 99.996%.
+- **건강 가시화** — `GET /api/quests` 가 `health`(quests·active·recovered·
+  last_save_error)를 함께 반환. verify_ghidra_facts 올 그린 유지(산문 차분
+  불변식 2장=2장·0.11/0.069 전후 동일 — vault 성장으로 절대값만 이동).
+
+## 🔍 종합 감사 — A→N1+N2 4기준 기계 재감사 + 부채 원장 (v7.3.2)
+일회성 수동 주장이 아니라 두뇌가 **자기 자신을 다시 감사**하는 재생산 가능
+게이트: `tools/audit_brain.py` (**15/15 그린**, exit-code 게이트, 네트워크 없음,
+git 있으면 best-effort·없으면 파일시스템 폴백).
+- **개인정보** — 커밋 텍스트 71장 전수: 하드 시크릿·개인 이메일·사용자
+  홈경로 **0**.
+- **무료** — 비-localhost URL 은 전부 **dormant 수동 다운로더**
+  (`scripts/download_portable_slm.py`, `__main__`+`--tier` 명시) 안에만, 외부
+  호스트는 무료 GGUF(huggingface)뿐(유료 API 0), 그 다운로더를 두뇌가
+  **import 안 함** = 자동 외부흐름 0.
+- **정직** — 환각방어·정직거부 코드 경로 실제 존재(chain_reasoner
+  `known:False`+부분사슬 · slm_bridge "근거 없으면 모름" · craft 일치율 기록 ·
+  quest_ledger 정직 `failed`).
+- **두뇌 소유** — 런타임 상태·무거운 바이너리 git 미유입 · gitignore 커버 ·
+  이식성(하드코딩 `/tmp` 런타임 경로 0·`/home/user` 절대경로 0).
+- **감사 중 고친 실제 결함**: `re_analyzer`·`ghidra_facts_pyghidra`·
+  `verify_ghidra_facts` 가 런타임 스크래치를 `/tmp/…` 에 하드코딩 →
+  Windows(`start_windows.bat` 존재)엔 `/tmp` 없어 Ghidra 경로 파손. 전부
+  `tempfile.gettempdir()` 로 교체(Linux/macOS 행동 동일, Windows `%TEMP%`
+  정상). 수정 후 verify 올 그린·회복력 32/32 유지(회귀 없음).
+- **부채 원장(정직 고지)**: ① Windows 오프라인 이식성 — vendor `jdk4py`·
+  `jpype1` wheel 은 manylinux x86_64 전용(win_amd64 미밴들) ② N·N1+N2 3커밋
+  master 미병합 ③ dependency-submission 워크플로 삭제(admin 403, 복원법 기록)
+  ④ craft 직선 스칼라 가족 한정 ⑤ SLM 브리지 dormant(GGUF 미밴들→grounded
+  폴백) ⑥ 산문 절대값 표류(차분 불변식은 항상 성립 — 설계). 상세
+  `20_Skills/skill_self_audit_4criteria.md`.
+
+## 🪟 Windows 오프라인 이식성 완성 — 부채 ① 해결 (v7.3.3)
+v7.3.2 종합감사가 남긴 유일한 실질 부채(Windows 오프라인 Ghidra 불가)를 증거
+기반으로 닫았어요. "외장하드 소유" 주장은 Windows 에서도 진짜여야 하니까요.
+- **win_amd64 wheel 밴들** — `vendor/` 에 `jdk4py-25.0.2.1-py3-none-win_amd64`
+  (31MB, `java.exe`+DLL 81개)·`jpype1-1.7.1-cp311-cp311-win_amd64`(0.4MB,
+  `_jpype.pyd`) 추가, 둘 다 PyPI sha256 검증. 기존 py3-none-any(packaging·
+  pyghidra·typing_extensions)는 Windows 에서 그대로 동작 → vendor 7휠·65MB.
+- **`re_analyzer.py` 플랫폼 인식** — `_IS_WIN = os.name == "nt"` 분기: venv
+  인터프리터 `Scripts\python.exe`(vs `bin/python`)·JDK PATH `os.pathsep`
+  (`;` vs `:`)·decompiler `win_x86_64\decompile.exe`(ldd/glibc 점검 생략)·
+  `analyzeHeadless.bat`. **기본값(False)은 Linux/macOS 현행 행동 그대로**라
+  라이브 숙주 무영향 — health all_ok·verify exit0·회복력 32/32·audit 15/15 재확인.
+- **Windows 부트스트랩** — `tools/fetch_ghidra_dist.ps1`(+`.bat` 래퍼)이
+  `fetch_ghidra_dist.sh` 의 정확한 미러: orphan 브랜치(codeload, allow-list)
+  청크 재조립·체크섬 → venv → **vendor 휠 `--no-index` 오프라인 설치**(파이썬/
+  플랫폼 안 맞으면 PyPI 무료 폴백) → PyGhidra 팩트 추출·verify. `$env:TEMP`
+  사용(하드코딩 `/tmp` 0·Windows 홈경로 리터럴 0).
+- **`start_windows.bat`** — 논블로킹 사전점검: `%TEMP%\jdkenv` 있으면 역공학
+  채널 활성 안내, 없으면 objdump 폴백 + `fetch_ghidra_dist.bat` 일회성 힌트.
+- **정직 잔여** — 이 Linux 샌드박스엔 실제 Windows 호스트가 없어 라이브 검증
+  불가(wheel 구조·정적 검토·Linux 회귀 그린으로 대리 증명). jpype1 은 cp311
+  태그라 Python 3.11 에서만 오프라인, 아니면 PyPI(무료) 폴백. `audit_brain.py`
+  `TEXT_EXT` 에 `.ps1` 추가 — 새 부트스트랩도 개인정보 스캔 대상(무료·`/tmp`
+  검사는 `.py` 한정이라 shell/ps1 부트스트랩의 배달 URL 은 dormancy 규칙과
+  무관하게 허용, `fetch_ghidra_dist.sh` 와 동일 대우).
+
+## 🧪 Windows 부트스트랩 검증 강화 — 부채① 잔여 좁히기 (v7.3.4)
+v7.3.3 의 `.ps1` 은 썼지만 이 Linux 샌드박스엔 **실제 Windows 호스트도 pwsh 도
+없어요** — PowerShell 릴리스가 allow-list 밖 `objects.githubusercontent.com` 으로
+리다이렉트되어 바이너리를 받을 수 없고, PyPI 에 PowerShell 파서도 없어요. 그래서
+"눈으로 봤다" 대신 **돌릴 수 있는 것은 실제로 돌려** 기계 증거로 남기는 재생산
+가능 게이트 `tools/verify_windows_bootstrap.py`(**49/49 그린**, exit-code 게이트,
+네트워크 없음)를 추가했어요.
+- **오프라인 설치 가능성 증명(핵심)** — vendor 휠 태그(PEP425) + 의존 그래프
+  (METADATA `Requires-Dist`)를 풀어, **Windows/cp311·Linux/cp311 양쪽**에서
+  `pip --no-index --find-links vendor jdk4py pyghidra jpype1` 의 의존 폐포
+  (pyghidra→jpype1`>=1.5.2,!=1.6.0,!=1.7.0`·typing_extensions`~=4.16`·packaging)가
+  전부 호환 휠 + 버전 제약으로 만족됨을 기계 증명.
+- **이진 재조립 알고리즘 실행** — `.ps1` 가 쓰는 "이름순 정렬 + FileStream 바이너리
+  연결 + SHA256" 을 합성 픽스처(0바이트 포함 300KB)로 **실제 실행**해 비트복원·
+  체크섬 일치 증명(`Get-Content -Raw` 가 바이너리를 깨는 함정 회피 확인).
+- **`.ps1` 구조 불변식** — `$env:TEMP`(코드에 `/tmp` 0)·`Scripts\python.exe`·
+  `analyzeHeadless.bat`·`--no-index` 오프라인+PyPI 정직 폴백·`Get-FileHash` 체크섬·
+  `$ErrorActionPreference=Stop`·`$LASTEXITCODE`+nonzero exit 13곳(조용한 통과 없음)·
+  주석/문자열 접은 **코드** 중괄호·괄호 균형·외부 호스트 = 무료 allow-list
+  (codeload.github.com·github.com)뿐.
+- **`.ps1` ↔ `.sh` 단계 패리티 11종** + `.bat` 래퍼(Bypass·exitcode 전파·CRLF)·
+  `start_windows.bat` 사전점검이 `.ps1` 와 같은 venv 경로(`%TEMP%\jdkenv`) 사용.
+- **정직 범위** — 이 게이트는 정적 구조·알고리즘·오프라인 해결을 증명하지만,
+  **실 Windows 호스트 end-to-end 실행은 여전히 미목격**(호스트·pwsh 없음). 첫
+  Windows 실행이 마지막 잔여로 부채원장에 남아요. `audit_brain.py` 는 이 게이트
+  `.py` 도 개인정보 스캔(82파일)하며, 게이트 속 검사 needle(`/tmp`·`c:\users`·`://`)은
+  자가오염 0(HOME_RE·TMP_RUNTIME_RE·URL_RE 어느 것도 안 걸림).

@@ -21,6 +21,7 @@ import json
 import shutil
 import sys
 import tempfile
+from typing import Any
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -132,8 +133,28 @@ def main() -> int:
     check("산문 쌍 코사인: 코드 수유 전후 동일",
           abs(a1 - n1) < 1e-9 and abs(a2 - n2) < 1e-9,
           f"= {round(n1, 3)}/{round(n2, 3)} (전 {round(a1, 3)}/{round(a2, 3)})")
-    check("엉터리 쌍은 낮음(절대 sanity)", max(n1, n2) < 0.2,
-          f"= max {round(max(n1, n2), 3)}")
+    # 엉터리 쌍 sanity — ⚠ 이건 **절대 상수(0.2)** 였는데, 위 주석이 스스로 말하듯
+    #   "불변식은 낡은 상수가 아니라 같은 런 안의 차이"여야 해요. vault 산문이 성장
+    #   하면서 절대값이 0.227 로 표류해 이 검사가 **실패**하고 있었어요(부채⑥
+    #   "산문 절대값 표류"의 실제 발현 — 그동안 dist 가 없어 rc=3 정직 skip 이라
+    #   가려져 있었음). 상대 불변식으로 바꿔요:
+    #     (a) 시스템이 스스로 "관련 있음"으로 보는 기준(cos_min=0.45)보다 낮을 것
+    #     (b) 각 노트의 **최근린** 유사도보다 낮을 것 — 유사도 함수가 퇴화해서
+    #         모든 쌍이 비슷해지면 (b) 가 깨져요(절대값보다 강한 판별력).
+    def _nn(chan: Any, notes: Any, target: Any) -> float:
+        return max((chan.pair_similarity(target, o) for o in notes
+                    if o["slug"] != target["slug"]), default=0.0)
+
+    COS_RELATED = 0.45                       # orphans() 가 쓰는 시스템 자신의 기준
+    t1 = byt(prose, "스킬 카트리지")
+    t2 = byt(prose, "LLM 위키")
+    nn1, nn2 = _nn(ch, prose, t1), _nn(ch, prose, t2)
+    check("엉터리 쌍은 관련 기준(cos_min=0.45)보다 낮음(상대 sanity)",
+          max(n1, n2) < COS_RELATED,
+          f"= max {round(max(n1, n2), 3)} < {COS_RELATED}")
+    check("엉터리 쌍은 각 노트의 최근린보다 낮음(유사도 판별력)",
+          n1 < nn1 and n2 < nn2,
+          f"n1={round(n1, 3)} vs nn1={round(nn1, 3)} · n2={round(n2, 3)} vs nn2={round(nn2, 3)}")
     print("── 5) 기계 채널의 구조적 구멍 ──")
     cg = ch.code_orphans(prose + back)
     check("구조적 구멍 보고", isinstance(cg, list) and all("in_edges" in g for g in cg),

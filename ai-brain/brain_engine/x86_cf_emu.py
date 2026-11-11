@@ -10,8 +10,9 @@
     이 에뮬레이터는 craft 의 **oracle**(원본 바이트의 참값)이에요. oracle 이
     틀리면 차분 검증이 오염되므로, 확신 없는 것은 절대 짐작하지 않고
     `unsupported` 에 넣고 **멈춰요**(craft 가 그 함수를 정직 skip). 지원 범위는
-    의도적으로 좁고 보수적: CALL(다른 함수)·복잡한 addressing·캡 초과·**RET 없이
-    끝나는(잘린) 명령 스트림** → bail.
+    의도적으로 좁고 보수적: CALL(다른 함수)·복잡한 addressing·캡 초과 → bail,
+    그리고 **RET 없이 끝나는(잘린) 명령 스트림** → `trunc:no-ret` 로 bail(침묵
+    완주 주장 금지). 제수 0·몫 오버플로(#DE)는 `div:div0`/`idiv:of` 등으로 bail.
     검증은 `tools/test_n3_craft.py`(제어흐름·메모리) 와 `tools/test_n4_muldiv.py`
     (곱셈·나눗셈 가족) 가 **gcc 네이티브 실행 ground truth** 와 전수 대조해요.
 

@@ -68,7 +68,9 @@ def main() -> int:
             insns, mnem, calls, refnames = [], [], [], []
             instr = listing.getInstructionAt(f.getEntryPoint())
             guard = 0
-            while instr is not None and f.getBody().contains(instr.getMinAddress()) and guard < 16:
+            # N4: magic-number 나눗셈/나머지 함수는 16 명령을 넘긴다(imod5≈19).
+            # 함수 본문 끝까지(또는 64 명령) 모아 잘림으로 인한 oracle 오차를 막는다.
+            while instr is not None and f.getBody().contains(instr.getMinAddress()) and guard < 64:
                 # 전체 피연산자까지 — 첫 피연산자만 적던 버그(XOR AL) 를 고쳐요.
                 # 에뮬레이터·노트 모두 완전한 명령 텍스트가 필요해요.
                 insns.append("%s:\t%s" % (instr.getMinAddress(), instr.toString()))

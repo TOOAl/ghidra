@@ -257,3 +257,32 @@ v7.3.3 의 `.ps1` 은 썼지만 이 Linux 샌드박스엔 **실제 Windows 호�
   quest 32·windows 49/49 유지).
 - **정직 잔여** — CALL/복잡 addressing/캡 초과 루프는 계속 정직 skip. "무엇이든"
   이 아니라 "검증 가능한 만큼만" craft.
+
+## 🌀 Stage N4 — 곱셈·나눗셈 자가복제: craft 가 magic reciprocal 과 절삭 나눗셈을 배우다 (v7.3.7)
+부채④ 잔여 중 "제수(나눗셈) 쓰는 함수는 oracle 이 bail → 복제 불가" 구멍을
+**증거 기반**으로 해소했어요. N3 와 같은 정직 방법론 — 새 oracle 명령을 **gcc -O0
+네이티브 실행과 11 함수 × 271 입력 전수 대조**(미지원 0)로 기계 증명.
+
+- **핵심 발견** — gcc 는 상수 제수를 `-O0` 에서도 **magic-number reciprocal 곱셈**
+  (3-operand `IMUL RDX,RDX,0x55555556` + shifts)으로 컴파일(`CDQ;IDIV` 아님).
+  `CDQ;IDIV`/`DIV` 는 **variable 제수**에서만. → 상수 나눗셈 craft 의 열쇠는 3-op IMUL.
+- **oracle 확장** (`brain_engine/x86_cf_emu.py`) — **3-operand `IMUL`**(magic)·
+  **one-op `MUL`/`IMUL`**(DX:AX 페어, 8/16/32/64)·**`CDQ/CQO/CWD/CDQE/CBW`**(부호확장)·
+  **`DIV`/`IDIV`**(2w비트 피제수, 몫 AX·나머지 DX, `IDIV` 0 방향 절삭, 제수0·#DE 정직 bail).
+- **합성기 확장** (`brain_engine/c_synthesize.py`) — C 정수 `/`·`%` 를 **C-충실 절삭**
+  헬퍼 `_tdiv`/`_tmod` 로(AST 치환). 파이썬 `//`·`%` 는 음수에서 바닥 나눗셈이라
+  환각(`-7//3=-3` vs C `-2`; `-7%3=2` vs C `-1`). 제수가 상수든 표현식이든 동작.
+  + Ghidra x86-64(LP64) `long`/`ulong`=**64비트** 타입폭 오분류 수정(64비트 곱셈 반환).
+- **차분 검증 게이트 유지** — oracle vs 합성 **100% 일치만 기록**. 지저문한 -O0
+  디컴파일(`vdiv` 16바이트 구조체 렌더)은 합성 `None`→skip, 병적 캐스트(`vmod`)는
+  차분 70.91%<100%→record 차단, 훼손 합성(바닥 `x//3`)도 거부 → 발명 구조적 불가.
+- **게이트** `tools/test_n4_muldiv.py` **51/51 그린**(exit 코드) — 실제 Ghidra insn +
+  gcc 네이티브 ground truth 픽스처로 oracle==native(11)·synth==native(9)·craft 100%(9)·
+  record 100%만·절삭 단위 테이블·정직(skip/거부)·gcc 미방출 형태(one-op mul/imul·
+  cqo·64 idiv·cdqe·cwd) 6개 독립 참조 검증. 회귀 없음(audit 15/15·n3 29·slm 13·
+  quest 32·windows 49/49 유지).
+- **정직 잔여** — `cmov`(absv·clampv)·`switch`(점프테이블)는 계속 정직 bail(N4 범위
+  밖). one-op `MUL`/`IMUL`·`CQO`·64비트 `IDIV`·`CDQE`/`CWD` 는 gcc 가 단순 단일입력
+  함수에서 방출하지 않아 **네이티브 아닌 독립 참조**로 증명(32비트 `CDQ;IDIV`/`DIV` 는
+  `vdiv`/`uvdiv` 네이티브 증명). 합성기는 부호 바꾸는 캐스트(`(int)uintVar`) 미모델링
+  → 그런 디컴파일은 차분 게이트 정직 거부. 타입폭 LP64 기준(LLP64 미모델링, 게이트 거부).

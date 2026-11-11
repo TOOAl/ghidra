@@ -59,8 +59,11 @@ online 경로를 실제로 띄워: 올바른 합성→차분 100%, **환각(그�
 ## 🚧 남은 한계 (정직 고지)
 CALL(다른 함수 호출)·복잡한 addressing 모드·스텝캡 초과 루프는 계속 정직
 skip 해요. "무엇이든 craft" 가 아니라 "검증 가능한 만큼만 craft" — 이게
-이 두뇌의 방식이에요.
+이 두뇌의 방식이에요. *(N3 당시 oracle 이 곱셈/나눗셈 가족 `IMUL` 3-op·`CDQ`·
+`DIV`/`IDIV` 에서 bail 하던 구멍은 → Stage N4 에서 해결돼 제수를 쓰는 함수도
+복제돼요. 아래 N4 노트 참고.)*
 
 ## 🔗 연결된 시냅스 (Wiki Links)
+- [[🌀 곱셈·나눗셈 자가복제 — craft 가 magic reciprocal 과 절삭 나눗셈을 배우다 (Stage N4)]]
 - [[자가 복제 공작 루프 — craft-anything 두뇌 판 (clean-room)]]
 - [[자가 종합 감사 — 4기준 기계 재감사와 부채 원장 (audit_brain)]]

@@ -16,6 +16,7 @@ Env:    GHIDRA_INSTALL_DIR, JAVA_HOME
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 import warnings
@@ -57,8 +58,29 @@ def main() -> int:
         pyghidra.start()
     from ghidra.app.decompiler import DecompInterface
 
-    facts = {"backend": "analyzeHeadless", "binary": binary.rsplit("/", 1)[-1], "functions": []}
-    _proj = os.path.join(tempfile.gettempdir(), "ghidra_pyproj")
+    # ⚠ 결함 수정(live 검증에서 발견): 프로젝트 캐시 위치가 **고정**이었어요
+    #   (`gettempdir()/ghidra_pyproj`). 그러면 내용이 바뀐 바이너리를 **같은 경로**로
+    #   다시 채집할 때 PyGhidra 가 이전 분석을 그대로 재사용해요 — 즉 다른 바이너리의
+    #   사실을 침묵으로 돌려주는 오염이에요(캡 잘림과 같은 종류의 "침묵 오염").
+    #   해결: 캐시 키를 **바이너리 내용 해시**로 만들어요(같은 내용은 여전히 빠르게
+    #   재사용, 내용이 다르면 새 프로젝트) + 출처를 facts 에 기록해 데이터가
+    #   스스로 "내가 어느 바이트에서 나왔는지" 말하게 해요.
+    _h = hashlib.sha256()
+    with open(binary, "rb") as _bf:
+        for _chunk in iter(lambda: _bf.read(1 << 20), b""):
+            _h.update(_chunk)
+    _digest = _h.hexdigest()
+    facts = {
+        "backend": "analyzeHeadless",
+        "binary": binary.rsplit("/", 1)[-1],
+        "source_sha256": _digest,
+        "source_size": os.path.getsize(binary),
+        "project_key": "ghidra_pyproj_" + _digest[:16],
+        "insn_cap": _INSN_CAP,
+        "dec_line_cap": _DEC_LINE_CAP,
+        "functions": [],
+    }
+    _proj = os.path.join(tempfile.gettempdir(), facts["project_key"])
     with pyghidra.open_program(binary, project_location=_proj, analyze=True) as flat:
         program = flat.getCurrentProgram()
         fm = program.getFunctionManager()

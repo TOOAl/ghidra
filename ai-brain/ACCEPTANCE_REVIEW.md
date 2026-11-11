@@ -26,7 +26,7 @@
 
 ### ① 개인정보 — ✅
 - `audit_brain`: 커밋 텍스트 **82파일 전수** — 하드 시크릿(AKIA·개인키·ghp_·sk-·AIza)·개인 이메일·사용자 홈경로 **0**.
-- **독립 NUL-safe 크로스스캔**(한국어 파일명 안전: `git -c core.quotepath=false ls-files -z | xargs -0 grep`): 비밀/이메일/홈경로 **0命中** — audit_brain 를 다른 방법으로 재확인.
+- **독립 NUL-safe 크로스스캔**(한국어 파일명 안전: `git -c core.quotepath=false ls-files -z | xargs -0 grep`): 비밀/이메일/홈경로 **0건** — audit_brain 를 다른 방법으로 재확인.
 - Windows 사용자 홈경로 리터럴 **0** — `.ps1`·`.bat`·노트 전부 `$env:TEMP`/`%TEMP%` 사용(하드코딩 없음).
 
 ### ② 무료 — ✅

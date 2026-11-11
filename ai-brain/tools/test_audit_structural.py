@@ -21,9 +21,10 @@
      독스트링에 기재돼 있어야 해요(staleness 금지). 텍스트 대조가 아니라 **실행**으로.
   5) **문자 오염** — 한글 산문·주석에 일본어 가나, 또는 한글을 **대체**한 한자가
      있으면 안 돼요. 단 정당한 국어 한자 병기(`무패(無敗)`)는 허용.
-  6) **두 oracle 경로 일관성** — 직선경로 `_W` 와 cf경로 `_tdiv`/`_tmod` 가 같은 C
-     truncation semantics 여야 하고, `_W` 가 산술 던더를 **갖고 있어야** 해요
-     (하나라도 사라지면 결함④ 재발).
+  6) **두 oracle 경로 일관성** — 직선경로 `_W` 와 cf경로 `_tdiv`/`_tmod`, 그리고
+     **게이트가 독립 유도체 참조**가 삼방으로 같은 C truncation semantics 여야 하고,
+     `_W` 가 산술 던더를 **갖고 있어야** 해요(하나라도 사라지면 결함④ 재발).
+     참조를 `SYN._tdiv` 호출로 쓰면 위임 리팩토링 후 tautology 가 돼요(변이 M9 실측).
   7) **정직 불변식** — `record` 는 match 100% 만 저장해요(99.99% 도 안 됨).
 
 정직 원칙: 이 게이트 자체도 짐작하지 않아요. 검사할 수 없는 것(예: live Ghidra
@@ -167,6 +168,33 @@ def test_single_source_register_model() -> None:
             risky.append(f"L{i + 1} 상위 if = {guard[:40]!r}")
     check(not risky, "`_core[0]+\"l\"`(al/bl/cl/dl 전용) 은 `_i < 4` 가드 안에서만 쓰임",
           "; ".join(risky))
+
+    # (g) C truncation 나눗셈의 단일 출처를 **행동**으로 확인해요.
+    #     `_W._div` 는 `c_synthesize._tdiv`/`_tmod` 를 *실제로 호출*해야 해요.
+    #     왜 텍스트가 아닌가 → M17 교훈: "본문에 그 이름이 있는가"는 독스트링
+    #     언급에 속아요. 호출 계수는 이름만 적어두는 것으로 위조할 수 없어요.
+    import brain_engine.c_synthesize as SYN
+
+    hits = {"tdiv": 0, "tmod": 0}
+    orig_div, orig_mod = SYN._tdiv, SYN._tmod
+
+    def _probe_div(a: int, b: int) -> int:
+        hits["tdiv"] += 1
+        return orig_div(a, b)
+
+    def _probe_mod(a: int, b: int) -> int:
+        hits["tmod"] += 1
+        return orig_mod(a, b)
+
+    SYN._tdiv, SYN._tmod = _probe_div, _probe_mod
+    try:
+        _ = CE._W(-7, 32, True) / CE._W(3, 32, True)
+        _ = CE._W(-7, 32, True) % CE._W(3, 32, True)
+    finally:
+        SYN._tdiv, SYN._tmod = orig_div, orig_mod   # 되돌리지 않으면 오염돼요
+    check(hits["tdiv"] > 0 and hits["tmod"] > 0,
+          "craft_engine 의 signed 나눗셈·나머지는 c_synthesize._tdiv/_tmod 를 실제 호출",
+          f"호출 횟수 {hits} — 0 이면 로직을 다시 인라인으로 펼친 거예요(복제 부활)")
 
 
 def test_truncation_never_silent() -> None:
@@ -497,8 +525,26 @@ def test_no_foreign_script_contamination() -> None:
           ", ".join(latin_hits[:6]))
 
 
+def _ref_c_div(a: int, b: int) -> int:
+    """C99 6.5.5 몫 — **게이트 안에서 독립 유도**한 참조예요.
+
+    ⚠ 여기서 `SYN._tdiv` 를 호출하면 비교가 **tautology** 가 돼요. v7.3.11 에서
+    `_W._div` 를 단일 출처로 `SYN._tdiv` 에 위임시켰더니, (b) 검사의 양쪽이 같은
+    함수가 되어 `_tdiv` 를 바닥나눗셈으로 바꾸는 변이(M9)가 **조용히 통과**했어요.
+    알고리즘은 C 표준이 유일하게 결정하므로 구현 텍스트가 같을 수밖에 없어요 —
+    중요한 것은 **호출 관계가 없어서 한쪽만 변이된다**는 거예요.
+    """
+    q = abs(a) // abs(b)
+    return -q if (a < 0) != (b < 0) else q
+
+
+def _ref_c_mod(a: int, b: int) -> int:
+    """C99 나머지 — `a == (a/b)*b + a%b` 이고 부호는 피제수를 따라요(독립 유도)."""
+    return a - _ref_c_div(a, b) * b
+
+
 def test_two_oracle_paths_agree() -> None:
-    print("\n[6] 두 oracle 경로 일관성 — `_W`(직선) == `_tdiv`/`_tmod`(cf)")
+    print("\n[6] 두 oracle 경로 일관성 — 직선 `_W` · cf `_tdiv`/`_tmod` · **독립 참조** 삼방")
     # (a) `_W` 가 산술 던더를 **갖고 있어야** 해요(사라지면 결함④ 재발)
     need = ["__mul__", "__rmul__", "__truediv__", "__rtruediv__", "__floordiv__",
             "__mod__", "__rmod__", "__neg__", "__invert__", "__eq__", "__lt__",
@@ -507,7 +553,11 @@ def test_two_oracle_paths_agree() -> None:
     check(not missing, f"`_W` 산술 던더 {len(need)}개 전부 존재(결함④ 재발 방지)",
           ", ".join(missing))
 
-    # (b) 두 경로가 같은 C truncation semantics 인지 전수 대조
+    # (b) **삼방 대조** — 직선 경로(`_W`), cf 경로(`SYN._tdiv`/`_tmod`), 그리고
+    #     게이트가 독립 유도체 참조를 서로 대조해요.
+    #     예전엔 직선 vs `SYN._tdiv` 였는데, `_W._div` 를 `_tdiv` 에 위임시킨 뒤로는
+    #     양쪽이 같은 함수라 **무조건 통과하는 tautology** 였어요(변이 M9 가 실측으로
+    #     드러냄). 참조를 독립 유도체로 바꾸고 `_tdiv` 자체도 직접 대조해요.
     M32 = (1 << 32) - 1
     bad: List[str] = []
     pairs = 0
@@ -516,13 +566,19 @@ def test_two_oracle_paths_agree() -> None:
             sa = a & M32
             sa = sa - (1 << 32) if sa >= (1 << 31) else sa
             pairs += 1
+            rq, rm = _ref_c_div(sa, b) & M32, _ref_c_mod(sa, b) & M32
             wq = CE.build_python(f"x / {b}", 32, True)(a) & M32
             wm = CE.build_python(f"x % {b}", 32, True)(a) & M32
-            if wq != (SYN._tdiv(sa, b) & M32):
-                bad.append(f"{a}/{b} q={wq} want={SYN._tdiv(sa, b) & M32}")
-            if wm != (SYN._tmod(sa, b) & M32):
-                bad.append(f"{a}%{b} m={wm} want={SYN._tmod(sa, b) & M32}")
-    check(not bad, f"직선 `_W` 나눗셈/나머지 == cf `_tdiv`/`_tmod` ({pairs}쌍 전수)",
+            if wq != rq:
+                bad.append(f"직선 {a}/{b} q={wq} want={rq}")
+            if wm != rm:
+                bad.append(f"직선 {a}%{b} m={wm} want={rm}")
+            if (SYN._tdiv(sa, b) & M32) != rq:
+                bad.append(f"cf _tdiv({a},{b})={SYN._tdiv(sa, b) & M32} want={rq}")
+            if (SYN._tmod(sa, b) & M32) != rm:
+                bad.append(f"cf _tmod({a},{b})={SYN._tmod(sa, b) & M32} want={rm}")
+    check(not bad,
+          f"직선 `_W` · cf `_tdiv`/`_tmod` · 독립 참조 삼방 일치 ({pairs}쌍 × 4대조)",
           "; ".join(bad[:4]))
 
     # (b2) `_W` 산술 **전부**를 독립 참조(파이썬 int + 폭 마스킹)와 대조해요.
@@ -549,6 +605,12 @@ def test_two_oracle_paths_agree() -> None:
             ]
             if b >= 0 and b < 32:
                 cases += [(f"x << {b}", (ua << b) & M32)]
+            if b:                       # 0 나눔은 (d) 에서 separately 다뤄요
+                # ⚠ 이 두 줄이 없었어요 — 나눗셈·나머지는 (b) 만이 재고 있었는데 그
+                #   (b) 가 위임 리팩토링 후 tautology 가 되면서 **C truncation 파괴가
+                #   게이트 전체에서 안 잡히는 상태**였어요(변이 M9 가 실측으로 노출).
+                cases += [(f"x / {b}", _ref_c_div(sa, b) & M32),
+                          (f"x % {b}", _ref_c_mod(sa, b) & M32)]
             for expr, want in cases:
                 n_arith += 1
                 try:

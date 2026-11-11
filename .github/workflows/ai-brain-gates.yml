@@ -57,12 +57,6 @@ jobs:
       - name: Gate — structural audit invariants
         run: python tools/test_audit_structural.py
 
-      # 불변식 게이트의 **자기효능** 검증: 원래 결함 19종을 되살렸을 때 게이트가
-      # 정말로 빨개지는지(그리고 *기대한 그 검사*로 빨개지는지) 매 실행마다 측정해요.
-      # 게이트를 약화시키면 여기서 드러나요. 파일을 변이시킨 뒤 sha256 로 복원을 검증해요.
-      - name: Gate — mutation suite (does the gate still catch the defects)
-        run: python tools/test_mutation_suite.py
-
       - name: Gate — N4 muldiv (oracle vs gcc native ground truth)
         run: python tools/test_n4_muldiv.py
 
@@ -80,3 +74,12 @@ jobs:
 
       - name: Gate — brain self audit (4 criteria)
         run: python tools/audit_brain.py
+
+      # 메타 게이트 — **위에 있는 게이트 전부**의 자기효능 검증이에요. 원래 결함 38종을
+      # 되살렸을 때 해당 게이트가 정말로 빨개지는지(그리고 *기대한 그 검사*로 빨개지는지)
+      # 매 실행마다 측정해요. 게이트를 약화시키면 여기서 드러나요.
+      # 스스로 베이스라인(변이 없음)을 먼저 요구하므로 뒤에 두어요. 파일을 변이시킨 뒤
+      # sha256 로 원본 복원을 검증하고, 마지막에 게이트 전부를 다시 돌려 트리를 증명해요.
+      # live Ghidra 가 필요한 verify_* 2종은 rc=3 정직 skip 이라 대상에서 제외(미측정).
+      - name: Gate — mutation suite (do the gates still catch the defects)
+        run: python tools/test_mutation_suite.py

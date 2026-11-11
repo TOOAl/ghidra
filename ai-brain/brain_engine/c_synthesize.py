@@ -28,12 +28,15 @@ from typing import Dict, List, Optional, Tuple
 _TYPE_WIDTH = {
     "char": 8, "byte": 8, "undefined1": 8, "bool": 8,
     "short": 16, "ushort": 16, "undefined2": 16, "word": 16,
-    "int": 32, "uint": 32, "undefined4": 32, "dword": 32, "long": 32,
+    "int": 32, "uint": 32, "undefined4": 32, "dword": 32,
+    # Ghidra x86-64(LP64) 렌더에서 `long`/`ulong` 은 8 바이트(64비트)다.
+    # (32비트로 두면 64비트 곱셈 반환을 잘못 잘라 차분 ゲ이트가 거부한다.)
+    "long": 64, "ulong": 64,
     "undefined8": 64, "qword": 64, "longlong": 64, "ulonglong": 64,
     "size_t": 64, "pointer": 64,
 }
 _UNSIGNED_TYPES = {"byte", "undefined1", "bool", "ushort", "word", "undefined2",
-                   "uint", "undefined4", "dword", "ulonglong", "undefined8",
+                   "uint", "undefined4", "dword", "ulong", "ulonglong", "undefined8",
                    "qword", "size_t", "pointer"}
 _CAST_RE = re.compile(
     r"\(\s*(?:unsigned\s+|signed\s+)?(?:const\s+)?"
@@ -42,6 +45,23 @@ _CAST_RE = re.compile(
 
 _LOOP_GUARD = 2_000_000        # 합성 루프의 안전 캡(진짜 무한루프만 차단)
 _IDENT = re.compile(r"[A-Za-z_]\w*")
+
+
+class _DivModToHelper(ast.NodeTransformer):
+    """C 정수 `a/b`·`a%b`(0 절삭, 피제수 부호) 를 런타임 헬퍼 호출로 치환.
+
+    파이썬 `//`·`%` 는 음수에서 C 와 결과가 달라서(바닥 나눗셈) 그대로 두면
+    환각이 된다. 제수가 0 이 아닌 상수일 때만 변환(비트폭 추정이 안전);
+    그 외엔 그대로 두고 상위의 안전 검증이 거부하게 한다.
+    """
+
+    def visit_BinOp(self, node):  # noqa: N802
+        self.generic_visit(node)
+        if not isinstance(node.op, (ast.Div, ast.Mod)):
+            return node
+        fname = "_tdiv" if isinstance(node.op, ast.Div) else "_tmod"
+        return ast.Call(func=ast.Name(id=fname, ctx=ast.Load()),
+                        args=[node.left, node.right], keywords=[])
 
 
 def _mask(w: int) -> int:
@@ -115,7 +135,6 @@ def xlate_expr(expr: str, imap: Dict[str, str]) -> Optional[str]:
         e = _CAST_RE.sub("", e)
     e = e.replace("&&", " and ").replace("||", " or ")
     e = re.sub(r"!(?!=)", " not ", e)
-    e = re.sub(r"(?<![<>=!+\-*/%&|^])/(?![/=*])", "//", e)   # 정수 나눗셈
     # C 정수 리터럴 접미어(U/L/UL/LL …) 제거 — Ghidra 가 `1U` `0xffU` 등으로 출력
     e = re.sub(r"\b(0[xX][0-9a-fA-F]+|\d+)[uUlL]+\b", r"\1", e)
     e = _IDENT.sub(lambda m: ("and" if m.group(0) == "and" else
@@ -132,7 +151,14 @@ def xlate_expr(expr: str, imap: Dict[str, str]) -> Optional[str]:
             return None
         if isinstance(node, ast.Constant) and isinstance(node.value, (float, complex, bytes, str)):
             return None                          # 부동소수/문자열 상수 → 이 부분집합 밖
-    return e
+    # C 정수 나눗셈/나머지는 0 절삭·피제수 부호 — 파이썬 `//`·`%` 와 음수에서
+    # 달라서,忠実 헬퍼 호출(_tdiv/_tmod)으로 AST 치환 후 unparse.
+    try:
+        tree = _DivModToHelper().visit(tree)
+        ast.fix_missing_locations(tree)
+        return ast.unparse(tree)
+    except Exception:  # noqa: BLE001
+        return None
 
 
 # ── 선언/시그니처 파싱 ──────────────────────────────────────────────────────
@@ -385,7 +411,22 @@ class _Synth:
 
 
 # 합성된 함수가 사용하는 런타임 헬퍼 (부호 wrap)
-_SYNTH_HELPERS = {"_w": lambda v, half, full: v - full if v >= half else v}
+def _tdiv(a: int, b: int) -> int:
+    """C 정수 나눗셈: 0 방향으로 절삭(파이썬 `//` 의 바닥 나눗셈과 다름)."""
+    q = abs(a) // abs(b)
+    return q if (a < 0) == (b < 0) else -q
+
+
+def _tmod(a: int, b: int) -> int:
+    """C 정수 나머지: 부호는 피제수(a)를 따름(파이썬 `%` 와 다름)."""
+    return a - _tdiv(a, b) * b
+
+
+_SYNTH_HELPERS = {
+    "_w": lambda v, half, full: v - full if v >= half else v,
+    "_tdiv": _tdiv,
+    "_tmod": _tmod,
+}
 
 
 def synthesize(dec: str, imap: Optional[Dict[str, str]] = None) -> Optional[str]:

@@ -62,6 +62,16 @@ def _mask(w: int) -> int:
     return (1 << w) - 1
 
 
+# 곱셈/나눗셈이 쓰는 누산기 레지스터 쌍 (low, high) — 폭별 DX:AX 페어
+_ACC = {8: ("al", "ah"), 16: ("ax", "dx"), 32: ("eax", "edx"), 64: ("rax", "rdx")}
+
+
+def _ssext(v: int, w: int) -> int:
+    """w비트 값을 파이썬 signed 로 부호 확장."""
+    v &= _mask(w)
+    return v - (1 << w) if (v >> (w - 1)) & 1 else v
+
+
 def _parse_imm(tok: str) -> int:
     tok = tok.strip().replace("$", "").replace(",", "")
     neg = tok.startswith("-")
@@ -408,6 +418,63 @@ def run(insns: List[str], x: int, input_reg: Optional[str] = None,
                 if not d or d.kind != "reg" or not s or s.kind != "mem":
                     unsupported.append("lea:bad"); break
                 write_op(d, eff(s), reg_info(d.reg)[2])              # type: ignore
+                pc = nxt; continue
+            # ── N4: 부호확장 + 곱셈/나눗셈 가족 (DX:AX 페어, 3-op imul, div/idiv) ──
+            if mnem in ("cdq", "cqo", "cwd", "cdqe", "cwde", "cbw"):
+                if mnem == "cdq":     rset("edx", _mask(32) if (rget("eax") >> 31) & 1 else 0)
+                elif mnem == "cqo":   rset("rdx", _mask(64) if (rget("rax") >> 63) & 1 else 0)
+                elif mnem == "cwd":   rset("dx", _mask(16) if (rget("ax") >> 15) & 1 else 0)
+                elif mnem == "cdqe":  rset("rax", _ssext(rget("eax"), 32))
+                elif mnem == "cwde":  rset("eax", _ssext(rget("ax"), 16))
+                elif mnem == "cbw":   rset("ax", _ssext(rget("al"), 8))
+                pc = nxt; continue
+            if mnem in ("mul", "div", "idiv") or (mnem == "imul" and len(ops) in (1, 3)):
+                if not ops:
+                    unsupported.append(mnem + ":ops"); break
+                if mnem == "imul" and len(ops) == 3:
+                    d = parse_operand(ops[0]); s = parse_operand(ops[1])
+                    if not d or d.kind != "reg" or not s:
+                        unsupported.append("imul3:bad"); break
+                    sv, _sw = read_op(s)
+                    dwi = reg_info(d.reg)[2]                      # type: ignore
+                    rset(d.reg, (sv * _parse_imm(ops[2])) & _mask(dwi))
+                    pc = nxt; continue
+                s = parse_operand(ops[0])
+                if not s or s.kind == "imm":
+                    unsupported.append(mnem + ":src"); break
+                sv, w = read_op(s)
+                if w not in (8, 16, 32, 64):
+                    unsupported.append(mnem + ":w"); break
+                lo, hi = _ACC[w]
+                if mnem in ("mul", "imul"):
+                    av = rget(lo)
+                    if mnem == "imul":
+                        prod = (_ssext(av, w) * _ssext(sv, w)) & _mask(2 * w)
+                    else:
+                        prod = (av * sv) & _mask(2 * w)
+                    rset(lo, prod & _mask(w))
+                    rset(hi, (prod >> w) & _mask(w))
+                    pc = nxt; continue
+                lowv = rget(lo); highv = rget(hi)
+                dividend = (highv << w) | lowv                    # 2w 비트 (unsigned)
+                if mnem == "idiv":
+                    D = _ssext(dividend, 2 * w); dvs = _ssext(sv, w)
+                else:
+                    D = dividend; dvs = sv
+                if dvs == 0:
+                    unsupported.append(mnem + ":div0"); break      # #DE → 정직 bail
+                if mnem == "idiv":
+                    q = abs(D) // abs(dvs)
+                    q = q if (D < 0) == (dvs < 0) else -q          # 0 절삭
+                    r = D - q * dvs
+                    if q >= (1 << (w - 1)) or q < -(1 << (w - 1)):
+                        unsupported.append(mnem + ":of"); break    # #DE 오버플로
+                else:
+                    q = D // dvs; r = D % dvs
+                    if q >= (1 << w):
+                        unsupported.append(mnem + ":of"); break
+                rset(lo, q & _mask(w))
+                rset(hi, r & _mask(w))
                 pc = nxt; continue
             if mnem in ARITH or mnem in SHIFT or mnem in ("not", "neg", "inc", "dec", "imul"):
                 if not ops:

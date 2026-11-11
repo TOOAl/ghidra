@@ -23,7 +23,7 @@ _CODE_FENCE = re.compile(r"```(?:python|py)?\s*\n(.*?)```", re.S)
 
 
 def _extract_func_src(reply: str) -> Optional[str]:
-    """LLM 응답에서 `def fn(x): ...` 파이썬 소스를 추출(코드펜스优先)."""
+    """LLM 응답에서 `def fn(x): ...` 파이썬 소스를 추출(코드펜스 우선)."""
     cand = None
     m = _CODE_FENCE.search(reply or "")
     if m:
@@ -230,7 +230,7 @@ class PortableSLMBridge:
     def synthesize_python(self, c_text: str, sig_hint: str = "") -> Dict[str, Any]:
         """디컴파일 C → clean-room 파이썬 `def fn(x): ...` 합성 시도.
 
-        online  : 로컬 LLM 에게 동등 함수를 요청 → 코드펜스 추출 → 정적 안전検証.
+        online  : 로컬 LLM 에게 동등 함수를 요청 → 코드펜스 추출 → 정적 안전 검증.
                   (최종 진실은 craft 의 차분 검증: 원본 바이트 oracle 과 100% 일치만 기록)
         offline : **grounded 폴백** — 코드를 발명하지 않고 정직하게 source=None 을
                   돌려줘 craft 가 규칙 기반 합성기(c_synthesize)를 쓰게 해요.

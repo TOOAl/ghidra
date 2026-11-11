@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""🌀 Stage N4 기계 증명 — 나눗셈/곱셈 가족 craft 정직 ゲ이트.
+"""🌀 Stage N4 기계 증명 — 나눗셈/곱셈 가족 craft 정직 게이트.
 
 자가완결·멱등: 임시 디렉터리만 쓰고(라이브 state/vault 불변), 외부 모델·네트워크·
 컴파일러 없이 **ฝัง된 실제 픽스처**(Ghidra analyzeHeadless insn + gcc -O0 네이티브
@@ -18,12 +18,21 @@ N3(제어흐름·메모리) 위에서 oracle(x86_cf_emu)을 곱셈/나눗셈 가
      나눗셈·나머지(magic 3-op imul)·variable 제수(cdq;idiv / div)·제곱(2-op imul)·
      64비트 곱셈(2-op imul, long 반환)
   2) 합성==네이티브 — 깔끔한 디컴파일 9개 전수
-  3) 차분 ゲ이트 — craft_function 100%(9개) + record 는 100%만 저장(발명 금지)
+  3) 차분 게이트 — craft_function 100%(9개) + record 는 100%만 저장(발명 금지)
   4) C-충실 절삭 — _tdiv/_tmod 단위 테이블(음수에서 파이썬 //·% 와 다름을 입증)
   5) 정직 — vdiv(지저분한 -O0 디컴파일)→합성 None→skip; vmod(병적 캐스트)→합성
      불일치→차분 <100%→record 차단; 훼손 합성(바닥 나눗셈)→거부
   6) 참조 검증 — gcc 가 방출하지 않은 형태(one-op MUL/IMUL·CQO·64비트 IDIV·
      CDQE·CWD)를 독립 파이썬 참조(x86 문서화 semantics)와 대조
+  7) oracle 무결성(감사 발견 결함 회귀 방지) — 바이트 레지스터 별칭(bl→rbp·
+     dl→rdi 오투영 + sil/dil/bpl/spl 누락 = **침묵 오답**이었음) 수정 검증
+  8) oracle 무결성 — RET 없이 끝나는(잘린) 명령 스트림은 침묵 완주 주장 대신
+     `trunc:no-ret` 로 정직 bail, craft 도 거짓 100% 기록 안 함
+  9) 나눗셈 정직 bail(제수0·#DE 오버플로) + 8/16비트 폭 참조 + record 게이트가
+     **실제** 불일치 합성(vmod 70.91%)을 섞어도 100%만 기록함을 검증
+ 10) 직선 경로 — `_W` 에 `__mul__`·`__truediv__`·`__mod__` 가 없어 gcc 의 2^n 상수
+     함수(SHL/SHR/AND → `x*4`·`x/8`·`x%8`)가 **전부 0.0% 로 침묵 거부**되던 결함
+     수정 검증 + C 부호 유추 + 부호 오검출/0나눔 은 여전히 정직 거부됨을 검증
 """
 from __future__ import annotations
 
@@ -136,9 +145,9 @@ def test_synth_vs_native() -> None:
         check(bad == 0, f"{name}: synth==native ({len(XS)} 입력)", f"bad={bad}")
 
 
-# ── [3] craft 차분 ゲ이트 100% + record 는 100%만 저장 ───────────────────────
+# ── [3] craft 차분 게이트 100% + record 는 100%만 저장 ───────────────────────
 def test_craft_differential() -> None:
-    print("\n[3] craft 차분 ゲ이트 — oracle vs 합성 100% (곱셈/나눗셈 9개)")
+    print("\n[3] craft 차분 게이트 — oracle vs 합성 100% (곱셈/나눗셈 9개)")
     crafted = []
     for name in CLEAN:
         fx = FUNCS[name]
@@ -149,7 +158,7 @@ def test_craft_differential() -> None:
               why or (f"match={entry['match_pct']} mm={entry['mismatches']}" if entry else ""))
         if entry is not None:
             crafted.append(entry)
-    # record ゲ이트: 100% 만 vault 노트로 기록(발명 금지)
+    # record 게이트: 100% 만 vault 노트로 기록(발명 금지)
     tmp = Path(tempfile.mkdtemp(prefix="n4rec_"))
     try:
         rep = {"binary": "n4mul_O0.o", "backend": "analyzeHeadless", "crafted": crafted}
@@ -254,13 +263,226 @@ def test_unelicited_reference() -> None:
               f"bad={bad} uns={uns}")
 
 
+# ── [7] oracle 무결성 — N4 감사에서 발견한 실제 결함의 회귀 방지 ─────────────
+def test_oracle_integrity_byte_regs() -> None:
+    print("\n[7] oracle 무결성 — 바이트 레지스터 별칭(감사에서 발견한 침묵 오답 결함)")
+    # ⚠ 결함이었음: `_core[0]+"l"` 이 rsi/rdi/rbp/rsp 에 대해 "sl"/"dl"/"bl"/"sl" 을
+    #   만들어 rdx 의 dl·rbx 의 bl 을 **덮어썼다** → dl→rdi, bl→rbp (침묵 오답).
+    expect = {"al": "rax", "bl": "rbx", "cl": "rcx", "dl": "rdx",
+              "ah": "rax", "bh": "rbx", "ch": "rcx", "dh": "rdx",
+              "sil": "rsi", "dil": "rdi", "bpl": "rbp", "spl": "rsp",
+              "r8b": "r8", "r15b": "r15"}
+    bad = []
+    for r, base in expect.items():
+        info = EMU.reg_info(r)
+        if not info or info[0] != base or info[2] != 8:
+            bad.append(f"{r}→{info}")
+    check(not bad, f"8비트 별칭 {len(expect)}개 전부 올바른 base/폭", ", ".join(bad))
+    check(EMU.reg_info("sl") is None, "허위 별칭 'sl' 제거됨(존재하면 안 됨)")
+    # ah/bh/ch/dh 는 고유예외(하위 8비트가 아니라 bits 8..15)
+    check(all(EMU.reg_info(h)[1] == 8 for h in ("ah", "bh", "ch", "dh")),
+          "ah/bh/ch/dh 는 shift=8 (고바이트) 유지")
+
+    # 실제 오답 시연이었음: BL 쓰기가 프레임 포인터 RBP 를 오염 → [RBP-4] 가 0 을 읽음
+    frame = ["0:\tPUSH RBP", "1:\tMOV RBP,RSP",
+             "4:\tMOV dword ptr [RBP + -0x4],EDI", "7:\tMOV BL,0x41",
+             "9:\tMOV EAX,dword ptr [RBP + -0x4]", "d:\tRET"]
+    bad = 0
+    for x in (0x1234, 7, 255, -1):
+        o, ow, u = EMU.run(frame, x)
+        if u or (o & _mask(ow)) != (x & _mask(32)):
+            bad += 1
+    check(bad == 0, "MOV BL 이 RBP 프레임을 파괴하지 않음(스택 지역변수 intact)", f"bad={bad}")
+    # DL 쓰기가 입력 레지스터 RDI 를 오염시키지 않음
+    o, ow, u = EMU.run(["0:\tMOV DL,0x99", "3:\tMOV EAX,EDI", "5:\tRET"], 0x12345678)
+    check(not u and (o & _mask(ow)) == 0x12345678,
+          "MOV DL 이 입력 RDI 를 파괴하지 않음", f"rax={o:#x} uns={u}")
+    # gcc 가 방출하는 REX 저바이트(dil) 를 실제로 파싱·실행
+    o, ow, u = EMU.run(["0:\tMOVZX EAX,DIL", "4:\tRET"], 0x41)
+    check(not u and (o & _mask(ow)) == 0x41, "DIL 파싱·실행(gcc byte 인자 형태)",
+          f"rax={o} uns={u}")
+
+
+def test_oracle_integrity_truncation() -> None:
+    print("\n[8] oracle 무결성 — 잘린 명령 스트림은 침묵 완주 주장하면 안 됨")
+    full = FUNCS["idiv3"]["insns"]
+    o, ow, u = EMU.run(full, 30)
+    check(not u and (o & _mask(ow)) == 10, "완전한 idiv3(30)=10, uns=[]", f"o={o} u={u}")
+    bad = []
+    for cut in (1, 2, 3, 4, 6):
+        o, ow, u = EMU.run(full[:len(full) - cut], 30)
+        if not u:
+            bad.append(f"cut{cut}:침묵완주(rax={o})")
+        elif "trunc:no-ret" not in u:
+            bad.append(f"cut{cut}:{u}")
+    check(not bad, f"끝 {6}가지 잘림 전부 `trunc:no-ret` 정직 bail", ", ".join(bad))
+    # 잘린 함수는 craft 도 기록하지 않음(거짓 100% 불가)
+    fx = FUNCS["idiv3"]
+    entry, why = CE.craft_function({"name": "t", "decompile": fx["dec"],
+                                    "insns": fx["insns"][:-3]}, False)
+    check(entry is None or entry["match_pct"] < 100.0,
+          "잘린 insns → craft 거짓 100% 기록 안 함", why or f"match={entry['match_pct']}")
+
+
+# ── [9] 나눗셈 정직 bail + 8/16비트 폭 + record 게이트(실제 불일치) ───────────
+def test_div_honesty_and_narrow_widths() -> None:
+    print("\n[9] 나눗셈 정직 bail(제수0·#DE) + 8/16비트 폭 + record 게이트")
+    M16, M32 = _mask(16), _mask(32)
+    # 제수 0 → #DE → 정직 bail (짐작 금지)
+    o, w, u = EMU.run(["0:\tMOV EAX,EDI", "2:\tXOR ECX,ECX", "4:\tCDQ",
+                       "6:\tIDIV ECX", "8:\tRET"], 10)
+    check(u == ["idiv:div0"], "IDIV 제수 0 → `idiv:div0` 정직 bail", f"uns={u}")
+    o, w, u = EMU.run(["0:\tMOV EAX,EDI", "2:\tXOR ECX,ECX", "4:\tDIV ECX",
+                       "6:\tRET"], 10)
+    check(u == ["div:div0"], "DIV 제수 0 → `div:div0` 정직 bail", f"uns={u}")
+    # 몫 오버플로(INT_MIN / -1) → #DE → 정직 bail
+    o, w, u = EMU.run(["0:\tMOV EAX,0x80000000", "5:\tMOV ECX,0xffffffff", "a:\tCDQ",
+                       "c:\tIDIV ECX", "e:\tRET"], 0)
+    check(u == ["idiv:of"], "IDIV 몫 오버플로(INT_MIN/-1) → `idiv:of` 정직 bail", f"uns={u}")
+    # 8비트 DIV 몫 > 0xFF → #DE
+    o, w, u = EMU.run(["0:\tMOV AX,DI", "3:\tMOV CL,0x3", "6:\tDIV CL", "8:\tRET"], 0xFFFF)
+    check(u == ["div:of"], "8비트 DIV 몫>0xFF → `div:of` 정직 bail", f"uns={u}")
+
+    # 8/16비트 폭 참조 검증 (gcc 가 단순 함수에서 잘 방출하지 않는 폭)
+    narrow = [
+        ("16비트 MUL 상위(DX)", ["0:\tMOV AX,DI", "3:\tMOV CX,0x100", "8:\tMUL CX",
+                                "b:\tMOV AX,DX", "e:\tRET"], 16,
+         lambda x: ((((x & M16) * 0x100) & _mask(32)) >> 16) & M16, [0, 1, 7, 255, -1, 300, 65535]),
+        ("16비트 IDIV(CWD)", ["0:\tMOV AX,DI", "3:\tMOV CX,0x3", "8:\tCWD",
+                              "a:\tIDIV CX", "d:\tRET"], 16,
+         lambda x: _ref_tdiv(_ssext(x, 16), 3) & M16, [0, 1, 3, -3, 7, -7, 32767, -32768]),
+        ("8비트 MUL 하위(AL)", ["0:\tMOV AX,DI", "3:\tMOV CL,0x10", "6:\tMUL CL",
+                               "8:\tRET"], 8,
+         lambda x: ((x & _mask(8)) * 0x10) & _mask(8), [0, 1, 7, 15, 255, -1, -16]),
+        ("8비트 DIV(몫 AL)", ["0:\tMOV AX,DI", "3:\tMOV CL,0x3", "6:\tDIV CL",
+                             "8:\tRET"], 8,
+         lambda x: ((x & M16) // 3) & _mask(8), [0, 3, 9, 255, 767]),
+    ]
+    for label, insns, w, ref, rxs in narrow:
+        bad = uns = 0
+        for x in rxs:
+            o, ow, u = EMU.run(insns, x)
+            if u:
+                uns += 1
+                continue
+            if (o & _mask(ow) & _mask(w)) != (ref(x) & _mask(w)):
+                bad += 1
+        check(bad == 0 and uns == 0, f"{label}: oracle==참조 ({len(rxs)} 입력)",
+              f"bad={bad} uns={uns}")
+
+    # record 게이트: **실제로** 불일치하는 합성(vmod 70.91%)이 report 에 섞여도 미기록
+    fx = FUNCS["vmod"]
+    entry, _why = CE.craft_function({"name": "vmod", "decompile": fx["dec"],
+                                     "insns": fx["insns"]}, False)
+    clean_entry, _w2 = CE.craft_function({"name": "idiv3", "decompile": FUNCS["idiv3"]["dec"],
+                                          "insns": FUNCS["idiv3"]["insns"]}, False)
+    import shutil
+    import tempfile
+    tmp = Path(tempfile.mkdtemp(prefix="n4rec2_"))
+    try:
+        rep = {"binary": "mix.o", "backend": "analyzeHeadless",
+               "crafted": [c for c in (clean_entry, entry) if c is not None]}
+        notes = CE.record(rep, tmp)
+        recorded = {p.name for p in notes}
+        check(len(notes) == 1 and any("idiv3" in n for n in recorded)
+              and not any("vmod" in n for n in recorded),
+              "record: 실제 불일치(vmod) 섞여도 100%(idiv3)만 기록", f"notes={recorded}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+# ── [10] 직선 경로 — `_W` 산술 완전성(감사 발견 결함: *,/,% 전부 TypeError) ───
+def test_straight_path_arithmetic() -> None:
+    print("\n[10] 직선 경로 `_W` 산술 — gcc 의 2^n 상수(SHL/SHR/AND) 함수 craft")
+    M32 = _mask(32)
+    # ⚠ 결함이었음: `_W` 에 `__mul__`·`__truediv__`·`__mod__` 가 없어 디컴파일 C 에
+    #   `*`·`/`·`%` 가 있으면 **모든 벡터 TypeError → match 0.0%** 로 전량 거부됐어요.
+    #   gcc 는 2^n 상수를 SHL/SHR/AND(전부 `_OPS`)로 내므로 흔한 함수들이 침묵 손실.
+    ins_u = ["0:\tMOV EAX,EDI", "2:\tSHR EAX,0x3", "5:\tRET"]          # unsigned x/8
+    ins_m = ["0:\tMOV EAX,EDI", "2:\tSHL EAX,0x2", "5:\tRET"]          # x*4
+    ins_r = ["0:\tMOV EAX,EDI", "2:\tAND EAX,0x7", "5:\tRET"]          # x%8
+    ins_b = ["0:\tMOV EAX,EDI", "2:\tMOV EDX,EAX", "4:\tSHR EDX,0x3",
+             "7:\tAND EAX,0x7", "a:\tADD EAX,EDX", "c:\tRET"]          # x/8 + x%8
+    cases = [
+        ("unsigned x/8",  ins_u, "uint f(uint param_1)\n{\n  return param_1 / 8;\n}",
+         "x / 8", False, lambda x: (x & M32) // 8),
+        ("x*4",           ins_m, "int f(int param_1)\n{\n  return param_1 * 4;\n}",
+         "x * 4", True, lambda x: ((x & M32) * 4) & M32),
+        ("unsigned x%8",  ins_r, "uint f(uint param_1)\n{\n  return param_1 % 8;\n}",
+         "x % 8", False, lambda x: (x & M32) % 8),
+        ("x/8 + x%8",     ins_b, "uint f(uint param_1)\n{\n  return param_1 / 8 + param_1 % 8;\n}",
+         "x / 8 + x % 8", False, lambda x: (x & M32) // 8 + (x & M32) % 8),
+    ]
+    for label, insns, dec, want_src, want_signed, ref in cases:
+        sy = CE.synth_for(dec, insns, False)
+        check(sy is not None and sy["kind"] == "straight" and sy["src"] == want_src
+              and sy.get("signed") is want_signed,
+              f"{label}: 직선경로 채택 + 부호유추={want_signed}",
+              f"sy={sy}")
+        if sy is None:
+            continue
+        d = CE.differential(insns, sy)
+        bad = sum(1 for x in (0, 1, 8, 100, 2**31, 2**32 - 1, 2746317214)
+                  if (CE.build_python(sy["src"], CE.input_width(insns), want_signed)(x)
+                      & M32) != (ref(x) & M32))
+        check(d["match_pct"] == 100.0 and bad == 0,
+              f"{label}: 차분 100% (이전 0.0%) + 참조 일치", f"match={d['match_pct']} bad={bad}")
+
+    # 기존 비트연산 직선경로는 회귀 없음
+    ins_bit = ["0:\tMOV EAX,EDI", "2:\tOR EAX,0x3", "5:\tAND EAX,0xfffffff8", "a:\tRET"]
+    d = CE.differential(ins_bit, CE.synth_for(
+        "int f(int param_1)\n{\n  return (param_1 | 3) & 0xfffffff8;\n}", ins_bit, False))
+    check(d["match_pct"] == 100.0, "비트연산 직선경로 회귀 없음(100%)", f"match={d['match_pct']}")
+
+    # ── 정직성: 부호 오검출·0나눔 은 절대 100% 가 되면 안 됨 ──
+    d = CE.differential(ins_u, {"kind": "straight", "src": "x / 8", "signed": True})
+    check(d["match_pct"] < 100.0,
+          "unsigned 를 signed 로 오해 → 차분이 정직 거부(거짓 100% 불가)",
+          f"match={d['match_pct']}")
+    d = CE.differential(ins_u, {"kind": "straight", "src": "x / (x & 0)", "signed": False})
+    check(d["match_pct"] < 100.0, "0 나눔 → 침묵 오답 아닌 거부", f"match={d['match_pct']}")
+
+    # 부호 유추: 실제 Ghidra 시그니처 12종
+    sigs = [("uint f(uint param_1)", False), ("int f(int param_1)", True),
+            ("undefined4 f(undefined4 param_1)", False), ("ulong f(ulong param_1)", False),
+            ("long f(long param_1)", True),
+            ("unsigned int f(unsigned int param_1)", False),
+            ("int32_t f(int32_t param_1)", True), ("uint32_t f(uint32_t param_1)", False),
+            ("char f(char param_1)", True), ("ushort f(ushort param_1)", False),
+            ("int f(int in_RDI)", True), ("uint f(uint in_RDI)", False)]
+    bad = []
+    for txt, want in sigs:
+        var = "param_1" if "param_1" in txt else "in_RDI"
+        got = CE._c_signedness(txt + "\n{\n  return " + var + " / 4;\n}", var)
+        if got != want:
+            bad.append(f"{txt}: want {want} got {got}")
+    check(not bad, f"부호 유추 {len(sigs)}종 시그니처 전부 정확", ", ".join(bad))
+
+    # `_W`(직선경로) 산술이 cf 경로의 `_tdiv`/`_tmod` 와 **같은** C truncation 인지 —
+    # 두 경로가 갈라지면 같은 C 함수에 대해 서로 다른 답을 craft 하게 돼요.
+    wb = []
+    for a in (0, 1, -1, 7, -7, 2**31, -2**31, 12345):
+        for b in (1, 2, 3, -3, 7):
+            sa = _ssext(a, 32)
+            q32 = CE.build_python("x / %d" % b, 32, True)(a) & M32
+            m32 = CE.build_python("x %% %d" % b, 32, True)(a) & M32
+            if q32 != (SYN._tdiv(sa, b) & M32):
+                wb.append(f"{a}/{b} q={q32} want={SYN._tdiv(sa, b) & M32}")
+            if m32 != (SYN._tmod(sa, b) & M32):
+                wb.append(f"{a}%{b} m={m32} want={SYN._tmod(sa, b) & M32}")
+    check(not wb, "직선경로 `_W` == cf경로 `_tdiv`/`_tmod` (두 경로 일관성, 40쌍)",
+          ", ".join(wb[:4]))
+
+
 def main() -> int:
     global PASS, FAIL
     print("=" * 72)
-    print("🌀 Stage N4 기계 증명 — 나눗셈/곱셈 가족 craft 정직 ゲ이트")
+    print("🌀 Stage N4 기계 증명 — 나눗셈/곱셈 가족 craft 정직 게이트")
     print(f"픽스처: {len(FUNCS)} 함수 · {len(XS)} 입력 · 출처=실제 Ghidra insn + gcc 네이티브 실행")
     for t in (test_oracle_vs_native, test_synth_vs_native, test_craft_differential,
-              test_truncation_semantics, test_honesty, test_unelicited_reference):
+              test_truncation_semantics, test_honesty, test_unelicited_reference,
+              test_oracle_integrity_byte_regs, test_oracle_integrity_truncation,
+              test_div_honesty_and_narrow_widths, test_straight_path_arithmetic):
         try:
             t()
         except Exception as exc:  # noqa: BLE001
@@ -274,7 +496,7 @@ def main() -> int:
         return 1
     print(f"✅ N4 MULDIV PASSED — {PASS} passed / {FAIL} failed")
     print("   정직 범위: oracle 은 11개 함수 전수 네이티브 일치(미지원 0) + gcc 미방출")
-    print("   형태 6개 참조 일치. 합성/차분 は 깔끔한 9개 100% 기록, 지저분한 2개는")
+    print("   형태 6개 참조 일치. 합성/차분은 깔끔한 9개 100% 기록, 지저분한 2개는")
     print("   정직 skip/거부(발명 금지). cmov·switch 는 N4 범위 밖(여전히 정직 bail).")
     return 0
 

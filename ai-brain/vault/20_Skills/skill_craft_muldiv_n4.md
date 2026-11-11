@@ -9,7 +9,7 @@ created: ""
 # 🌀 곱셈·나눗셈 자가복제 — craft 가 magic reciprocal 과 절삭 나눗셈을 배우다 (Stage N4)
 
 ## 💡 핵심 요약
-N3 까지 craft 의 oracle(에뮬레이터)은加减法·비트·시프트·제어흐름·메모리는
+N3 까지 craft 의 oracle(에뮬레이터)은 가감법·비트·시프트·제어흐름·메모리는
 실행했지만 **곱셈/나눗셈 가족**(`IMUL` 3-operand·`CDQ/CQO`·`DIV/IDIV`·one-op
 `MUL/IMUL`)은 만나면 정직하게 `unsupported` 로 멈췄어요. 그래서 제수(나누는 수)를
 쓰는 함수는 복제 불가였죠(부채④ 잔여). N4 는 이 구멍을 막았어요 — oracle 에
@@ -22,7 +22,7 @@ truth 와 11개 함수 전수 대조**(각 271 입력, 미지원 0).
 `CDQ;IDIV`/`DIV` 는 **variable 제수**에서만 나와요. 즉 상수 나눗셈 craft 의 열쇠는
 3-operand IMUL 이었고, variable 나눗셈의 열쇠는 CDQ+IDIV/DIV 였어요.
 
-## 🔩扩展된 두 부품
+## 🔩 확장된 두 부품
 - **`brain_engine/x86_cf_emu.py`** (oracle) — 곱셈/나눗셈 가족 추가:
   - **3-operand `IMUL dst,src,imm`** — `dst = (src*imm)` 폭 래핑(magic reciprocal 의
     핵심). 2-operand `IMUL dst,src` 는 기존 ARITH 경로 그대로.
@@ -39,7 +39,7 @@ truth 와 11개 함수 전수 대조**(각 271 입력, 미지원 0).
   (피제수 부호). 제수가 상수든 표현식이든(`x/((x&7)+2)`) 동일하게 동작.
   - **타입폭 수정**: Ghidra x86-64(LP64) 렌더의 `long`/`ulong` 은 **64비트**
     (이전 `_TYPE_WIDTH` 가 `long:32` 로 오분류 → 64비트 곱셈 반환을 32비트로
-    잘라 차분 ゲ이트가 거부했음). `ulong` 은 누락돼 추가.
+    잘라 차분 게이트가 거부했음). `ulong` 은 누락돼 추가.
 
 ## 🧭 정직 게이트 (환각이 structurally 불가능한 이유)
 N3 와 동일 구조 — **차분 검증 100% 만 vault 기록**. 게이트
@@ -65,9 +65,9 @@ N3 와 동일 구조 — **차분 검증 100% 만 vault 기록**. 게이트
   함수에서 방출하지 않아 **네이티브가 아닌 독립 참조**로 증명(oracle 구현은
  complete, 32비트 `CDQ;IDIV`/`DIV` 는 `vdiv`/`uvdiv` 로 네이티브 증명됨).
 - 합성기는 부호를 바꾸는 캐스트(`(int)uintVar`)를 모델링하지 않음 → 그런 지저분한
-  -O0 디컴파일(`vmod`)은 차분 ゲ이트가 정직 거부(거짓 기록 없음).
+  -O0 디컴파일(`vmod`)은 차분 게이트가 정직 거부(거짓 기록 없음).
 - 타입폭은 LP64(x86-64 Linux) 기준 — Windows LLP64(`long`=32) 는 미모델링,
-  어긋나면 차분 ゲ이트가 거부.
+  어긋나면 차분 게이트가 거부.
 - "무엇이든 craft" 가 아니라 "검증 가능한 만큼만 craft" — N3 와 같은 방식.
 
 ## 🔗 연결된 시냅스 (Wiki Links)

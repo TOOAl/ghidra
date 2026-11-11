@@ -10,11 +10,17 @@
     이 에뮬레이터는 craft 의 **oracle**(원본 바이트의 참값)이에요. oracle 이
     틀리면 차분 검증이 오염되므로, 확신 없는 것은 절대 짐작하지 않고
     `unsupported` 에 넣고 **멈춰요**(craft 가 그 함수를 정직 skip). 지원 범위는
-    의도적으로 좁고 보수적: CALL(다른 함수)·복잡한 addressing·캡 초과 → bail.
-    검증은 `tools/test_n3_craft.py` 가 **네이티브 실행 ground truth** 와 대조해요.
+    의도적으로 좁고 보수적: CALL(다른 함수)·복잡한 addressing·캡 초과·**RET 없이
+    끝나는(잘린) 명령 스트림** → bail.
+    검증은 `tools/test_n3_craft.py`(제어흐름·메모리) 와 `tools/test_n4_muldiv.py`
+    (곱셈·나눗셈 가족) 가 **gcc 네이티브 실행 ground truth** 와 전수 대조해요.
 
-지원 명령(부분집합): mov/movzx/movsx/lea · push/pop · add/sub/and/or/xor/
-    shl/shr/rol/ror/not/neg/inc/dec/imul · cmp/test · jmp/jcc · ret/leave · nop.
+지원 명령(부분집합): mov/movzx/movsx/movsxd/lea · push/pop · add/sub/and/or/xor/
+    shl/shr/sal/sar/rol/ror/not/neg/inc/dec · cmp/test · jmp/jcc · ret/leave · nop
+    · **imul**(2-operand) · **N4 곱셈/나눗셈 가족**: 3-operand `imul dst,src,imm`
+    (magic reciprocal) · one-op `mul`/`imul`(DX:AX 페어, 8/16/32/64) · `div`/`idiv`
+    (몫→AX·나머지→DX, `idiv` 는 0 방향 절삭, 제수 0·몫 오버플로 #DE → bail) ·
+    부호확장 `cdq`/`cqo`/`cwd`/`cdqe`/`cwde`/`cbw`.
 메모리: `<size> ptr [base + index*scale + disp]` (base/index 는 GPR).
 입력: 첫 "쓰기 전 읽힘" GPR(rsp/rbp 제외) = x (Stage N 과 동일 규칙), 또는 명시.
 출력: rax(+마지막 rax 쓰기 폭).
@@ -32,12 +38,21 @@ _ALIASES: Dict[str, Tuple[str, int]] = {}
 for _i, _b in enumerate(_BASES):
     _ALIASES[_b] = (_b, 64)
     if _i < 8:
-        _core = _b[1:]
+        _core = _b[1:]                            # ax bx cx dx si di bp sp
         _ALIASES[_core] = (_b, 16)
         _ALIASES["e" + _core] = (_b, 32)
-        _ALIASES[_core[0] + "l"] = (_b, 8)
         if _i < 4:
-            _ALIASES[_core[0] + "h"] = (_b, 8)
+            _ALIASES[_core[0] + "l"] = (_b, 8)    # al bl cl dl
+            _ALIASES[_core[0] + "h"] = (_b, 8)    # ah bh ch dh
+        else:
+            # sil/dil/bpl/spl — REX 로만 접근되는 저바이트(고바이트는 없어요).
+            # ⚠ 결함 수정(N4 감사에서 발견): 이전에 여기서 `_core[0] + "l"` 을
+            #   써서 rsi→"sl", rdi→"dl", rbp→"bl", rsp→"sl" 이 만들어졌고, 그것이
+            #   rdx 의 "dl"·rbx 의 "bl" 을 **덮어써** dl→rdi, bl→rbp 로 잘못
+            #   매핑됐어요. 결과: `MOV BL,imm` 가 프레임 포인터 RBP 를 오염시켜
+            #   `[RBP±K]` 가 엉뚱한 주소를 읽고, `MOV DL,imm` 가 입력 RDI 를
+            #   오염 — 둘 다 `unsupported` 비어있는 **침묵 오답**이었어요.
+            _ALIASES[_core + "l"] = (_b, 8)
     else:
         _ALIASES[_b + "d"] = (_b, 32)
         _ALIASES[_b + "w"] = (_b, 16)
@@ -572,4 +587,11 @@ def run(insns: List[str], x: int, input_reg: Optional[str] = None,
         except Exception as exc:                  # noqa: BLE001 — 예측 못 한 형태는 bail
             unsupported.append(f"{mnem}:{type(exc).__name__}")
             break
+    # 여기에 도달했다는 것은 RET 을 만나지 못하고 명령 스트림이 끝났다는 뜻이에요.
+    # 즉 채집이 잘린 것(함수 본문이 채집 캡 초과, 또는 꼬리 점프) — 이때 RAX 는
+    # 참값이라는 보장이 전혀 없어요. 침묵 완주 주장 대신 **정직하게 bail** 해요.
+    # (불명확한 명령·step_cap·jtarget 등으로 break 한 경우는 unsupported 가 이미
+    #  비어있지 않으므로 이 표식이 중복 붙지 않아요.)
+    if not unsupported:
+        unsupported.append("trunc:no-ret")
     return rget("rax"), out_width, unsupported

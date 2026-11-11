@@ -22,6 +22,14 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
+# 채집 캡. ⚠ 캡에 걸리면 데이터가 **잘리므로**, 잘림 여부를 아래 플래그로
+#   데이터에 명시해요(insns_complete / decompile_truncated). oracle 도 RET 없이
+#   끝나는 스트림을 `trunc:no-ret` 로 정직 bail 해서 침묵 오답을 막아요.
+#   (이전값: insn 16 → magic-number 나눗셈 함수(imod5≈20)가 잘렸었어요.
+#     디컴파일 24줄 → 큰 함수의 C 가 잘려 합성이 불완전해졌었어요.)
+_INSN_CAP = 64
+_DEC_LINE_CAP = 120
+
 
 def main() -> int:
     binary, out = sys.argv[1], sys.argv[2]
@@ -68,9 +76,9 @@ def main() -> int:
             insns, mnem, calls, refnames = [], [], [], []
             instr = listing.getInstructionAt(f.getEntryPoint())
             guard = 0
-            # N4: magic-number 나눗셈/나머지 함수는 16 명령을 넘긴다(imod5≈19).
-            # 함수 본문 끝까지(또는 64 명령) 모아 잘림으로 인한 oracle 오차를 막는다.
-            while instr is not None and f.getBody().contains(instr.getMinAddress()) and guard < 64:
+            # N4: magic-number 나눗셈/나머지 함수는 16 명령을 넘긴다(imod5≈20).
+            # 함수 본문 끝까지(또는 _INSN_CAP) 모아 잘림으로 인한 oracle 오차를 막는다.
+            while instr is not None and f.getBody().contains(instr.getMinAddress()) and guard < _INSN_CAP:
                 # 전체 피연산자까지 — 첫 피연산자만 적던 버그(XOR AL) 를 고쳐요.
                 # 에뮬레이터·노트 모두 완전한 명령 텍스트가 필요해요.
                 insns.append("%s:\t%s" % (instr.getMinAddress(), instr.toString()))
@@ -95,18 +103,24 @@ def main() -> int:
             if len(insns) < 3:
                 continue
             dec = ""
+            dec_trunc = False
             if decomp is not None:
                 try:
                     dr = decomp.decompileFunction(f, 20, None)
                     if dr is not None and dr.decompileCompleted() and dr.getDecompiledFunction() is not None:
                         c = dr.getDecompiledFunction().getC()
                         if c:
-                            dec = "\n".join(c.split("\n")[:24])
+                            dlines = c.split("\n")
+                            dec_trunc = len(dlines) > _DEC_LINE_CAP
+                            dec = "\n".join(dlines[:_DEC_LINE_CAP])
                 except Exception:
                     dec = ""
             facts["functions"].append({
                 "name": f.getName(), "addr": str(f.getEntryPoint()), "insns": insns,
                 "mnemonics": mnem, "calls": calls, "refs": refnames, "decompile": dec,
+                # 침묵 잘림 방지: 캡에 걸려 데이터가 불완전한지 데이터 스스로 말해요.
+                "insns_complete": guard < _INSN_CAP,
+                "decompile_truncated": dec_trunc,
             })
         if decomp is not None:
             decomp.dispose()

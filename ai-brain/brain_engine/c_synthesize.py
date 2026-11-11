@@ -30,7 +30,7 @@ _TYPE_WIDTH = {
     "short": 16, "ushort": 16, "undefined2": 16, "word": 16,
     "int": 32, "uint": 32, "undefined4": 32, "dword": 32,
     # Ghidra x86-64(LP64) 렌더에서 `long`/`ulong` 은 8 바이트(64비트)다.
-    # (32비트로 두면 64비트 곱셈 반환을 잘못 잘라 차분 ゲ이트가 거부한다.)
+    # (32비트로 두면 64비트 곱셈 반환을 잘못 잘라 차분 게이트가 거부한다.)
     "long": 64, "ulong": 64,
     "undefined8": 64, "qword": 64, "longlong": 64, "ulonglong": 64,
     "size_t": 64, "pointer": 64,
@@ -152,7 +152,7 @@ def xlate_expr(expr: str, imap: Dict[str, str]) -> Optional[str]:
         if isinstance(node, ast.Constant) and isinstance(node.value, (float, complex, bytes, str)):
             return None                          # 부동소수/문자열 상수 → 이 부분집합 밖
     # C 정수 나눗셈/나머지는 0 절삭·피제수 부호 — 파이썬 `//`·`%` 와 음수에서
-    # 달라서,忠実 헬퍼 호출(_tdiv/_tmod)으로 AST 치환 후 unparse.
+    # 달라서 충실 헬퍼 호출(_tdiv/_tmod)으로 AST 치환 후 unparse.
     try:
         tree = _DivModToHelper().visit(tree)
         ast.fix_missing_locations(tree)

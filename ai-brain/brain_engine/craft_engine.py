@@ -35,9 +35,11 @@ _BASES = x86_cf_emu._BASES
 _ALIASES = x86_cf_emu._ALIASES
 
 
-def _reg_info(name: str) -> Optional[Tuple[str, int, int]]:
-    """이름 → (base, shift, width bits). `x86_cf_emu.reg_info` 와 단일 출처예요."""
-    return x86_cf_emu.reg_info(name)
+# 이름 → (base, shift, width bits). **래퍼가 아니라 동일 객체**예요.
+# 결함①′(별칭 표 복제)의 재발 경로는 "위임 함수를 다시 인라인으로 펼치는 것"인데,
+# 그건 *텍스트* 검사로는 못 막아요(독스트링에 공유 구현 이름을 적어두면 통과했었어요 —
+# 변이 M17 이 실제로 찾아냈어요). 동일 객체면 `is` 로 위조 불가능하게 검사돼요.
+_reg_info = x86_cf_emu.reg_info
 
 
 class _Regs:

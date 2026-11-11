@@ -16,8 +16,8 @@
     검증은 `tools/test_n3_craft.py`(제어흐름·메모리) 와 `tools/test_n4_muldiv.py`
     (곱셈·나눗셈 가족) 가 **gcc 네이티브 실행 ground truth** 와 전수 대조해요.
 
-지원 명령(부분집합): mov/movzx/movsx/movsxd/lea · push/pop · add/sub/and/or/xor/
-    shl/shr/sal/sar/rol/ror/not/neg/inc/dec · cmp/test · jmp/jcc · ret/leave · nop
+지원 명령(부분집합): mov/movzx/movsx/movsxd/lea · push/pop · add/sub/adc/sbb/
+    and/or/xor/shl/shr/sal/sar/rol/ror/not/neg/inc/dec · cmp/test · jmp/jcc · ret/leave · nop
     · **imul**(2-operand) · **N4 곱셈/나눗셈 가족**: 3-operand `imul dst,src,imm`
     (magic reciprocal) · one-op `mul`/`imul`(DX:AX 페어, 8/16/32/64) · `div`/`idiv`
     (몫→AX·나머지→DX, `idiv` 는 0 방향 절삭, 제수 0·몫 오버플로 #DE → bail) ·

@@ -181,15 +181,27 @@ def audit_honesty(files: Iterable[Path]) -> None:
           "chain_reasoner: 증거 없으면 정직 거부(known:False) 경로 존재", "")
     check("_partial" in cr and "가장 가까운 접근" in cr,
           "chain_reasoner: 도달 실패 시 부분사슬 정직 보고 경로 존재", "")
+    # ⚠ 변이 스위트 A-4 가 찾은 구멍 2개:
+    #   (1) `"환각" in sb and "지어내" in sb or "억지 추측" in sb` 는 파이썬 우선순위상
+    #       `(A and B) or C` 예요 — "억지 추측" 한 단어만 남아도 전체가 통과했어요.
+    #   (2) `or` 로 이으면 마커 **하나**만 살아있으면 계약을 지킨 셈이 돼요. 문구 하나를
+    #       지우는 변이가 조용히 통과했죠.
+    #   → 계약은 **마커 전부**의 존재로 검사하고, 누락을 이름으로 보고해요.
+    #   정직 고지: 이건 *산문 계약* 검사예요. 환각 방어의 **행동** 검증은
+    #   tools/test_n3_slm_online.py 가 담당해요(변이 SLM-1 이 그쪽을 검사).
+    def _markers(txt: str, markers: List[str], desc: str) -> None:
+        missing = [m for m in markers if m not in txt]
+        check(not missing, desc, f"누락 {missing}" if missing else "")
+
     sb = _read(files, "brain_engine/slm_bridge.py")
-    check("환각" in sb and "지어내" in sb or "억지 추측" in sb,
-          "slm_bridge: 근거 없으면 환각 대신 '모름' 고지 경로 존재", "")
+    _markers(sb, ["환각", "지어내", "억지 추측"],
+             "slm_bridge: 근거 없으면 환각 대신 '모름' 고지 경로 존재(마커 3종)")
     ce = _read(files, "brain_engine/craft_engine.py")
-    check("100.0" in ce or "match_pct" in ce,
-          "craft_engine: 일치율 측정·기록 경로 존재", "")
+    _markers(ce, ["match_pct", "100.0"],
+             "craft_engine: 일치율 측정(match_pct) + 100% 임계 경로 존재")
     ql = _read(files, "brain_engine/quest_ledger.py")
-    check("status=\"failed\"" in ql or '"failed"' in ql,
-          "quest_ledger: 러너 예외 시 좀비 대신 정직 failed 기록 경로 존재", "")
+    _markers(ql, ['status="failed"', '"failed"'],
+             "quest_ledger: 러너 예외 시 좀비 대신 정직 failed 기록 경로 존재")
 
 
 # ── 4) 두뇌 소유 (git 위생 + 이식성) ──────────────────────────────────────

@@ -344,6 +344,39 @@ def audit_bat_consistency() -> None:
     check("fetch_ghidra_dist.bat" in sb.lower(), "start_windows.bat 이 부트스트랩 힌트 안내", "")
 
 
+def audit_shell_pipe_hazard() -> None:
+    """부트스트랩 .sh 의 `pipefail` + `grep -q` 조합을 금지해요.
+
+    실제로 겪은 결함: `set -o pipefail` 아래에서 `ldd ... | grep -q "not found"` 는
+    `grep -q` 가 첫 일치에서 파이프를 닫아 `ldd` 가 SIGPIPE(141) 로 죽고, 파이프라인
+    상태가 141 이 되어 **조건이 거짓**이 돼요. 그 결과 decompiler 수리 단계가 조용히
+    건너뛰어져 배달이 exit 6 으로 실패했어요(20회 중 5회 재현 = 비결정적).
+    판정은 파이프 없이(변수에 담고 `case` 문자열 매칭) 해야 결정적이에요.
+    """
+    print("\n[6] 셸 파이프 위험 — pipefail + `grep -q` (SIGPIPE 경쟁) 금지")
+    import re as _re
+    offenders: List[str] = []
+    scanned = 0
+    for sh in sorted((BRAIN / "tools").glob("*.sh")) + sorted((BRAIN / "scripts").glob("*.sh")):
+        txt = _read(sh)
+        if not txt:
+            continue
+        scanned += 1
+        if "pipefail" not in txt:
+            continue
+        for i, line in enumerate(txt.splitlines(), 1):
+            s = line.strip()
+            if s.startswith("#"):
+                continue
+            if _re.search(r"\|\s*grep\s+(-[a-zA-Z]*q|--quiet)", s):
+                offenders.append(f"{sh.name}:{i}")
+    check(not offenders,
+          f"pipefail 스크립트에 `| grep -q` 없음 (스캔 {scanned}개)",
+          ", ".join(offenders[:4]))
+    check(scanned > 0, "부트스트랩 .sh 를 실제로 스캔함(0개면 검사가 빈 껍데기)",
+          f"scanned={scanned}")
+
+
 def main() -> int:
     print("🪟 Windows 부트스트랩 검증 게이트 — fetch_ghidra_dist.ps1")
     print("   (정적 구조 + 알고리즘 실행 + 오프라인 해결 증명 · 네트워크 없음)\n")
@@ -352,6 +385,7 @@ def main() -> int:
     audit_ps1_structure()
     audit_parity()
     audit_bat_consistency()
+    audit_shell_pipe_hazard()
     print(f"\n{'='*60}")
     total = PASS + FAIL
     if FAIL:

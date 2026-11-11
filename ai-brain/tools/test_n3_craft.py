@@ -177,11 +177,34 @@ def test_slm_grounded_fallback() -> None:
 def test_safe_synth_source() -> None:
     print("\n[7] 안전 합성 소스 정적 검증")
     check(SLM.safe_synth_source("def fn(x):\n    return x ^ 0x5a"), "정상 def fn(x) 허용")
-    check(not SLM.safe_synth_source("import os\ndef fn(x):\n    return x"), "import 거부")
+    check(not SLM.safe_synth_source("import os\ndef fn(x):\n    return x"),
+          "import 거부 — 문 2개(단일 def 규칙)")
+    # ⚠ 변이 스위트 N3-1 이 찾은 구멍: 위 입력은 `len(tree.body) != 1` 에서 **먼저**
+    #   거부돼요. 그래서 import 금지 규칙을 지워도 이 검사는 여전히 통과했어요 —
+    #   검사가 *자기가 시험한다고 주장한 경로*에 도달하지 못한 거죠. 함수 **본문 안**
+    #   import 는 문이 1개라 그 규칙을 지나므로, 여기서 금지 규칙이 실제로 작동하는지
+    #   확인해요(교훈: 입력이 그 분기에 도달하는지까지 확인해야 해요).
+    check(not SLM.safe_synth_source("def fn(x):\n    import os\n    return x"),
+          "본문 안 import 거부(금지 규칙이 실제로 작동)")
+    check(not SLM.safe_synth_source("def fn(x):\n    from os import system\n    return x"),
+          "본문 안 from-import 거부")
+    check(not SLM.safe_synth_source("def fn(x):\n    global g\n    return x"),
+          "본문 안 global 거부")
     check(not SLM.safe_synth_source("def fn(x):\n    return x.__class__"), "던더 접근 거부")
     check(not SLM.safe_synth_source("def g(x):\n    return x"), "fn 아닌 함수 거부")
     check(not SLM.safe_synth_source("def fn(x, y):\n    return x"), "시그니처 불일치 거부")
     check(not SLM.safe_synth_source("def fn(x): return (("), "구문 오류 거부")
+    # 코드펜스 추출 — 변이 N3-2 가 찾은 구멍: 오프라인 게이트에 펜스 경로 검사가
+    #   없어서 `_CODE_FENCE` 를 무력화해도 조용히 통과했어요. 펜스 마커가 소스에
+    #   섞이면 ast.parse 가 실패해서 **정답도 거부**되므로(침묵 성능 저하) 검사해요.
+    fenced = "```python\ndef fn(x):\n    return x ^ 0x5a\n```"
+    src = SLM._extract_func_src(fenced)
+    check(src is not None and "```" not in src and SLM.safe_synth_source(src),
+          "코드펜스 응답에서 펜스 마커 없이 소스 추출", repr(src)[:56])
+    bare = "앞설명\ndef fn(x):\n    return x\n뒷설명"
+    src2 = SLM._extract_func_src(bare)
+    check(src2 is not None and src2.startswith("def fn("),
+          "펜스 없는 응답에서도 `def fn(` 부터 추출", repr(src2)[:56])
 
 
 def main() -> int:

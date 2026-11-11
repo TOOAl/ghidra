@@ -93,7 +93,18 @@ chmod +x "$HEADLESS" "$ROOT/support/"*.sh 2>/dev/null || true
 #    더 늙었다면, 저장소 자신의 C++ 소스로 다시 굽습니다 — 공식
 #    바이너리와 동일한 구성(ghidra_opt 타겟, BFD 불필요)이에요.
 DECOMP="$ROOT/Ghidra/Features/Decompiler/os/linux_x86_64/decompile"
-if [ -x "$DECOMP" ] && ldd "$DECOMP" 2>&1 | grep -q "not found"; then
+# ⚠ 여기서 `ldd ... | grep -q "not found"` 를 쓰면 **안 돼요**(실제로 깨졌었어요):
+#   `grep -q` 는 첫 일치에서 즉시 종료하며 파이프를 닫고, 그러면 `ldd` 가
+#   SIGPIPE(141) 로 죽어요. 이 스크립트는 `set -o pipefail` 이라 파이프라인 상태가
+#   141 → **조건이 거짓** → 수리 단계를 *조용히* 건너뛰고, 그 결과 디컴파일된 C 가
+#   0개여서 exit 6 으로 끝났어요. 실측: 20회 중 5회(25%) 재현.
+#   → 출력을 먼저 변수에 담고 **파이프 없이** 판정해요(20/20 결정적).
+_LDD_OUT="$(ldd "$DECOMP" 2>&1 || true)"
+_NEEDS_REBUILD=0
+if [ -x "$DECOMP" ]; then
+  case "$_LDD_OUT" in *"not found"*) _NEEDS_REBUILD=1 ;; esac
+fi
+if [ "$_NEEDS_REBUILD" = 1 ]; then
   echo "  🛠 decompile 이 이 숙주 glibc 와 안 맞음 → 소스에서 재주조"
   if command -v g++ >/dev/null 2>&1 && command -v make >/dev/null 2>&1; then
     CPP="$(cd "$SCRIPT_DIR/../.." && pwd)/Ghidra/Features/Decompiler/src/decompile/cpp"

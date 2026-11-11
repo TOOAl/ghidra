@@ -57,6 +57,12 @@ jobs:
       - name: Gate — structural audit invariants
         run: python tools/test_audit_structural.py
 
+      # 불변식 게이트의 **자기효능** 검증: 원래 결함 19종을 되살렸을 때 게이트가
+      # 정말로 빨개지는지(그리고 *기대한 그 검사*로 빨개지는지) 매 실행마다 측정해요.
+      # 게이트를 약화시키면 여기서 드러나요. 파일을 변이시킨 뒤 sha256 로 복원을 검증해요.
+      - name: Gate — mutation suite (does the gate still catch the defects)
+        run: python tools/test_mutation_suite.py
+
       - name: Gate — N4 muldiv (oracle vs gcc native ground truth)
         run: python tools/test_n4_muldiv.py
 

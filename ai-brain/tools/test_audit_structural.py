@@ -118,11 +118,12 @@ def test_single_source_register_model() -> None:
     check(not offenders, "다른 모듈이 별칭 표를 독자 구성하지 않음(복제 금지)",
           ", ".join(offenders))
 
-    # (c) 위임: `_reg_info` 는 자체 로직이 아니라 공유 구현을 호출해야 해요
-    src = (_ROOT / "brain_engine" / "craft_engine.py").read_text(encoding="utf-8")
-    m = re.search(r"def _reg_info\(.*?\n(?=\n|\S)", src, re.S)
-    body = m.group(0) if m else ""
-    check("x86_cf_emu.reg_info" in body, "craft_engine._reg_info 는 공유 구현으로 위임")
+    # (c) 단일 출처: `_reg_info` 는 **동일 객체**여야 해요.
+    #     예전엔 "본문에 `x86_cf_emu.reg_info` 라는 글자가 있는가"로 검사했는데, 변이
+    #     스위트 M17 이 그 구멍을 찾았어요 — 함수를 다시 인라인으로 펼쳐도 *독스트링*에
+    #     그 이름이 남아 있으면 통과했어요. `is` 는 위조할 수 없어요.
+    check(CE._reg_info is EMU.reg_info,
+          "craft_engine._reg_info 는 x86_cf_emu.reg_info 와 동일 객체(재인라인 불가)")
 
     # (d) 독립 참조 표와 **전수** 대조 — 결함①(bl→rbp, dl→rdi, sil/dil 누락) 재발 방지
     bad: List[str] = []
@@ -329,6 +330,14 @@ def _probe_insns() -> Dict[str, List[str]]:
         "cdqe": ["0:\tMOV EAX,EDI", "2:\tCDQE", "3:\tRET"],
         "cwde": ["0:\tMOV AX,DI", "3:\tCWDE", "4:\tRET"],
         "cbw": ["0:\tMOV AL,DIL", "3:\tCBW", "4:\tRET"],
+        # **미지원** 명령들도 probe 에 넣어요 — 문서가 이걸 지원한다고 *주장*하면
+        # (a) 검사가 거짓 주장으로 잡아내야 해요(반대 방향 검증).
+        "cmovl": ["0:\tMOV EAX,EDI", "2:\tMOV ECX,0x3", "7:\tCMP EAX,0x0",
+                  "a:\tCMOVL EAX,ECX", "d:\tRET"],
+        "sete": ["0:\tMOV EAX,EDI", "2:\tCMP EAX,0x0", "5:\tSETE AL", "7:\tRET"],
+        "bswap": ["0:\tMOV EAX,EDI", "2:\tBSWAP EAX", "4:\tRET"],
+        "adc": ["0:\tMOV EAX,EDI", "2:\tADC EAX,0x1", "5:\tRET"],
+        "sbb": ["0:\tMOV EAX,EDI", "2:\tSBB EAX,0x1", "5:\tRET"],
     }
 
 
@@ -354,16 +363,54 @@ def test_docstring_matches_behavior() -> None:
     check(not lied, f"주장한 {len(claimed)}개 명령 전부 실제 실행 가능(거짓 주장 0)",
           "; ".join(lied[:5]))
 
-    # (b) 실제로 **지원하는데** 문서에 없는 명령 → staleness(결함④의 실제 형태)
-    undocumented = []
-    for mnem, insns in sorted(probes.items()):
-        _o, _w, uns = EMU.run(insns, 0)
-        supported = not uns
-        in_doc = bool(re.search(r"(?<![a-z])" + mnem + r"(?![a-z])", block))
-        if supported and not in_doc:
+    # (b) 실제로 **지원하는데** 문서에 없는 명령 → staleness(결함④/⑥의 실제 형태)
+    #   ⚠ 후보를 probe 표에서만 뽑으면 표에 없는 명령이 **숨어요**. 실제로
+    #     `adc`·`sbb` 가 지원되는데 문서에 없고 probe 표에도 없어 이 검사를
+    #     통과했었어요. 그래서 후보를 **소스에서 기계적으로 유도**해요
+    #     (ARITH·SHIFT 집합 + `mnem ==`/`mnem in (...)` 리터럴 + startswith 접두).
+    esrc = (_ROOT / "brain_engine" / "x86_cf_emu.py").read_text(encoding="utf-8")
+    cands: Set[str] = set(probes)
+    for cname in ("ARITH", "SHIFT"):
+        m = re.search(rf"^{cname}\s*=\s*[{{(]([^)}}]*)[)}}]", esrc, re.M | re.S)
+        if m:
+            cands |= set(re.findall(r"\"([a-z0-9]+)\"", m.group(1)))
+    cands |= set(re.findall(r'mnem\s*==\s*\"([a-z0-9]+)\"', esrc))
+    for grp in re.findall(r'mnem\s+in\s+\(([^)]*)\)', esrc):
+        cands |= set(re.findall(r'\"([a-z0-9]+)\"', grp))
+    for pre in set(re.findall(r'mnem\.startswith\(\"([a-z]+)\"\)', esrc)):
+        cands |= {pre, pre + "x"}                  # movs→movsd, movz→movzx 류 대표형
+    # `call`/`callq` 는 지원이 아니라 **bail 처리**로 등장해요(문서에도 bail 로 기재)
+    cands -= {"call", "callq", "j", "jmpq"}
+
+    # 동의어·노프 계열은 **근거를 명시하고** 정규 이름으로 환원해요(그냥 제외하면
+    # 언젠가 진짜 미기재 명령이 이 목록에 숨어요).
+    SYNONYM = {"retq": "ret", "callq": "call"}      # 어셈블러 표기 차이(동일 명령)
+    NOP_FAMILY = {"endbr64", "endbr32"}             # CET 노프 — `nop` 과 함께 처리
+    doc_tokens = set(re.findall(r"[a-z][a-z0-9]{1,9}", block))
+
+    def _documented(m: str) -> bool:
+        if m in doc_tokens:
+            return True
+        if SYNONYM.get(m, "") in doc_tokens:
+            return True
+        if m in NOP_FAMILY and "nop" in doc_tokens:
+            return True
+        # startswith 접두 가족: 문서에 `movs` 로 시작하는 실제 명령(movsx·movsxd)이
+        # 있으면 그 가족은 기재된 셈이에요.
+        return any(d.startswith(m) and len(d) > len(m) for d in doc_tokens)
+
+    undocumented: List[str] = []
+    for mnem in sorted(cands):
+        forms = [[f"0:\tMOV EAX,EDI", f"2:\t{mnem.upper()} EAX,0x1", "5:\tRET"],
+                 [f"0:\tMOV EAX,EDI", f"2:\t{mnem.upper()} EAX", "4:\tRET"],
+                 [f"0:\tMOV EAX,EDI", f"2:\t{mnem.upper()}", "3:\tRET"]]
+        supported = any(not EMU.run(f, 0)[2] for f in forms)
+        if not supported:
+            continue
+        if not _documented(mnem):
             undocumented.append(mnem)
     check(not undocumented,
-          "실제 지원 명령은 전부 문서에 기재(staleness 0 — 결함④ 재발 방지)",
+          f"실제 지원 명령은 전부 문서에 기재(소스 유도 후보 {len(cands)}개, staleness 0)",
           ", ".join(undocumented))
 
     # (c) 픽스처에서 실제로 깨끗이 실행되는 mnem 도 문서에 있어야 해요(독립 경로)

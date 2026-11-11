@@ -23,36 +23,21 @@ from brain_engine import x86_cf_emu          # Stage N3: 제어흐름+메모리 
 from brain_engine import c_synthesize        # Stage N3: C 부분집합 → 파이썬 합성기
 
 # ── 레지스터 파일: 이름 → (base, shift, width bits) ─────────────────────────
-_WIDTHS = {"b": 8, "w": 16, "d": 32, "q": 64}
-_BASES = ["rax", "rbx", "rcx", "rdx", "rsi", "rdi", "rbp", "rsp",
-          "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"]
-
-
-_ALIASES: Dict[str, Tuple[str, int]] = {}
-for _i, _b in enumerate(_BASES):
-    _ALIASES[_b] = (_b, 64)
-    if _i < 8:
-        _core = _b[1:]
-        _ALIASES[_core] = (_b, 16)
-        _ALIASES["e" + _core] = (_b, 32)
-        _ALIASES[_core[0] + "l"] = (_b, 8)
-        if _i < 4:
-            _ALIASES[_core[0] + "h"] = (_b, 8)
-    else:
-        _ALIASES[_b + "d"] = (_b, 32)
-        _ALIASES[_b + "w"] = (_b, 16)
-        _ALIASES[_b + "b"] = (_b, 8)
+# 별칭/폭 규칙은 **단일 출처**(`x86_cf_emu`)를 그대로 공유해요. 이전에 이 표를
+# 복제해서 갖고 있었는데, 그 사본에도 동일한 바이트 레지스터 오투영 결함
+# (`_core[0]+"l"` 이 rsi/rdi/rbp/rsp 에 대해 "sl"/"dl"/"bl"/"sl" 을 만들어
+# rdx 의 dl·rbx 의 bl 을 덮어씀 → dl→rdi, bl→rbp, 그리고 sil/dil/bpl/spl 누락)
+# 이 그대로 들어 있었어요. 즉 **중복이 같은 결함을 두 벌로** 만들었고, 둘 다
+# `unsupported` 없이 침묵 오답을 냈어요(직선 경로 oracle 도 오염). N4 감사에서
+# 발견하고 표를 하나로 통합해요 — 앞으로 한쪽만 고쳐서 갈라지는 일이 없어요.
+_WIDTHS = x86_cf_emu._WIDTHS
+_BASES = x86_cf_emu._BASES
+_ALIASES = x86_cf_emu._ALIASES
 
 
 def _reg_info(name: str) -> Optional[Tuple[str, int, int]]:
-    n = name.strip().lower()
-    hit = _ALIASES.get(n)
-    if not hit:
-        return None
-    base, wid = hit
-    if n in ("ah", "bh", "ch", "dh"):
-        return base, 8, 8
-    return base, 0, wid
+    """이름 → (base, shift, width bits). `x86_cf_emu.reg_info` 와 단일 출처예요."""
+    return x86_cf_emu.reg_info(name)
 
 
 class _Regs:
@@ -249,30 +234,119 @@ def _c_to_lambda(dec: str, imap: Optional[Dict[str, str]] = None) -> Optional[st
     return expr
 
 
+_UNSIGNED_TY = re.compile(
+    r"\bunsigned\b|\bundefined\d*\b|\bu(char|short|int|long|int8_t|int16_t|int32_t|int64_t)\b")
+
+
+def _c_signedness(dec: str, var: str = "param_1") -> bool:
+    """디컴파일 C 에서 주 입력 변수의 부호를 유추해요. 판단 불가 시 **signed**(보수적).
+
+    보수적 기본값이 안전한 이유: 실제가 unsigned 인데 signed 로 가정하면 큰 입력에서
+    결과가 어긋나 차분게이트가 **정직하게 거부**해요(거짓 100% 기록 불가). 반대로
+    signed 를 unsigned 로 오해하면 오답을 통과시킬 수 있으니 그 방향은 절대 기본값
+    으로 쓰지 않아요.
+    """
+    # 변수 **바로 앞**의 타입 토큰 — `uint div8(uint param_1)` 에서 "uint" 만 집어요.
+    # 시그니처 앞부분(`uint div8(`)까지 탐욕으로 잡히면 오검출이므로 타입 단어만 허용.
+    ty = (r"([A-Za-z_]\w*(?:\s+(?:unsigned|signed|const|short|long|int|char))*"
+          r")\s+" + re.escape(var) + r"\b")
+    m = re.search(ty, dec)
+    if m:
+        return not bool(_UNSIGNED_TY.search(m.group(1)))
+    # 표현식 안의 캐스트 — `(uint)param_1 / 8`
+    m = re.search(r"\(\s*([A-Za-z_]\w*(?:\s+\w+)?)\s*\)\s*" + re.escape(var), dec)
+    if m:
+        return not bool(_UNSIGNED_TY.search(m.group(1)))
+    return True
+
+
+class _DivZero(ZeroDivisionError):
+    """C 의 0 나눔은 UB — **짐작하지 않고** 예외로 올려 차분게이트가 실패로 집계해요."""
+
+
 class _W:
-    """폭이 감긴 정수 — C 의 byte/word 산술을 그대로 재현해요."""
+    """폭이 감긴 정수 — C 의 byte/word 산술을 그대로 재현해요.
 
-    __slots__ = ("v", "w")
+    ⚠ 감사에서 발견한 결함(수정됨): 이 클래스에 `__mul__`·`__truediv__`·`__mod__` 가
+      **없어서**, 디컴파일 C 에 `*`·`/`·`%` 가 조금이라도 있으면 직선 경로 합성이
+      모든 벡터에서 `TypeError` → match 0.0% 로 **전부 거부**됐어요. gcc 는 2^n 상수를
+      `SHL`/`SHR`/`AND`(전부 `_OPS` 에 있음)로 컴파일하므로 `x*4`·`x/8`·`x%8` 같은
+      **아주 흔한** 함수들이 직선 경로에 진입만 하고 하나도 craft 되지 못했어요.
+      환각은 아니었지만(0% 는 정직 거부) 침묵의 도달범위 손실이었고, 이제 C truncation
+      semantics 로 채워요(부호는 `_c_signedness` 가 디컴파일 C 에서 유추).
+    """
 
-    def __init__(self, v: int, w: int) -> None:
+    __slots__ = ("v", "w", "s")
+
+    def __init__(self, v: int, w: int, signed: bool = True) -> None:
         self.w = w
+        self.s = bool(signed)
         self.v = int(v) & ((1 << w) - 1)
 
     def _o(self, o: Any) -> int:
+        """비트/덧셈/곱셈용 — 폭 안에서 wrap 하므로 부호와 무관하게 raw 값."""
         return o.v if isinstance(o, _W) else int(o)
 
-    def __xor__(self, o): return _W(self.v ^ self._o(o), self.w)
+    def _svof(self, o: Any) -> int:
+        """나눗셈/비교용 — `_W` 면 그 자신의 부호 규칙으로 확장, 아니면 정수 그대로."""
+        return o._sv() if isinstance(o, _W) else int(o)
+
+    def _sv(self) -> int:
+        """부호 확장된 값(C 연산의 실제 피연산자)."""
+        if not self.s:
+            return self.v
+        half = 1 << (self.w - 1)
+        return self.v - (1 << self.w) if self.v >= half else self.v
+
+    def _n(self, val: int) -> "_W":
+        return _W(val, self.w, self.s)
+
+    def _div(self, a: int, b: int, mod: bool) -> "_W":
+        if b == 0:
+            raise _DivZero("division by zero (C UB — 짐작하지 않음)")
+        if self.s:
+            q = abs(a) // abs(b)                     # C truncation toward zero
+            if (a < 0) != (b < 0):
+                q = -q
+            return self._n(a - q * b if mod else q)
+        ua, ub = a & ((1 << self.w) - 1), b & ((1 << self.w) - 1)
+        q = ua // ub
+        return self._n(ua - q * ub if mod else q)
+
+    def __xor__(self, o): return self._n(self.v ^ self._o(o))
     __rxor__ = __xor__
-    def __or__(self, o): return _W(self.v | self._o(o), self.w)
+    def __or__(self, o): return self._n(self.v | self._o(o))
     __ror__ = __or__
-    def __and__(self, o): return _W(self.v & self._o(o), self.w)
+    def __and__(self, o): return self._n(self.v & self._o(o))
     __rand__ = __and__
-    def __add__(self, o): return _W(self.v + self._o(o), self.w)
+    def __add__(self, o): return self._n(self.v + self._o(o))
     __radd__ = __add__
-    def __sub__(self, o): return _W(self.v - self._o(o), self.w)
-    def __rsub__(self, o): return _W(self._o(o) - self.v, self.w)
-    def __lshift__(self, n): return _W(self.v << int(n), self.w)
-    def __rshift__(self, n): return _W(self.v >> int(n), self.w)
+    def __sub__(self, o): return self._n(self.v - self._o(o))
+    def __rsub__(self, o): return self._n(self._o(o) - self.v)
+    def __mul__(self, o): return self._n(self._sv() * self._o(o))
+    __rmul__ = __mul__
+    def __lshift__(self, n): return self._n(self.v << int(n))
+    def __rshift__(self, n): return self._n(self.v >> int(n))
+    def __rlshift__(self, n): return self._n(int(n) << self.v)
+    def __rrshift__(self, n): return self._n(int(n) >> self.v)
+    def __truediv__(self, o): return self._div(self._sv(), self._svof(o), False)
+    def __rtruediv__(self, o): return self._div(self._svof(o), self._sv(), False)
+    __floordiv__ = __truediv__
+    __rfloordiv__ = __rtruediv__
+    def __mod__(self, o): return self._div(self._sv(), self._svof(o), True)
+    def __rmod__(self, o): return self._div(self._svof(o), self._sv(), True)
+    def __neg__(self): return self._n(-self._sv())
+    def __pos__(self): return self._n(self._sv())
+    def __invert__(self): return self._n(~self.v)
+    def __eq__(self, o): return self._sv() == self._svof(o)
+    def __ne__(self, o): return self._sv() != self._svof(o)
+    def __lt__(self, o): return self._sv() < self._svof(o)
+    def __le__(self, o): return self._sv() <= self._svof(o)
+    def __gt__(self, o): return self._sv() > self._svof(o)
+    def __ge__(self, o): return self._sv() >= self._svof(o)
+    def __bool__(self): return bool(self.v)
+    def __hash__(self): return hash((self.v, self.w, self.s))
+    def __repr__(self): return f"_W({self.v}, {self.w}, {'s' if self.s else 'u'})"
     def __int__(self): return self.v
     def __index__(self): return self.v
 
@@ -287,11 +361,17 @@ _HELPERS = {"bswap16": lambda v: (((int(v) & 0xFF) << 8) | ((int(v) >> 8) & 0xFF
             "CONCAT22": _concat22}
 
 
-def build_python(expr: str, width: int) -> Any:
+def build_python(expr: str, width: int, signed: bool = True) -> Any:
+    """직선경로 합성식을 실행 가능 함수로 만들어요.
+
+    `signed` 는 C 타입의 부호 — `/`·`%` 의 truncation 방향을 정해요. 디컴파일 C 에서
+    `_c_signedness` 가 유추하고, 유추 불가 시 True(보수적: 오답이면 차분이 거부).
+    """
     code = compile(expr, "<craft>", "eval")
 
     def fn(x: int) -> int:
-        val = eval(code, {"__builtins__": {}}, dict(_HELPERS, x=_W(x, width)))  # noqa: S307
+        val = eval(code, {"__builtins__": {}},                        # noqa: S307
+                   dict(_HELPERS, x=_W(x, width, signed)))
         return int(val)
     return fn
 
@@ -321,7 +401,7 @@ def input_width(insns: List[str]) -> int:
 #          build = c_synthesize (규칙 기반) [+ SLM 브리지 online 시 LLM 합성]
 # 두 경로 모두 **차분 검증**(oracle vs 합성, 100% 일치만 기록) 으로 환각을 차단해요.
 
-_MIN_CF_COMPARABLE = 32          # 제어흐름 함수: oracle 이 완주한 벡터 최소証拠
+_MIN_CF_COMPARABLE = 32          # 제어흐름 함수: oracle 이 완주한 벡터 최소 증거
 
 
 def synth_for(dec: str, insns: List[str], is_pe: bool,
@@ -329,7 +409,7 @@ def synth_for(dec: str, insns: List[str], is_pe: bool,
     """함수 하나에 대한 합성 시도. {"kind","src"[,"via"]} 또는 None(정직 skip).
 
     직선 스칼라로 표현되고 oracle 이 완주하면 경로1, 아니면 제어흐름 경로2.
-    경로2 는 규칙 기반 합성优先, 실패 시 SLM 브리지(online) 시도, dormant 면
+    경로2 는 규칙 기반 합성 우선, 실패 시 SLM 브리지(online) 시도, dormant 면
     규칙 기반이 grounded 폴백(SLM 은 코드 발명 거부).
     """
     imap = ident_map(insns, is_pe)
@@ -340,7 +420,15 @@ def synth_for(dec: str, insns: List[str], is_pe: bool,
         except Exception:  # noqa: BLE001
             uns0 = ["exc"]
         if not uns0:
-            return {"kind": "straight", "src": expr, "via": "rule"}
+            # 직선경로는 C 표현식을 **그대로** 실행하므로 `/`·`%`·`*` 의 부호 규칙이
+            # 결과에 영향을 줘요. 디컴파일 C 의 타입에서 유추해 함께 넘겨요.
+            xvars = [k for k, v in imap.items() if v == "x"]
+            signed = True
+            for vn in xvars or ["param_1"]:
+                if re.search(re.escape(vn) + r"\b", dec):
+                    signed = _c_signedness(dec, vn)
+                    break
+            return {"kind": "straight", "src": expr, "via": "rule", "signed": signed}
     src = c_synthesize.synthesize(dec, imap)
     via = "rule"
     if src is None and slm is not None:
@@ -360,7 +448,8 @@ def differential(insns: List[str], synth: Dict[str, str]) -> Dict[str, Any]:
     """oracle(원본 바이트 실행) vs 합성 함수 차분 검증 → 일치율/벡터/불일치."""
     kind = synth["kind"]
     if kind == "straight":
-        built = build_python(synth["src"], input_width(insns))
+        built = build_python(synth["src"], input_width(insns),
+                             bool(synth.get("signed", True)))
         _o0, owid, _u0 = emulate(insns, 0)
         mask = (1 << owid) - 1
         if owid <= 8:

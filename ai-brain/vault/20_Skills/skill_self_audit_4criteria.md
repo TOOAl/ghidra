@@ -114,8 +114,59 @@ created: ""
    `CWD` 는 gcc 가 단순 단일입력 함수에서 방출하지 않아 **네이티브 아닌 독립
    참조**로 증명(32비트 `CDQ;IDIV`/`DIV` 는 `vdiv`/`uvdiv` 네이티브 증명) ⑶ 합성기는
    부호 바꾸는 캐스트(`(int)uintVar`) 미모델링 → 그런 -O0 디컴파일(`vmod`)은 차분
-   ゲ이트 정직 거부 ⑷ 타입폭 LP64 기준, Windows LLP64(`long`=32) 미모델링(어긋나면
+   게이트 정직 거부 ⑷ 타입폭 LP64 기준, Windows LLP64(`long`=32) 미모델링(어긋나면
    게이트 거부).
+
+8. **✅ 전수 감사에서 발견·수정한 결함 7종 (v7.3.8, Stage N4 감사)** — "게이트가
+   그린이다"와 "결과물이 맞다"는 다르다는 것을 증명한 감사. **기존 게이트 6개가
+   전부 그린인 상태**에서 아래 결함을 찾았어요(=게이트가 못 잡던 구멍).
+   **🔴 ① 바이트 레지스터 오투영 — 침묵 오답 (최심각)**: `x86_cf_emu._ALIASES`
+   빌드가 `_i<8` 전부에 `_core[0]+"l"` 을 적용해 rsi/rdi/rbp/rsp 에서 `sl`/`dl`/
+   `bl`/`sl` 을 만들고, 이게 **rdx 의 `dl`·rbx 의 `bl` 을 덮어썼어요** → `dl`→rdi,
+   `bl`→rbp 로 오매핑 + `sil`/`dil`/`bpl`/`spl` 미파싱 + 허위 별칭 `sl`. 시연:
+   `MOV BL,0x41` 이 **프레임 포인터 RBP 를 오염**시켜 `[RBP-4]` 가 0 을 읽고도
+   `unsupported=[]` 였어요(정직 게이트가 못 잡음). 수정 = `_core+"l"`(→sil/dil/bpl/spl).
+   **+ 동일 결함이 `craft_engine._ALIASES` 에 복제돼 있었어요** — 표를 복제한 것이
+   같은 결함을 두 벌로 만들었고 직선경로 oracle 도 오염. 이제 `craft_engine` 은
+   `x86_cf_emu._ALIASES/_BASES/_WIDTHS` 를 **공유(단일 출처)**하고 `_reg_info` 는
+   `x86_cf_emu.reg_info` 로 위임 → 한쪽만 고쳐서 갈라지는 일이 구조적으로 불가.
+   **🔴 ② 절단된 명령 스트림의 침묵 완주 — 정직성 구멍**: `run()` 이 `while pc <
+   len(parsed)` 를 정상 소진하면 그대로 return → RET 없이 끝나도 `unsupported=[]`
+   였어요(idiv3 끝 3개 자르면 rax=0 을 **완주 결과로** 반환). 수정 = 최종 return
+   직전 `trunc:no-ret` append(step_cap·jtarget·bad 는 이미 append 후 break 라 중복
+   없음). RET 핸들러가 유일한 정상 종료 경로가 됐어요.
+   **🟠 ③ N3 픽스처 `classify` 가 잘려 있었음**: 구버전 캡(16 명령) 시절 산출물이라
+   `POP RBP` 에서 끝나 RET 가 없었어요 → ②수정 후 게이트가 이를 **정확히 노출**
+   (91개 입력 전부 uns, craft kind=—). 손으로 지어내지 않고 `SPECIMEN_C` 를
+   gcc -O0 재컴파일 + `objdump -d <classify>` 대조(주소 0x2e..0x55 명령·주소 완전
+   일치, `56: ret` 존재)로 근거를 확보한 뒤 `"00100056:\tRET"` 1개를 추가 →
+   6개 함수 전부 RET 종결, N3 게이트 29/29 회복.
+   **🟠 ④ 직선경로 `_W` 산술 누락 — 침묵의 도달범위 손실**: `_W` 에 `__mul__`·
+   `__truediv__`·`__mod__` 가 없어서 디컴파일 C 에 `*`·`/`·`%` 가 조금이라도 있으면
+   직선경로 합성이 **모든 벡터에서 TypeError → match 0.0%** 로 전량 거부됐어요.
+   gcc 는 2^n 상수를 `SHL`/`SHR`/`AND`(전부 `_OPS` 에 있음)로 컴파일하므로 `x*4`·
+   `x/8`·`x%8` 같은 **아주 흔한** 함수가 직선경로에 진입만 하고 하나도 craft 안 됐어요
+   (환각은 아니지만 정직한 손실). 수정 = C truncation semantics 로 산술 추가 +
+   `_c_signedness()` 가 디컴파일 C 타입에서 부호를 유추(`uint`→unsigned). **정직성
+   유지 증명**: 부호 오검출 시 차분이 49.61%/0.0% 로 거부(거짓 100% 불가), 0 나눔은
+   `_DivZero` 로 거부, 기존 비트연산 직선경로 회귀 없음.
+   **🟡 ⑤ 채집 캡의 침묵 잘림**: `ghidra_facts_pyghidra.py` 가 insn 을 64개,
+   디컴파일 C 를 **24줄**에서 잘랐어요(후자는 미발견 상태였음 — 큰 함수의 C 가
+   잘려 합성이 불완전). 수정 = 캡을 상수 `_INSN_CAP=64`/`_DEC_LINE_CAP=120` 으로
+   명시 + **데이터 스스로 잘림을 말하도록** `insns_complete`·`decompile_truncated`
+   플래그를 함수 레코드에 기록.
+   **🟡 ⑥ 문서 staleness·문자 오염**: `x86_cf_emu` 독스트링의 "지원 명령" 목록이
+   N4 확장(mul/div/idiv·cdq/cqo/cwd/cdqe/cwde/cbw·3-op imul)을 반영 안 했고,
+   한글 문서·코드 **5개 파일 16곳에 일본어 가나(`ゲイト`·`は`)가 혼입**돼 있었어요
+   (병합된 산출물). 전부 수정 + 재스캔으로 잔존 0 확인.
+   **🟡 ⑦ 테스트 커버리지 갭**: `test_n4_muldiv.py` 에 8/16비트 mul·div 케이스가
+   없었어요. ①②④⑤⑥⑦ 전부 회귀 테스트로 고정 → **51/51 → 82/82**.
+   **잔여(정직 고지)**: ⑴ ⑤의 gatherer 수정은 이 컨테이너에 Ghidra dist 가 없어
+   (`/tmp` 소실) **py_compile 검증만** 했고 live Ghidra end-to-end 재채집은
+   미실행 — 실제 채집 시 플래그 값 확인이 남았어요. ⑵ ③의 픽스처는 objdump 대조로
+   근거를 확보했지만 원본 Ghidra 출력 자체의 재현은 역시 dist 부재로 미실행.
+   ⑶ ①의 허위 별칭 `sl` 제거는 `sl` 을 쓰던 데이터가 없다는 전제(스캔으로 확인)에
+   기반해요. ⑷ `cmov`·`switch`·LLP64·부호 바꾸는 캐스트 는 계속 미해결(부채⑦ 잔여).
 
 ## 🔗 연결된 시냅스 (Wiki Links)
 - [[자가 치유 끈기 원장 — kill -9 를 견디는 퀘스트 기억 (quest_ledger)]]
